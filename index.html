@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lịch Sử Tiến Hóa Của Hải Thành (2007 - 2026)</title>
-  <meta name="description" content="Biên niên sử tiến hóa vượt bậc của sinh vật Hải Thành từ lúc còn là tân thủ Lv.02 ngây ngô đến chiến thần Lv.21 cày code xuyên màn đêm.">
+  <title>Thiên Mệnh Chi Thành</title>
+  <meta name="description" content="Thiên Mệnh Chi Thành — biên niên ký lưu giữ những cột mốc trưởng thành và ký ức của Hải Thành.">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=37">
-   <link rel="stylesheet" href="css/style.css?v=44">
+   <link rel="stylesheet" href="css/style.css?v=49">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;600&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet">
@@ -114,10 +114,13 @@
   <!-- STICKY TOP NAVIGATION BAR (Visible on scroll) -->
   <header id="sticky-header" class="sticky-nav">
     <div class="nav-container">
-      <a href="#hero" class="nav-brand">
-        <img src="images/2026/IMG_4295_Original.JPG" alt="Hải Thành" class="brand-logo-img">
-        <span class="brand-title">LỊCH SỬ TIẾN HÓA HẢI THÀNH</span>
-      </a>
+      <div class="nav-brand-row">
+        <a href="#hero" class="nav-brand">
+          <img src="images/2026/IMG_4295_Original.JPG" alt="Hải Thành" class="brand-logo-img">
+          <span class="brand-title">THIÊN MỆNH CHI THÀNH</span>
+        </a>
+        <button type="button" class="nav-btn nav-btn-auth" id="btn-header-auth" aria-haspopup="dialog" aria-controls="auth-modal">◈ Đăng nhập</button>
+      </div>
 
       <!-- Quick Chapter Dropdown / Nav -->
       <nav class="nav-chapters" id="nav-chapters-bar" aria-label="Điều hướng giai đoạn">
@@ -183,7 +186,7 @@
       <!-- Top Museum Badge -->
       <div class="hero-badge">
         <span class="badge-dot"></span>
-        <span class="badge-text">BIÊN NIÊN SỬ TIẾN HÓA HẢI THÀNH &bull; TỪ LV.02 ĐẾN LV.21</span>
+        <span class="badge-text">THIÊN MỆNH CHI THÀNH &bull; TỪ LV.02 ĐẾN LV.21</span>
       </div>
 
       <div class="hero-main-grid">
@@ -191,7 +194,7 @@
         <div class="hero-text-col">
           <div class="hero-title-row">
             <h1 class="hero-title" id="hero-title">
-              Lịch Sử <span class="text-gradient">Tiến Hóa Của Hải Thành</span>
+              Thiên Mệnh <span class="text-gradient">Chi Thành</span>
             </h1>
             <span class="hero-seal-stamp" aria-label="Tu Tiên Ký"><span>TU</span><span>TIÊN</span><span>KÝ</span></span>
           </div>
@@ -346,6 +349,11 @@
         <h3 class="lightbox-title" id="lightbox-title">Tiêu đề kỷ niệm</h3>
         <p class="lightbox-desc" id="lightbox-desc">Ghi chú kỷ niệm...</p>
         <div class="lightbox-time" id="lightbox-time">Thời gian</div>
+        <button type="button" class="memory-like-button lightbox-memory-like" id="lightbox-memory-like" aria-pressed="false">
+          <span class="memory-like-icon" aria-hidden="true">💠</span>
+          <span class="memory-like-label">Tặng Linh Thạch (<span class="memory-like-count">0</span>)</span>
+        </button>
+        <p class="memory-like-status" id="lightbox-memory-like-status" role="status" aria-live="polite"></p>
       </div>
 
       <!-- Thumbnails Strip (if multi-image) -->
@@ -430,6 +438,15 @@
         <p class="result-commentary" id="result-commentary">
           Bạn nhớ được hầu hết các cột mốc quan trọng trên hành trình lớn lên!
         </p>
+
+        <section class="game-leaderboard" aria-labelledby="leaderboard-title">
+          <h4 id="leaderboard-title">🏅 Top 5 Thiên Kiêu Bảng</h4>
+          <ol id="leaderboard-list" class="leaderboard-list">
+            <li>Đang triệu hồi bảng xếp hạng...</li>
+          </ol>
+          <p id="leaderboard-load-status" class="leaderboard-status" role="status" aria-live="polite"></p>
+          <p id="leaderboard-save-status" class="leaderboard-status" role="status" aria-live="polite"></p>
+        </section>
 
         <div class="result-actions">
           <button class="btn btn-primary" id="btn-game-replay">
@@ -818,7 +835,7 @@
                         <img src="images/2026/IMG_4295_Original.JPG" alt="Logo Hải Thành">
                       </div>
                       <div class="ticket-header-text">
-                        <div class="ticket-museum-brand">LỊCH SỬ TIẾN HÓA CỦA HẢI THÀNH</div>
+                        <div class="ticket-museum-brand">THIÊN MỆNH CHI THÀNH</div>
                         <div class="ticket-category-tag">VÉ THAM QUAN ĐẶC BIỆT &bull; SOUVENIR ADMISSION PASS</div>
                       </div>
                       <div class="ticket-vintage-stamp">
@@ -959,16 +976,96 @@
     </button>
   </aside>
 
+  <div id="auth-modal" class="admin-modal auth-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" hidden>
+    <div class="admin-modal-backdrop" id="auth-modal-backdrop"></div>
+    <section class="admin-modal-dialog">
+      <header class="admin-modal-header">
+        <div>
+          <span class="admin-modal-kicker">NGỌC BỘI ĐẠO HỮU</span>
+          <h2 id="auth-modal-title">Cổng Đạo Hữu</h2>
+        </div>
+        <button type="button" class="admin-modal-close" id="auth-modal-close" aria-label="Đóng cửa sổ tài khoản">✕</button>
+      </header>
+
+      <div class="admin-modal-content">
+        <div class="auth-tabs" id="auth-tabs" role="tablist" aria-label="Chọn đăng nhập hoặc đăng ký">
+          <button type="button" class="auth-tab active" id="auth-tab-login" role="tab" aria-selected="true" aria-controls="auth-login-form">Đăng nhập</button>
+          <button type="button" class="auth-tab" id="auth-tab-signup" role="tab" aria-selected="false" aria-controls="auth-signup-form">Đăng ký</button>
+        </div>
+        <form id="auth-login-form" class="admin-form auth-form" autocomplete="on">
+          <p class="admin-form-intro">Đăng nhập để khai mở các pháp bảo tương tác của bảo tàng.</p>
+          <label for="auth-login-email">Email</label>
+          <input id="auth-login-email" name="email" type="email" autocomplete="username" required>
+          <label for="auth-login-password">Mật khẩu</label>
+          <input id="auth-login-password" name="password" type="password" autocomplete="current-password" required>
+          <button type="submit" class="admin-primary-button">Đăng nhập</button>
+        </form>
+        <form id="auth-signup-form" class="admin-form auth-form" autocomplete="on" hidden>
+          <p class="admin-form-intro">Lập danh tính Đạo Hữu để cùng lưu giữ những mảnh ký ức.</p>
+          <label for="auth-signup-name">Tên hiển thị (không bắt buộc)</label>
+          <input id="auth-signup-name" name="display_name" type="text" maxlength="60" autocomplete="name">
+          <label for="auth-signup-email">Email</label>
+          <input id="auth-signup-email" name="email" type="email" autocomplete="email" required>
+          <label for="auth-signup-password">Mật khẩu (ít nhất 6 ký tự)</label>
+          <input id="auth-signup-password" name="password" type="password" autocomplete="new-password" required>
+          <button type="submit" class="admin-primary-button">Đăng ký Đạo Hữu</button>
+        </form>
+
+        <section id="auth-account-panel" hidden>
+          <div class="admin-dashboard-heading">
+            <p id="auth-user-label"></p>
+            <button type="button" id="auth-sign-out" class="admin-secondary-button">Đăng xuất</button>
+          </div>
+          <div id="auth-member-panel" class="auth-member-panel" hidden>
+            <span class="admin-modal-kicker">THẺ ĐẠO HỮU</span>
+            <p>Email đang đăng nhập: <strong id="auth-member-email"></strong></p>
+          </div>
+          <section id="admin-dashboard" hidden>
+            <h3 class="auth-admin-heading">Quản Trị Tiên Giới (Admin)</h3>
+            <form id="admin-memory-form" class="admin-form">
+              <h3>Thêm Kỷ Niệm Mới</h3>
+              <label for="admin-stage">Giai đoạn</label>
+              <select id="admin-stage" name="stage" required>
+                <option value="luc-nho">Tuổi thơ</option>
+                <option value="2021">2021</option>
+                <option value="2022">2022</option>
+                <option value="2023">2023</option>
+                <option value="2024">2024</option>
+                <option value="2025">2025</option>
+                <option value="2026">2026</option>
+              </select>
+              <label for="admin-memory-title">Tiêu đề</label>
+              <input id="admin-memory-title" name="title" type="text" maxlength="160" required>
+              <label for="admin-memory-time">Thời gian</label>
+              <input id="admin-memory-time" name="time" type="text" maxlength="100" required>
+              <label for="admin-memory-description">Mô tả chi tiết</label>
+              <textarea id="admin-memory-description" name="description" rows="4" maxlength="2000"></textarea>
+              <label for="admin-memory-image">Ảnh kỷ niệm</label>
+              <input id="admin-memory-image" name="image" type="file" accept="image/*" required>
+              <button type="submit" class="admin-primary-button">Nén ảnh &amp; khai ấn kỷ niệm</button>
+            </form>
+            <div class="admin-memory-manager">
+              <h3>Kỷ niệm động đã đăng</h3>
+              <div id="admin-memory-list" class="admin-memory-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <p id="auth-status" class="admin-status" role="status" aria-live="polite"></p>
+      </div>
+    </section>
+  </div>
+
   <!-- ======================================================== -->
   <!-- FOOTER                                                   -->
   <!-- ======================================================== -->
   <footer class="museum-footer">
     <div class="container footer-container">
       <div class="footer-brand">
-        <h3>Lịch Sử Tiến Hóa Của Hải Thành</h3>
+        <h3>Thiên Mệnh Chi Thành</h3>
       </div>
       <div class="footer-bottom">
-        <p>© 2007 - 2026 Lịch Sử Tiến Hóa Của Hải Thành. Tối ưu cho GitHub Pages &amp; Thiết bị di động.</p>
+        <p>© 2007 - 2026 Thiên Mệnh Chi Thành. Tối ưu cho GitHub Pages &amp; Thiết bị di động.</p>
         <a href="#hero" class="back-to-top">Lên đầu trang ↑</a>
       </div>
     </div>
@@ -982,7 +1079,8 @@
       document.write('<script src="js/html2canvas.min.js"><\/script>');
     }
   </script>
-   <script src="js/memories.js?v=44"></script>
-   <script src="js/app.js?v=44"></script>
+   <script src="js/memories.js?v=49"></script>
+   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+   <script src="js/app.js?v=49"></script>
 </body>
 </html>

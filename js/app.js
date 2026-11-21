@@ -1,10 +1,21 @@
 /**
- * LỊCH SỬ TIẾN HÓA CỦA HẢI THÀNH (2007 - 2026)
+ * THIÊN MỆNH CHI THÀNH (2007 - 2026)
  * Senior Frontend Core Application Script (Vanilla JavaScript)
  */
 
 (function () {
   'use strict';
+
+  const SUPABASE_URL = 'https://ruevfxnbpjhqxzaojpbz.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_QNd2mBQcvG4Ay3TXFscC-g_2tucdI69';
+  const ADMIN_EMAIL = 'phamnguyenhaithanh4@gmail.com';
+  const SITE_NAME = 'Thiên Mệnh Chi Thành';
+  const supabaseClient = window.supabase && typeof window.supabase.createClient === 'function'
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    : null;
+  let authenticatedUser = null;
+  let pendingAuthAction = null;
+  let activeAuthMode = 'login';
 
   // State Management
   const state = {
@@ -36,6 +47,8 @@
       currentIndex: 0,
       score: 0,
       streak: 0,
+      bestStreak: 0,
+      resultSaved: false,
       hasAnswered: false,
       lastCorrectLine: '',
       lastWrongLine: ''
@@ -58,6 +71,16 @@
     const m = Math.floor(seconds / 60);
     const s = Math.floor(seconds % 60);
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, character => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    })[character]);
   }
 
   function getCultivationLevelName(stage) {
@@ -85,6 +108,181 @@
       '2026': 'Mệnh cách Kiếm Tốc Lập Code – deploy thẳng, nhân phẩm thẳng hơn.'
     };
     return fates[stageId] || 'Mệnh cách Ấn Linh – chờ trời mở cánh cửa.';
+  }
+
+  function getStagePresentation(stage, index, total) {
+    const presentations = {
+      'luc-nho': 'Thuở Khai Linh • Luyện Khí Sơ Nhập',
+      '2021': 'Niên Hiệu 2021 • Trúc Cơ Độ Kiếp',
+      '2022': 'Niên Hiệu 2022 • Kết Đan Nhập Môn',
+      '2023': 'Niên Hiệu 2023 • Nguyên Anh Tu Hành',
+      '2024': 'Niên Hiệu 2024 • Hóa Thần Vượt Bão',
+      '2025': 'Niên Hiệu 2025 • Luyện Hư Ngộ Đạo',
+      '2026': 'Niên Hiệu 2026 • Hợp Thể Kiếm Tiền'
+    };
+    const stageNumber = String(index + 1).padStart(2, '0');
+    const totalStages = String(total).padStart(2, '0');
+    const isOrigin = stage.id === 'luc-nho' || stage.period === 'Tuổi thơ';
+    const eyebrow = isOrigin
+      ? `KIẾP NẠN THỨ ${stageNumber} / ${totalStages} • KHỞI NGUYÊN • THUỞ KHAI LINH`
+      : `KIẾP NẠN THỨ ${stageNumber} / ${totalStages} • NIÊN HIỆU ${stage.period}`;
+    return {
+      eyebrow,
+      title: presentations[stage.id] || stage.title
+    };
+  }
+
+  function getMemoryLikeId(stage, memory) {
+    return String(memory.dbId != null ? memory.dbId : `${stage.id}:${memory.id}`);
+  }
+
+  function memoryLikeButtonMarkup(stage, memory, extraClass = '') {
+    return `
+      <div class="memory-like-control">
+        <button type="button" class="memory-like-button ${extraClass}" data-memory-like-button
+          data-stage-id="${escapeHtml(stage.id)}" data-memory-id="${escapeHtml(memory.id)}" aria-pressed="false">
+          <span class="memory-like-icon" aria-hidden="true">💠</span>
+          <span class="memory-like-label">Tặng Linh Thạch (<span class="memory-like-count">0</span>)</span>
+        </button>
+        <span class="memory-like-status" role="status" aria-live="polite"></span>
+      </div>
+    `;
+  }
+
+  function getMemoryLikeStatusElement(button) {
+    if (button && button.id === 'lightbox-memory-like') {
+      return document.getElementById('lightbox-memory-like-status');
+    }
+    return button && button.closest('.memory-like-control')
+      ? button.closest('.memory-like-control').querySelector('.memory-like-status')
+      : null;
+  }
+
+  function setMemoryLikeStatus(button, message, isError = false) {
+    const status = getMemoryLikeStatusElement(button);
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle('is-error', isError);
+  }
+
+  function findMemoryForLikeButton(button) {
+    if (!state.data || !button) return null;
+    const stage = state.data.stages.find(item => item.id === button.dataset.stageId);
+    if (!stage) return null;
+    const memory = stage.memories.find(item => String(item.id) === button.dataset.memoryId);
+    return memory ? { stage, memory } : null;
+  }
+
+  async function refreshMemoryLikeButton(button, stage, memory) {
+    if (!button || !stage || !memory) return;
+    if (!supabaseClient) {
+      setMemoryLikeStatus(button, 'Linh mạch dữ liệu hiện chưa kết nối.', true);
+      return;
+    }
+
+    const memoryId = getMemoryLikeId(stage, memory);
+    try {
+      const countRequest = supabaseClient.from('memory_likes')
+        .select('*', { count: 'exact', head: true })
+        .eq('memory_id', memoryId);
+      const ownLikeRequest = authenticatedUser
+        ? supabaseClient.from('memory_likes')
+          .select('memory_id')
+          .eq('memory_id', memoryId)
+          .eq('user_id', authenticatedUser.id)
+          .maybeSingle()
+        : Promise.resolve({ data: null, error: null });
+      const [countResult, ownResult] = await Promise.all([countRequest, ownLikeRequest]);
+      if (countResult.error) throw countResult.error;
+      if (ownResult.error) throw ownResult.error;
+      if (button.dataset.memoryId !== String(memory.id)) return;
+
+      const count = Number(countResult.count) || 0;
+      const isLiked = Boolean(ownResult.data);
+      const countLabel = button.querySelector('.memory-like-count');
+      if (countLabel) countLabel.textContent = String(count);
+      button.classList.toggle('is-liked', isLiked);
+      button.setAttribute('aria-pressed', String(isLiked));
+      setMemoryLikeStatus(button, '');
+    } catch (error) {
+      console.error('Không thể tải số Linh Thạch:', error);
+      if (button.dataset.memoryId === String(memory.id)) {
+        setMemoryLikeStatus(button, 'Chưa thể tải Linh Thạch. Vui lòng thử lại.', true);
+      }
+    }
+  }
+
+  function refreshVisibleMemoryLikes(root = document) {
+    if (!root || typeof root.querySelectorAll !== 'function') return;
+    root.querySelectorAll('[data-memory-like-button]').forEach(button => {
+      if (button.closest('[hidden]')) return;
+      const found = findMemoryForLikeButton(button);
+      if (found) refreshMemoryLikeButton(button, found.stage, found.memory);
+    });
+  }
+
+  async function toggleMemoryLike(memory, stage, button) {
+    if (!supabaseClient || !authenticatedUser) {
+      setMemoryLikeStatus(button, 'Vui lòng đăng nhập để tặng Linh Thạch.', true);
+      return;
+    }
+    const memoryId = getMemoryLikeId(stage, memory);
+    button.disabled = true;
+    setMemoryLikeStatus(button, 'Đang truyền Linh Thạch…');
+    try {
+      const { data: existingLike, error: lookupError } = await supabaseClient.from('memory_likes')
+        .select('memory_id')
+        .eq('memory_id', memoryId)
+        .eq('user_id', authenticatedUser.id)
+        .maybeSingle();
+      if (lookupError) throw lookupError;
+
+      if (existingLike) {
+        const { error } = await supabaseClient.from('memory_likes')
+          .delete()
+          .eq('memory_id', memoryId)
+          .eq('user_id', authenticatedUser.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabaseClient.from('memory_likes')
+          .upsert(
+            { memory_id: memoryId, user_id: authenticatedUser.id },
+            { onConflict: 'memory_id,user_id' }
+          );
+        if (error) throw error;
+      }
+
+      await refreshMemoryLikeButton(button, stage, memory);
+      setMemoryLikeStatus(button, existingLike ? 'Đã thu hồi Linh Thạch.' : 'Linh Thạch đã được dâng lên!');
+    } catch (error) {
+      console.error('Không thể cập nhật Linh Thạch:', error);
+      setMemoryLikeStatus(button, 'Không thể cập nhật Linh Thạch. Vui lòng thử lại.', true);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function handleMemoryLikeClick(memory, stage, button) {
+    if (!authenticatedUser) {
+      const lightboxOpen = button.id === 'lightbox-memory-like' &&
+        document.getElementById('lightbox-modal')?.classList.contains('active');
+      const filmstripModal = document.getElementById('filmstrip-modal');
+      const filmstripOpen = lightboxOpen && filmstripModal && filmstripModal.classList.contains('active');
+      if (lightboxOpen) closeLightbox();
+      if (filmstripOpen) closeFilmstripModal();
+      const resumeAction = () => {
+        let targetButton = button;
+        if (lightboxOpen) {
+          if (filmstripOpen) openFilmstripModal(stage.id);
+          openLightbox(memory, 0, stage);
+          targetButton = document.getElementById('lightbox-memory-like');
+        }
+        toggleMemoryLike(memory, stage, targetButton);
+      };
+      requireAuth(resumeAction);
+      return;
+    }
+    toggleMemoryLike(memory, stage, button);
   }
 
   function applyStartTimeOnce(audio, startTime) {
@@ -161,7 +359,7 @@
         ...stage,
         mainStats: Array.isArray(stage.mainStats) ? stage.mainStats : [],
         subStats: Array.isArray(stage.subStats) ? stage.subStats : [],
-        memories: Array.isArray(stage.memories) ? stage.memories : [],
+        memories: Array.isArray(stage.memories) ? [...stage.memories] : [],
         themeSong: stage.themeSong || { title: 'Giai điệu hoài niệm', src: '', startTime: 0 }
       }));
 
@@ -178,9 +376,697 @@
       bindGlobalEvents();
       initModalNavbarSync();
       initUtilityPanels();
+      initAuthPortal();
+      void loadDynamicMemories();
     } catch (e) {
       console.error('Không thể khởi tạo trang:', e);
     }
+  }
+
+  function findStageForMemoryRow(row) {
+    const stageKey = String(row.stage || row.stage_id || '');
+    return state.data.stages.find(stage =>
+      stage.id === stageKey || stage.period === stageKey || stage.title === stageKey
+    );
+  }
+
+  function mapDynamicMemory(row) {
+    if (!row || row.id == null) return null;
+    const source = row.image_url || row.image || row.imageUrl || row.photo_url;
+    const imageList = Array.isArray(source) ? source : source ? [source] : [];
+    const images = imageList
+      .filter(image => typeof image === 'string' && /^https?:\/\//i.test(image))
+      .map(image => image.trim());
+
+    return {
+      id: `supabase-${String(row.id)}`,
+      dbId: row.id,
+      isDynamic: true,
+      title: String(row.title || 'Kỷ niệm mới'),
+      time: String(row.time || row.created_at || ''),
+      month: row.month == null || row.month === '' ? null : Number(row.month),
+      description: String(row.description || ''),
+      image: images,
+      tag: 'Kỷ niệm',
+      isHighlight: false
+    };
+  }
+
+  function getStageQuoteMemories(stage) {
+    return stage.memories.filter(memory =>
+      (!memory.image || memory.image.length === 0) || memory.tag === 'Tâm sự'
+    );
+  }
+
+  function bindStageQuoteToggle(toggle) {
+    const button = toggle.querySelector('.btn-toggle-stage-quotes');
+    if (!button) return;
+    button.addEventListener('click', () => {
+      const content = toggle.querySelector('.stage-quotes-content');
+      if (!content) return;
+      const willOpen = content.hidden;
+      content.hidden = !willOpen;
+      button.setAttribute('aria-expanded', String(willOpen));
+      const label = button.querySelector('.quote-toggle-text');
+      if (label) label.textContent = willOpen ? 'Thu Gọn Tâm Ma Bí Lục' : 'Khai Mở Tâm Ma Bí Lục';
+      button.setAttribute('aria-label', `${label ? label.textContent : 'Tâm Ma Bí Lục'} (${button.querySelector('.quotes-count')?.textContent || ''})`);
+      if (willOpen) refreshVisibleMemoryLikes(content);
+    });
+  }
+
+  function syncStageQuoteList(stage, section) {
+    const quotes = getStageQuoteMemories(stage);
+    let toggle = section.querySelector('.stage-quotes-toggle');
+    if (!quotes.length) {
+      if (toggle) toggle.remove();
+      return;
+    }
+
+    const wasExpanded = Boolean(toggle && toggle.querySelector('.stage-quotes-content') &&
+      !toggle.querySelector('.stage-quotes-content').hidden);
+    if (!toggle) {
+      toggle = document.createElement('div');
+      toggle.className = 'stage-quotes-toggle';
+      const archiveRow = section.querySelector('.stage-archive-row');
+      if (archiveRow) archiveRow.before(toggle);
+      else section.querySelector('.container')?.appendChild(toggle);
+    }
+
+    toggle.dataset.stageId = stage.id;
+    toggle.innerHTML = `
+      <button class="btn-toggle-stage-quotes" type="button" aria-expanded="${wasExpanded}" aria-controls="stage-quotes-${escapeHtml(stage.id)}">
+        <span class="quote-toggle-label">
+          <svg class="quote-scroll-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+            <path d="M8 5.5h15a3 3 0 0 1 3 3v15a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-15a3 3 0 0 1 3-3Z" fill="none" stroke="currentColor" stroke-width="1.6"/>
+            <path d="M9 10h12M9 14h12M9 18h9M9 22h7M5 8H3.5v16H5m21-16h2v16h-2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.35"/>
+            <path d="m22 4 2 2-2 2M10 27l-2 2-2-2" fill="none" stroke="#f8dfa0" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4"/>
+          </svg>
+          <span class="quote-toggle-text">${wasExpanded ? 'Thu Gọn Tâm Ma Bí Lục' : 'Khai Mở Tâm Ma Bí Lục'}</span>
+        </span>
+        <span class="quotes-count">${quotes.length} chương</span>
+      </button>
+      <div class="stage-quotes-content" id="stage-quotes-${escapeHtml(stage.id)}" ${wasExpanded ? '' : 'hidden'}>
+        ${quotes.map(memory => `
+          <article class="stage-quote-item">
+            <span class="stage-quote-time">${escapeHtml(memory.time || '')}</span>
+            <h4>${escapeHtml(memory.title || 'Tâm sự')}</h4>
+            <p>“${escapeHtml(memory.description || '')}”</p>
+            ${memoryLikeButtonMarkup(stage, memory, 'quote-memory-like')}
+          </article>
+        `).join('')}
+      </div>
+    `;
+    bindStageQuoteToggle(toggle);
+  }
+
+  function updateStageMemoryCounts() {
+    state.data.stages.forEach((stage, index) => {
+      const section = document.getElementById(`stage-${stage.id}`);
+      if (!section) return;
+      syncStageQuoteList(stage, section);
+      const presentation = getStagePresentation(stage, index, state.data.stages.length);
+      const indexTag = section.querySelector('.stage-index-tag');
+      const archiveLabel = section.querySelector('.btn-open-archive > span:last-child');
+      const count = stage.memories.length;
+      if (indexTag) {
+        indexTag.textContent = `${presentation.eyebrow} • ${count} MẢNH KÝ ỨC`;
+      }
+      if (archiveLabel) {
+        archiveLabel.textContent = `Khai Ấn Ngọc Giản: Ký Ức ${stage.period} (${count} mảnh tàn hồn)`;
+      }
+    });
+  }
+
+  function refreshOpenArchive(stage) {
+    const modal = document.getElementById('filmstrip-modal');
+    if (!modal || !modal.classList.contains('active') || state.currentStageForModal !== stage) return;
+    const subtitle = document.getElementById('modal-stage-subtitle');
+    if (subtitle) subtitle.textContent = `Kho lưu trữ gồm ${stage.memories.length} khoảnh khắc & tư liệu`;
+    buildModalMonthChips(stage);
+    renderFilmstripGrid(stage, state.currentModalMonth);
+  }
+
+  async function loadDynamicMemories() {
+    if (!supabaseClient || !state.data) return;
+
+    try {
+      const { data, error } = await supabaseClient
+        .from('memories')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (error || !Array.isArray(data)) return;
+
+      let changed = false;
+      data.forEach(row => {
+        const stage = findStageForMemoryRow(row);
+        const memory = mapDynamicMemory(row);
+        if (!stage || !memory || stage.memories.some(item => String(item.dbId) === String(row.id))) return;
+        stage.memories.push(memory);
+        changed = true;
+      });
+
+      if (changed) {
+        updateStageMemoryCounts();
+        if (state.currentStageForModal) refreshOpenArchive(state.currentStageForModal);
+        renderAdminMemoryList();
+      }
+    } catch (error) {
+      // Supabase data is optional; the bundled memories remain available offline.
+    }
+  }
+
+  function isAdminUser(user = authenticatedUser) {
+    return String(user && user.email || '').toLowerCase() === ADMIN_EMAIL;
+  }
+
+  function requireAuth(actionCallback) {
+    if (authenticatedUser) return true;
+    pendingAuthAction = typeof actionCallback === 'function' ? actionCallback : null;
+    activeAuthMode = 'login';
+    openAuthModal('Đạo hữu vui lòng Đăng nhập hoặc Đăng ký để khai mở pháp bảo này!');
+    return false;
+  }
+
+  function openAuthModal(message = '') {
+    const modal = document.getElementById('auth-modal');
+    if (!modal) return;
+    modal.hidden = false;
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    renderAuthState(authenticatedUser);
+    if (!authenticatedUser) setAuthMode(activeAuthMode);
+    setAdminStatus(message);
+  }
+
+  function closeAuthModal(clearPending = false) {
+    const modal = document.getElementById('auth-modal');
+    if (!modal) return;
+    if (clearPending) pendingAuthAction = null;
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+    modal.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  function setAuthMode(mode) {
+    if (authenticatedUser) return;
+    activeAuthMode = mode === 'signup' ? 'signup' : 'login';
+    setAdminStatus('');
+    const loginForm = document.getElementById('auth-login-form');
+    const signupForm = document.getElementById('auth-signup-form');
+    const loginTab = document.getElementById('auth-tab-login');
+    const signupTab = document.getElementById('auth-tab-signup');
+    if (!loginForm || !signupForm) return;
+
+    loginForm.hidden = activeAuthMode !== 'login';
+    signupForm.hidden = activeAuthMode !== 'signup';
+    if (loginTab) {
+      loginTab.classList.toggle('active', activeAuthMode === 'login');
+      loginTab.setAttribute('aria-selected', String(activeAuthMode === 'login'));
+    }
+    if (signupTab) {
+      signupTab.classList.toggle('active', activeAuthMode === 'signup');
+      signupTab.setAttribute('aria-selected', String(activeAuthMode === 'signup'));
+    }
+    const visibleForm = activeAuthMode === 'login' ? loginForm : signupForm;
+    visibleForm.classList.remove('auth-form-enter');
+    void visibleForm.offsetWidth;
+    visibleForm.classList.add('auth-form-enter');
+  }
+
+  function renderAuthState(user) {
+    const headerButton = document.getElementById('btn-header-auth');
+    const tabs = document.getElementById('auth-tabs');
+    const loginForm = document.getElementById('auth-login-form');
+    const signupForm = document.getElementById('auth-signup-form');
+    const accountPanel = document.getElementById('auth-account-panel');
+    const memberPanel = document.getElementById('auth-member-panel');
+    const adminPanel = document.getElementById('admin-dashboard');
+    const userLabel = document.getElementById('auth-user-label');
+    const memberEmail = document.getElementById('auth-member-email');
+    const email = String(user && user.email || '');
+    const admin = isAdminUser(user);
+    const displayName = user && user.user_metadata &&
+      (user.user_metadata.display_name || user.user_metadata.full_name);
+    const headerLabel = !user
+      ? '◈ Đăng nhập'
+      : admin
+        ? '◈ Admin'
+        : `◈ ${displayName || email.split('@')[0] || 'Đạo Hữu'}`;
+
+    if (headerButton) {
+      headerButton.textContent = headerLabel;
+      headerButton.title = user ? email : 'Đăng nhập hoặc đăng ký';
+      headerButton.classList.toggle('is-admin', admin);
+      headerButton.classList.toggle('is-member', Boolean(user) && !admin);
+    }
+
+    if (!tabs || !loginForm || !signupForm || !accountPanel) return;
+    accountPanel.hidden = !user;
+    tabs.hidden = Boolean(user);
+    loginForm.hidden = Boolean(user) || activeAuthMode !== 'login';
+    signupForm.hidden = Boolean(user) || activeAuthMode !== 'signup';
+    if (memberPanel) memberPanel.hidden = !user || admin;
+    if (adminPanel) adminPanel.hidden = !user || !admin;
+    if (userLabel) userLabel.textContent = user ? `Đang đăng nhập: ${email}` : '';
+    if (memberEmail) memberEmail.textContent = email;
+
+    if (user) {
+      fillAuthenticatedForms(user);
+      if (admin) renderAdminMemoryList();
+    }
+  }
+
+  function fillAuthenticatedForms(user) {
+    const email = String(user.email || '');
+    const userName = String(
+      user.user_metadata && (user.user_metadata.display_name || user.user_metadata.full_name) ||
+      email.split('@')[0] ||
+      'Đạo Hữu'
+    ).trim();
+    const fields = [
+      document.getElementById('ticket-visitor-name'),
+      document.getElementById('capsule-sender')
+    ];
+    fields.forEach(field => {
+      if (!field) return;
+      const currentValue = field.value.trim();
+      const lastPrefill = field.dataset.authPrefillValue || '';
+      if (!currentValue || currentValue === lastPrefill) {
+        field.value = userName;
+        field.dataset.authPrefillValue = userName;
+        field.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+
+    const ticketName = document.getElementById('ticket-visitor-name');
+    const ticketDisplay = document.getElementById('ticket-disp-visitor');
+    const ticketStub = document.getElementById('ticket-disp-stub-visitor');
+    if (ticketName && ticketDisplay && ticketName.value.trim() === userName) {
+      ticketDisplay.textContent = userName;
+      if (ticketStub) ticketStub.textContent = userName.length > 14
+        ? `${userName.substring(0, 14)}...`
+        : userName;
+    }
+  }
+
+  function setAuthenticatedUser(user) {
+    const wasAuthenticated = Boolean(authenticatedUser);
+    authenticatedUser = user || null;
+    renderAuthState(authenticatedUser);
+    refreshVisibleMemoryLikes();
+
+    if (authenticatedUser && pendingAuthAction) {
+      const action = pendingAuthAction;
+      pendingAuthAction = null;
+      closeAuthModal();
+      action();
+    } else if (!authenticatedUser && wasAuthenticated) {
+      pendingAuthAction = null;
+      closeProtectedFeatures();
+    }
+  }
+
+  function closeProtectedFeatures() {
+    ['time-capsule', 'ticket-station'].forEach(id => {
+      const section = document.getElementById(id);
+      if (section) {
+        section.hidden = true;
+        section.classList.remove('open');
+      }
+      document.querySelectorAll(`[data-utility-target="${id}"]`).forEach(button => {
+        button.setAttribute('aria-expanded', 'false');
+      });
+    });
+    const gameModal = document.getElementById('game-modal');
+    if (gameModal && gameModal.classList.contains('active')) closeGameModal();
+  }
+
+  function setAdminStatus(message, isError = false) {
+    const status = document.getElementById('auth-status');
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle('is-error', isError);
+  }
+
+  function authErrorMessage(error, mode) {
+    const message = String(error && error.message || '');
+    const normalized = message.toLowerCase();
+    if (/invalid login credentials|invalid credentials|email or password/.test(normalized)) {
+      return 'Email hoặc mật khẩu không chính xác.';
+    }
+    if (/already registered|already exists|user already|email.*taken/.test(normalized)) {
+      return 'Email này đã được đăng ký. Đạo hữu hãy đăng nhập nhé.';
+    }
+    if (/email not confirmed|email.*confirm/.test(normalized)) {
+      return 'Email chưa được xác nhận. Vui lòng kiểm tra hộp thư trước khi đăng nhập.';
+    }
+    if (/password/.test(normalized) && /at least|minimum|short|weak|6 characters/.test(normalized)) {
+      return 'Mật khẩu cần có ít nhất 6 ký tự.';
+    }
+    return `Không thể ${mode === 'signup' ? 'đăng ký' : 'đăng nhập'}: ${message || 'Đã xảy ra lỗi.'}`;
+  }
+
+  function initAuthPortal() {
+    const modal = document.getElementById('auth-modal');
+    const headerButton = document.getElementById('btn-header-auth');
+    const loginForm = document.getElementById('auth-login-form');
+    const signupForm = document.getElementById('auth-signup-form');
+    const memoryForm = document.getElementById('admin-memory-form');
+    if (!modal || !loginForm || !signupForm || !memoryForm) return;
+
+    renderAuthState(authenticatedUser);
+    if (headerButton) headerButton.addEventListener('click', () => openAuthModal());
+
+    const closeButton = document.getElementById('auth-modal-close');
+    const backdrop = document.getElementById('auth-modal-backdrop');
+    if (closeButton) closeButton.addEventListener('click', () => closeAuthModal(true));
+    if (backdrop) backdrop.addEventListener('click', () => closeAuthModal(true));
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && modal.classList.contains('active')) closeAuthModal(true);
+    });
+
+    const loginTab = document.getElementById('auth-tab-login');
+    const signupTab = document.getElementById('auth-tab-signup');
+    if (loginTab) loginTab.addEventListener('click', () => setAuthMode('login'));
+    if (signupTab) signupTab.addEventListener('click', () => setAuthMode('signup'));
+
+    loginForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!supabaseClient) {
+        setAdminStatus('Dịch vụ tài khoản chưa sẵn sàng. Vui lòng kiểm tra kết nối mạng.', true);
+        return;
+      }
+
+      const submitButton = loginForm.querySelector('button[type="submit"]');
+      if (submitButton) submitButton.disabled = true;
+      setAdminStatus('Đang xác thực Đạo Hữu…');
+      try {
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+          email: document.getElementById('auth-login-email').value.trim(),
+          password: document.getElementById('auth-login-password').value
+        });
+        if (error) throw error;
+        setAuthenticatedUser(data.session && data.session.user);
+        loginForm.reset();
+        setAdminStatus('Đăng nhập thành công.');
+      } catch (error) {
+        setAdminStatus(authErrorMessage(error, 'login'), true);
+      } finally {
+        if (submitButton) submitButton.disabled = false;
+      }
+    });
+
+    signupForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!supabaseClient) {
+        setAdminStatus('Dịch vụ tài khoản chưa sẵn sàng. Vui lòng kiểm tra kết nối mạng.', true);
+        return;
+      }
+
+      const name = document.getElementById('auth-signup-name').value.trim();
+      const email = document.getElementById('auth-signup-email').value.trim();
+      const password = document.getElementById('auth-signup-password').value;
+      if (password.length < 6) {
+        setAdminStatus('Mật khẩu cần có ít nhất 6 ký tự.', true);
+        return;
+      }
+
+      const submitButton = signupForm.querySelector('button[type="submit"]');
+      if (submitButton) submitButton.disabled = true;
+      setAdminStatus('Đang lập danh tính Đạo Hữu…');
+      try {
+        const options = name ? { data: { display_name: name } } : {};
+        const { data, error } = await supabaseClient.auth.signUp({ email, password, options });
+        if (error) throw error;
+        signupForm.reset();
+        if (data.session && data.session.user) {
+          setAuthenticatedUser(data.session.user);
+          setAdminStatus('Đăng ký thành công.');
+        } else {
+          document.getElementById('auth-login-email').value = email;
+          setAuthMode('login');
+          setAdminStatus('Đăng ký thành công. Vui lòng xác nhận email để hoàn tất rồi đăng nhập.');
+        }
+      } catch (error) {
+        setAdminStatus(authErrorMessage(error, 'signup'), true);
+      } finally {
+        if (submitButton) submitButton.disabled = false;
+      }
+    });
+
+    const signOutButton = document.getElementById('auth-sign-out');
+    if (signOutButton) {
+      signOutButton.addEventListener('click', async () => {
+        if (!supabaseClient) return;
+        signOutButton.disabled = true;
+        try {
+          const { error } = await supabaseClient.auth.signOut();
+          if (error) throw error;
+          setAuthenticatedUser(null);
+          activeAuthMode = 'login';
+          renderAuthState(null);
+          setAuthMode('login');
+          setAdminStatus('Đã đăng xuất.');
+        } catch (error) {
+          setAdminStatus(`Không thể đăng xuất: ${error.message || 'Lỗi kết nối.'}`, true);
+        } finally {
+          signOutButton.disabled = false;
+        }
+      });
+    }
+
+    if (supabaseClient) {
+      supabaseClient.auth.onAuthStateChange((_event, session) => {
+        setAuthenticatedUser(session && session.user);
+      });
+      supabaseClient.auth.getSession()
+        .then(({ data, error }) => {
+          if (error) throw error;
+          setAuthenticatedUser(data.session && data.session.user);
+        })
+        .catch(error => {
+          console.warn('Không thể tải phiên Đạo Hữu:', error);
+          if (modal.classList.contains('active')) {
+            setAdminStatus(`Không thể kiểm tra phiên đăng nhập: ${error.message || 'Lỗi kết nối.'}`, true);
+          }
+        });
+    }
+
+    memoryForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!isAdminUser()) {
+        setAdminStatus('Chỉ chủ bảo tàng mới được đăng kỷ niệm.', true);
+        return;
+      }
+      if (!supabaseClient) {
+        setAdminStatus('Chưa thể kết nối dịch vụ lưu trữ. Vui lòng thử lại khi có mạng.', true);
+        return;
+      }
+
+      const stageId = document.getElementById('admin-stage').value;
+      const title = document.getElementById('admin-memory-title').value.trim();
+      const time = document.getElementById('admin-memory-time').value.trim();
+      const description = document.getElementById('admin-memory-description').value.trim();
+      const fileInput = document.getElementById('admin-memory-image');
+      const file = fileInput.files && fileInput.files[0];
+      const submitButton = memoryForm.querySelector('button[type="submit"]');
+      if (!file || !file.type.startsWith('image/')) {
+        setAdminStatus('Vui lòng chọn một tệp ảnh hợp lệ.', true);
+        return;
+      }
+
+      if (submitButton) submitButton.disabled = true;
+      setAdminStatus('Đang nén ảnh và khai ấn kỷ niệm…');
+      let uploadedPath = '';
+      let recordInserted = false;
+      try {
+        const compressedImage = await compressImage(file);
+        const filePath = `${stageId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
+        const { data: uploaded, error: uploadError } = await supabaseClient.storage
+          .from('museum-images')
+          .upload(filePath, compressedImage, { contentType: 'image/jpeg', upsert: false });
+        if (uploadError) throw uploadError;
+        uploadedPath = uploaded.path;
+
+        const { data: publicData } = supabaseClient.storage.from('museum-images').getPublicUrl(uploadedPath);
+        if (!publicData || !publicData.publicUrl) throw new Error('Không lấy được đường dẫn ảnh công khai.');
+
+        const row = await insertDynamicMemory({
+          stage: stageId,
+          title,
+          time,
+          description
+        }, publicData.publicUrl);
+        recordInserted = true;
+        const stage = state.data.stages.find(item => item.id === stageId);
+        const memory = mapDynamicMemory(row);
+        if (!stage || !memory) throw new Error('Bản ghi đã lưu nhưng thiếu giai đoạn hoặc mã kỷ niệm hợp lệ.');
+
+        stage.memories.push(memory);
+        updateStageMemoryCounts();
+        renderAdminMemoryList();
+        refreshOpenArchive(stage);
+        memoryForm.reset();
+        setAdminStatus('Đã đăng kỷ niệm mới thành công.');
+      } catch (error) {
+        let cleanupMessage = '';
+        if (uploadedPath && !recordInserted) {
+          try {
+            const { error: cleanupError } = await supabaseClient.storage
+              .from('museum-images')
+              .remove([uploadedPath]);
+            if (cleanupError) cleanupMessage = ' Không thể xóa ảnh đã tải lên dở dang.';
+          } catch (cleanupError) {
+            cleanupMessage = ' Không thể xóa ảnh đã tải lên dở dang.';
+          }
+        }
+        setAdminStatus(`Không thể đăng kỷ niệm: ${error.message || 'Lỗi lưu trữ.'}${cleanupMessage}`, true);
+      } finally {
+        if (submitButton) submitButton.disabled = false;
+      }
+    });
+
+    if (new URLSearchParams(window.location.search).get('admin') === '1') {
+      openAuthModal();
+    }
+  }
+
+  function renderAdminMemoryList() {
+    const list = document.getElementById('admin-memory-list');
+    if (!list || !state.data) return;
+    list.replaceChildren();
+    const memories = state.data.stages.flatMap(stage =>
+      stage.memories
+        .filter(memory => memory.isDynamic)
+        .map(memory => ({ stage, memory }))
+    );
+    if (!memories.length) {
+      const empty = document.createElement('p');
+      empty.className = 'admin-memory-empty';
+      empty.textContent = 'Chưa có kỷ niệm động nào.';
+      list.appendChild(empty);
+      return;
+    }
+
+    memories.forEach(({ stage, memory }) => {
+      const item = document.createElement('div');
+      item.className = 'admin-memory-item';
+      const label = document.createElement('span');
+      label.textContent = `${stage.period} · ${memory.title}`;
+      const removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.className = 'admin-delete-button';
+      removeButton.textContent = 'Xóa';
+      removeButton.disabled = memory.dbId == null;
+      removeButton.addEventListener('click', () => deleteDynamicMemory(stage, memory, removeButton));
+      item.append(label, removeButton);
+      list.appendChild(item);
+    });
+  }
+
+  async function deleteDynamicMemory(stage, memory, button) {
+    if (!isAdminUser() || !supabaseClient || memory.dbId == null) {
+      setAdminStatus('Chỉ chủ bảo tàng mới được xóa kỷ niệm.', true);
+      return;
+    }
+    if (!window.confirm(`Xóa kỷ niệm “${memory.title}”?`)) return;
+    button.disabled = true;
+    setAdminStatus('Đang xóa kỷ niệm…');
+
+    try {
+      const { error } = await supabaseClient.from('memories').delete().eq('id', memory.dbId);
+      if (error) throw error;
+      stage.memories = stage.memories.filter(item => item !== memory);
+      updateStageMemoryCounts();
+      renderAdminMemoryList();
+      refreshOpenArchive(stage);
+
+      const imagePath = getMuseumImagePath(memory.image[0]);
+      if (imagePath) {
+        try {
+          const { error: storageError } = await supabaseClient.storage.from('museum-images').remove([imagePath]);
+          if (storageError) {
+            setAdminStatus(`Đã xóa bản ghi nhưng chưa dọn được ảnh: ${storageError.message}`, true);
+            return;
+          }
+        } catch (storageError) {
+          setAdminStatus(`Đã xóa bản ghi nhưng chưa dọn được ảnh: ${storageError.message || 'Lỗi kết nối.'}`, true);
+          return;
+        }
+      }
+      setAdminStatus('Đã xóa kỷ niệm.');
+    } catch (error) {
+      button.disabled = false;
+      setAdminStatus(`Không thể xóa kỷ niệm: ${error.message || 'Lỗi kết nối.'}`, true);
+    }
+  }
+
+  function getMuseumImagePath(imageUrl) {
+    if (typeof imageUrl !== 'string') return '';
+    try {
+      const pathname = new URL(imageUrl).pathname;
+      const marker = '/storage/v1/object/public/museum-images/';
+      const index = pathname.indexOf(marker);
+      return index < 0 ? '' : decodeURIComponent(pathname.slice(index + marker.length));
+    } catch (error) {
+      return '';
+    }
+  }
+
+  async function insertDynamicMemory(fields, publicUrl) {
+    const baseRecord = { ...fields };
+    let result = await supabaseClient
+      .from('memories')
+      .insert({ ...baseRecord, image_url: publicUrl })
+      .select()
+      .single();
+
+    if (result.error && isMissingDatabaseColumn(result.error, 'image_url')) {
+      result = await supabaseClient
+        .from('memories')
+        .insert({ ...baseRecord, image: publicUrl })
+        .select()
+        .single();
+    }
+    if (result.error) throw result.error;
+    return result.data;
+  }
+
+  function isMissingDatabaseColumn(error, column) {
+    const message = `${error.message || ''} ${error.details || ''}`.toLowerCase();
+    return message.includes(column) && /column|schema cache|does not exist|not found/.test(message);
+  }
+
+  function compressImage(file) {
+    return new Promise((resolve, reject) => {
+      const objectUrl = URL.createObjectURL(file);
+      const image = new Image();
+      image.onload = () => {
+        const scale = Math.min(1, 1200 / image.naturalWidth);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        const context = canvas.getContext('2d');
+        if (!context) {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('Trình duyệt không hỗ trợ nén ảnh.'));
+          return;
+        }
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => {
+          URL.revokeObjectURL(objectUrl);
+          if (blob) resolve(blob);
+          else reject(new Error('Không thể chuyển ảnh sang JPEG.'));
+        }, 'image/jpeg', 0.8);
+      };
+      image.onerror = () => {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error('Không thể đọc ảnh đã chọn.'));
+      };
+      image.src = objectUrl;
+    });
   }
 
   function initCultivationBackground() {
@@ -463,11 +1349,8 @@
     const heroTitle = document.getElementById('hero-title');
     const heroIntro = document.getElementById('hero-intro');
     if (heroTitle) {
-      if (String(siteInfo.title || '').includes('Lịch Sử Tiến Hóa')) {
-        heroTitle.innerHTML = `Lịch Sử <span class="text-gradient">${String(siteInfo.title).replace('Lịch Sử ', '')}</span>`;
-      } else {
-        heroTitle.innerHTML = `Bảo Tàng <span class="text-gradient">${String(siteInfo.title || '').replace('Bảo Tàng ', '')}</span>`;
-      }
+      const [firstWord, ...remainingWords] = SITE_NAME.split(' ');
+      heroTitle.innerHTML = `${firstWord} <span class="text-gradient">${remainingWords.join(' ')}</span>`;
     }
     if (heroIntro) heroIntro.textContent = siteInfo.intro || '';
 
@@ -585,15 +1468,14 @@
       section.className = 'stage-section';
       section.id = `stage-${stage.id}`;
 
-      const stageNumber = (index + 1).toString().padStart(2, '0');
-      const totalStages = state.data.stages.length.toString().padStart(2, '0');
+      const presentation = getStagePresentation(stage, index, state.data.stages.length);
 
       // Top Header Block
       let html = `
         <div class="container">
           <div class="stage-header-block">
-            <span class="stage-index-tag">GIAI ĐOẠN ${stageNumber} / ${totalStages} &bull; ${stage.period}</span>
-            <h2 class="stage-main-title">${stage.title}</h2>
+            <span class="stage-index-tag stage-eyebrow">${escapeHtml(presentation.eyebrow)}</span>
+            <h2 class="stage-main-title stage-title">${escapeHtml(presentation.title)}</h2>
           </div>
 
           <!-- Stage RPG & Music Top Row -->
@@ -727,15 +1609,23 @@
             return `
           <div class="stage-quotes-toggle" data-stage-id="${stage.id}">
             <button class="btn-toggle-stage-quotes" type="button" aria-expanded="false" aria-controls="stage-quotes-${stage.id}">
-              <span>✍️ Xem tâm sự</span>
-              <span class="quotes-count">${quotes.length} bài</span>
+              <span class="quote-toggle-label">
+                <svg class="quote-scroll-icon" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+                  <path d="M8 5.5h15a3 3 0 0 1 3 3v15a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3v-15a3 3 0 0 1 3-3Z" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                  <path d="M9 10h12M9 14h12M9 18h9M9 22h7M5 8H3.5v16H5m21-16h2v16h-2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.35"/>
+                  <path d="m22 4 2 2-2 2M10 27l-2 2-2-2" fill="none" stroke="#f8dfa0" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.4"/>
+                </svg>
+                <span class="quote-toggle-text">Khai Mở Tâm Ma Bí Lục</span>
+              </span>
+              <span class="quotes-count">${quotes.length} chương</span>
             </button>
             <div class="stage-quotes-content" id="stage-quotes-${stage.id}" hidden>
               ${quotes.map(q => `
                 <article class="stage-quote-item">
-                  <span class="stage-quote-time">${q.time || ''}</span>
-                  <h4>${q.title || 'Tâm sự'}</h4>
-                  <p>“${q.description || ''}”</p>
+                  <span class="stage-quote-time">${escapeHtml(q.time || '')}</span>
+                  <h4>${escapeHtml(q.title || 'Tâm sự')}</h4>
+                  <p>“${escapeHtml(q.description || '')}”</p>
+                  ${memoryLikeButtonMarkup(stage, q, 'quote-memory-like')}
                 </article>
               `).join('')}
             </div>
@@ -770,18 +1660,7 @@
     attachMemoryCardEvents();
     attachArchiveButtons();
 
-    document.querySelectorAll('.btn-toggle-stage-quotes').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const contentId = btn.getAttribute('aria-controls');
-        const content = document.getElementById(contentId);
-        if (!content) return;
-        const willOpen = content.hidden;
-        content.hidden = !willOpen;
-        btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-        const label = btn.querySelector(':scope > span:first-child');
-        if (label) label.textContent = willOpen ? '✍️ Thu gọn tâm sự' : '✍️ Xem tâm sự';
-      });
-    });
+    document.querySelectorAll('.stage-quotes-toggle').forEach(bindStageQuoteToggle);
     } catch (e) {
       console.error('Lỗi render 7 giai đoạn:', e);
     }
@@ -794,18 +1673,24 @@
     const imgList = mem.image || [];
     const hasImages = imgList.length > 0;
     const isMultiImage = imgList.length >= 2;
+    const memoryId = escapeHtml(mem.id);
+    const memoryTitle = escapeHtml(mem.title);
+    const memoryTime = escapeHtml(mem.time);
+    const memoryDescription = escapeHtml(mem.description);
+    const memoryTag = escapeHtml(mem.tag || 'Kỷ niệm');
+    const focalStyle = mem.focalPoint ? `style="object-position: ${escapeHtml(mem.focalPoint)};"` : '';
 
     // Type 1: Quote Card (No image -> Warm Paper Journal Card)
     if (!hasImages) {
       return `
-        <div class="memory-card card-quote" data-type="quote" data-id="${mem.id}">
+        <div class="memory-card card-quote" data-type="quote" data-id="${memoryId}">
           <div>
             <div class="quote-top-row">
-              <span class="quote-tag">${mem.tag || 'Tâm sự'}</span>
-              <span class="quote-time">${mem.time}</span>
+              <span class="quote-tag">${escapeHtml(mem.tag || 'Tâm sự')}</span>
+              <span class="quote-time">${memoryTime}</span>
             </div>
-            <h4 class="quote-heading">${mem.title}</h4>
-            <p class="quote-content">"${mem.description}"</p>
+            <h4 class="quote-heading">${memoryTitle}</h4>
+            <p class="quote-content">"${memoryDescription}"</p>
           </div>
           <div class="quote-footer">
             <span class="quote-author">Trang nhật ký</span>
@@ -818,48 +1703,46 @@
     // Type 2: Photo Stack Card (2 or more images)
     if (isMultiImage) {
       const extraCount = imgList.length - 1;
-      const focalStyle = mem.focalPoint ? `style="object-position: ${mem.focalPoint};"` : '';
       return `
-        <div class="memory-card card-stack" data-type="photo" data-id="${mem.id}">
-          <div class="stack-wrapper" data-memory-id="${mem.id}">
+        <div class="memory-card card-stack" data-type="photo" data-id="${memoryId}">
+          <div class="stack-wrapper" data-memory-id="${memoryId}">
             <div class="stack-badge">+${extraCount} ảnh</div>
-            <span class="card-tag-badge">${mem.tag || 'Kỷ niệm'}</span>
+            <span class="card-tag-badge">${memoryTag}</span>
 
             <!-- Stack Layers -->
             <div class="stack-layer stack-layer-1">
-              <img src="${imgList[1]}" alt="${mem.title}" loading="lazy" ${focalStyle}>
+              <img src="${escapeHtml(imgList[1])}" alt="${memoryTitle}" loading="lazy" ${focalStyle}>
             </div>
             ${imgList.length > 2 ? `
               <div class="stack-layer stack-layer-2">
-                <img src="${imgList[2]}" alt="${mem.title}" loading="lazy" ${focalStyle}>
+                <img src="${escapeHtml(imgList[2])}" alt="${memoryTitle}" loading="lazy" ${focalStyle}>
               </div>
             ` : ''}
             <div class="stack-layer stack-layer-main">
-              <img src="${imgList[0]}" alt="${mem.title}" loading="lazy" ${focalStyle}>
+              <img src="${escapeHtml(imgList[0])}" alt="${memoryTitle}" loading="lazy" ${focalStyle}>
             </div>
           </div>
 
           <div class="card-body-content">
-            <div class="card-time-text">${mem.time}</div>
-            <h4 class="card-heading">${mem.title}</h4>
-            <p class="card-note-text">${mem.description || 'Bộ ảnh kỷ niệm đặc biệt.'}</p>
+            <div class="card-time-text">${memoryTime}</div>
+            <h4 class="card-heading">${memoryTitle}</h4>
+            <p class="card-note-text">${memoryDescription || 'Bộ ảnh kỷ niệm đặc biệt.'}</p>
           </div>
         </div>
       `;
     }
 
     // Type 3: Standard Single Photo Card
-    const focalStyle = mem.focalPoint ? `style="object-position: ${mem.focalPoint};"` : '';
     return `
-      <div class="memory-card card-photo" data-type="photo" data-id="${mem.id}">
-        <div class="card-img-container" data-memory-id="${mem.id}">
-          <span class="card-tag-badge">${mem.tag || 'Khoảnh khắc'}</span>
-          <img src="${imgList[0]}" alt="${mem.title}" loading="lazy" ${focalStyle}>
+      <div class="memory-card card-photo" data-type="photo" data-id="${memoryId}">
+        <div class="card-img-container" data-memory-id="${memoryId}">
+          <span class="card-tag-badge">${memoryTag}</span>
+          <img src="${escapeHtml(imgList[0])}" alt="${memoryTitle}" loading="lazy" ${focalStyle}>
         </div>
         <div class="card-body-content">
-          <div class="card-time-text">${mem.time}</div>
-          <h4 class="card-heading">${mem.title}</h4>
-          ${mem.description ? `<p class="card-note-text">${mem.description}</p>` : ''}
+          <div class="card-time-text">${memoryTime}</div>
+          <h4 class="card-heading">${memoryTitle}</h4>
+          ${memoryDescription ? `<p class="card-note-text">${memoryDescription}</p>` : ''}
         </div>
       </div>
     `;
@@ -1172,16 +2055,16 @@
         ? mem.image[0] 
         : 'images/Lúc nhỏ/IMG_0025_Original.JPG';
 
-      const focalStyle = mem.focalPoint ? `style="object-position: ${mem.focalPoint};"` : '';
+      const focalStyle = mem.focalPoint ? `style="object-position: ${escapeHtml(mem.focalPoint)};"` : '';
 
       frame.innerHTML = `
         <span class="film-number">#${frameNumber}</span>
         <div class="film-thumb-box">
-          <img src="${imgSource}" alt="${mem.title}" loading="lazy" ${focalStyle} onerror="this.src='images/Lúc nhỏ/IMG_0025_Original.JPG';">
+          <img src="${escapeHtml(imgSource)}" alt="${escapeHtml(mem.title)}" loading="lazy" ${focalStyle} onerror="this.src='images/Lúc nhỏ/IMG_0025_Original.JPG';">
         </div>
         <div class="film-frame-info">
-          <span class="film-frame-time">${mem.time}</span>
-          <h5 class="film-frame-title">${mem.title}</h5>
+          <span class="film-frame-time">${escapeHtml(mem.time)}</span>
+          <h5 class="film-frame-title">${escapeHtml(mem.title)}</h5>
         </div>
       `;
 
@@ -1246,6 +2129,7 @@
     const prevBtn = document.getElementById('lightbox-btn-prev');
     const nextBtn = document.getElementById('lightbox-btn-next');
     const wrapper = document.getElementById('lightbox-img-wrapper');
+    const likeButton = document.getElementById('lightbox-memory-like');
 
     if (!imgEl || !counterEl || !tagEl || !titleEl || !descEl || !timeEl || !thumbsContainer || !prevBtn || !nextBtn || !wrapper) return;
 
@@ -1267,6 +2151,13 @@
     titleEl.textContent = memory.title;
     descEl.textContent = memory.description || '';
     timeEl.textContent = memory.time;
+    if (likeButton) {
+      const stage = state.data.stages.find(item => item.memories.some(itemMemory => itemMemory.id === memory.id));
+      likeButton.dataset.stageId = stage ? stage.id : '';
+      likeButton.dataset.memoryId = memory.id;
+      likeButton.disabled = !stage;
+      if (stage) refreshMemoryLikeButton(likeButton, stage, memory);
+    }
 
     // Thumbnails
     thumbsContainer.innerHTML = '';
@@ -1365,7 +2256,15 @@
     state.game.currentIndex = 0;
     state.game.score = 0;
     state.game.streak = 0;
+    state.game.bestStreak = 0;
+    state.game.resultSaved = false;
     state.game.hasAnswered = false;
+    const leaderboardList = document.getElementById('leaderboard-list');
+    const leaderboardLoadStatus = document.getElementById('leaderboard-load-status');
+    const leaderboardSaveStatus = document.getElementById('leaderboard-save-status');
+    if (leaderboardList) leaderboardList.innerHTML = '<li>Đang triệu hồi bảng xếp hạng...</li>';
+    if (leaderboardLoadStatus) leaderboardLoadStatus.textContent = '';
+    if (leaderboardSaveStatus) leaderboardSaveStatus.textContent = '';
 
     // Reset UI screens
     document.getElementById('game-play-screen').style.display = 'flex';
@@ -1542,6 +2441,7 @@
     if (isCorrect) {
       state.game.score += 1;
       state.game.streak += 1;
+      state.game.bestStreak = Math.max(state.game.bestStreak, state.game.streak);
       revealCard.classList.add('is-correct');
       revealHeader.className = 'reveal-header is-correct';
       statusIcon.textContent = '🎉';
@@ -1598,6 +2498,99 @@
     }
   }
 
+  function setLeaderboardStatus(elementId, message, isError = false) {
+    const status = document.getElementById(elementId);
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle('is-error', isError);
+  }
+
+  function renderLeaderboard(rows) {
+    const list = document.getElementById('leaderboard-list');
+    if (!list) return;
+    list.replaceChildren();
+    if (!rows || rows.length === 0) {
+      const emptyRow = document.createElement('li');
+      emptyRow.textContent = 'Bảng vàng còn chờ vị Thiên Kiêu đầu tiên ghi danh.';
+      list.appendChild(emptyRow);
+      return;
+    }
+
+    rows.forEach(row => {
+      const item = document.createElement('li');
+      const content = document.createElement('span');
+      content.className = 'leaderboard-row';
+      const name = document.createElement('span');
+      name.className = 'leaderboard-name';
+      name.textContent = String(row.display_name || 'Đạo Hữu');
+      const score = document.createElement('span');
+      score.className = 'leaderboard-score';
+      score.textContent = `${Number(row.high_score) || 0} điểm · ${Number(row.best_streak) || 0}🔥`;
+      content.append(name, score);
+      item.appendChild(content);
+      list.appendChild(item);
+    });
+  }
+
+  async function loadLeaderboard() {
+    if (!supabaseClient) {
+      setLeaderboardStatus('leaderboard-load-status', 'Bảng Thiên Kiêu chưa kết nối được linh mạch dữ liệu.', true);
+      return;
+    }
+    setLeaderboardStatus('leaderboard-load-status', 'Đang triệu hồi bảng xếp hạng…');
+    try {
+      const { data, error } = await supabaseClient.from('leaderboard')
+        .select('display_name,high_score,best_streak')
+        .order('high_score', { ascending: false })
+        .order('best_streak', { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      renderLeaderboard(data || []);
+      setLeaderboardStatus('leaderboard-load-status', '');
+    } catch (error) {
+      console.error('Không thể tải bảng Thiên Kiêu:', error);
+      const list = document.getElementById('leaderboard-list');
+      if (list) {
+        list.replaceChildren();
+        const errorRow = document.createElement('li');
+        errorRow.textContent = 'Bảng xếp hạng tạm thời ẩn trong màn sương.';
+        list.appendChild(errorRow);
+      }
+      setLeaderboardStatus('leaderboard-load-status', 'Không thể tải Top 5. Vui lòng kiểm tra quyền đọc bảng leaderboard.', true);
+    }
+  }
+
+  async function saveGameScore() {
+    if (!supabaseClient || !authenticatedUser) return;
+    setLeaderboardStatus('leaderboard-save-status', 'Đang khắc thành tích vào Thiên Kiêu Bảng…');
+    try {
+      const { data: previous, error: readError } = await supabaseClient.from('leaderboard')
+        .select('high_score,best_streak')
+        .eq('user_id', authenticatedUser.id)
+        .maybeSingle();
+      if (readError) throw readError;
+
+      const email = String(authenticatedUser.email || '');
+      const metadata = authenticatedUser.user_metadata || {};
+      const displayName = String(metadata.display_name || metadata.full_name || email.split('@')[0] || 'Đạo Hữu');
+      const score = Math.max(Number(previous && previous.high_score) || 0, state.game.score);
+      const bestStreak = Math.max(Number(previous && previous.best_streak) || 0, state.game.bestStreak);
+      const { error: saveError } = await supabaseClient.from('leaderboard').upsert({
+        user_id: authenticatedUser.id,
+        display_name: displayName,
+        high_score: score,
+        best_streak: bestStreak,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+      if (saveError) throw saveError;
+
+      setLeaderboardStatus('leaderboard-save-status', 'Thành tích đã được lưu vào Thiên Kiêu Bảng.');
+    } catch (error) {
+      console.error('Không thể lưu thành tích:', error);
+      setLeaderboardStatus('leaderboard-save-status', 'Chưa thể lưu thành tích. Kiểm tra cấu hình bảng leaderboard và thử lại.', true);
+    }
+  }
+
   function showGameResult() {
     document.getElementById('game-play-screen').style.display = 'none';
     const resultScreen = document.getElementById('game-result-screen');
@@ -1636,6 +2629,16 @@
     document.getElementById('result-trophy-icon').textContent = trophy;
     document.getElementById('result-rank-badge').textContent = rank;
     document.getElementById('result-commentary').textContent = commentary;
+    if (!state.game.resultSaved) {
+      state.game.resultSaved = true;
+      if (authenticatedUser) {
+        void saveGameScore().finally(() => { void loadLeaderboard(); });
+      } else {
+        const saveStatus = document.getElementById('leaderboard-save-status');
+        if (saveStatus) saveStatus.textContent = 'Đăng nhập để lưu thành tích của lượt chơi này.';
+        loadLeaderboard();
+      }
+    }
   }
 
   // ========================================================
@@ -1956,10 +2959,19 @@
       }
     }
 
+    function requestUtilityToggle(targetId) {
+      const section = sections[targetId];
+      if (!section) return;
+      const shouldOpen = section.hidden;
+      if (shouldOpen && (targetId === 'time-capsule' || targetId === 'ticket-station')) {
+        if (!requireAuth(() => toggleUtility(targetId, true))) return;
+      }
+      toggleUtility(targetId, shouldOpen);
+    }
+
     document.querySelectorAll('.utility-launch-btn').forEach(button => {
       button.addEventListener('click', () => {
-        const targetId = button.dataset.utilityTarget;
-        toggleUtility(targetId, sections[targetId]?.hidden);
+        requestUtilityToggle(button.dataset.utilityTarget);
       });
     });
 
@@ -1975,13 +2987,17 @@
 
     const navTicketBtn = document.getElementById('nav-ticket-btn');
     if (navTicketBtn) {
-      navTicketBtn.addEventListener('click', () => toggleUtility('ticket-station', true));
+      navTicketBtn.addEventListener('click', () => {
+        if (!requireAuth(() => toggleUtility('ticket-station', true))) return;
+        toggleUtility('ticket-station', true);
+      });
     }
 
     const heroTicketBtn = document.getElementById('btn-hero-ticket');
     if (heroTicketBtn) {
       heroTicketBtn.addEventListener('click', e => {
         e.preventDefault();
+        if (!requireAuth(() => toggleUtility('ticket-station', true))) return;
         toggleUtility('ticket-station', true);
       });
     }
@@ -2003,6 +3019,13 @@
     if (lightboxBackdrop) lightboxBackdrop.addEventListener('click', closeLightbox);
     if (btnLightboxPrev) btnLightboxPrev.addEventListener('click', prevLightboxImage);
     if (btnLightboxNext) btnLightboxNext.addEventListener('click', nextLightboxImage);
+    document.addEventListener('click', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      const likeButton = target && target.closest('[data-memory-like-button], #lightbox-memory-like');
+      if (!likeButton) return;
+      const found = findMemoryForLikeButton(likeButton);
+      if (found) handleMemoryLikeClick(found.memory, found.stage, likeButton);
+    });
 
     // Zoom Toggle in Lightbox
     const zoomBtn = document.getElementById('lightbox-btn-zoom');
@@ -2035,11 +3058,15 @@
     }
 
     // Game Trigger & Control Events
+    const startAuthenticatedGame = () => {
+      if (!requireAuth(startNewGame)) return;
+      startNewGame();
+    };
     const btnHeroGame = document.getElementById('btn-hero-game');
-    if (btnHeroGame) btnHeroGame.addEventListener('click', startNewGame);
+    if (btnHeroGame) btnHeroGame.addEventListener('click', startAuthenticatedGame);
 
     const btnNavGame = document.getElementById('btn-nav-game');
-    if (btnNavGame) btnNavGame.addEventListener('click', startNewGame);
+    if (btnNavGame) btnNavGame.addEventListener('click', startAuthenticatedGame);
 
     const btnCloseGame = document.getElementById('btn-close-game');
     if (btnCloseGame) btnCloseGame.addEventListener('click', closeGameModal);
@@ -2060,7 +3087,7 @@
     }
 
     const btnGameReplay = document.getElementById('btn-game-replay');
-    if (btnGameReplay) btnGameReplay.addEventListener('click', startNewGame);
+    if (btnGameReplay) btnGameReplay.addEventListener('click', startAuthenticatedGame);
 
     const btnGameExit = document.getElementById('btn-game-exit');
     if (btnGameExit) btnGameExit.addEventListener('click', closeGameModal);
@@ -2228,7 +3255,7 @@
     // Fallback quotes if pool is small
     if (quotesPool.length === 0) {
       quotesPool.push(
-        { text: "Mỗi bức ảnh, mỗi dòng ghi chú ở đây đều là một mảnh ký ức thật trên hành trình lớn lên từ thuở nhỏ đến năm 2026.", source: "Lịch Sử Tiến Hóa Của Hải Thành" },
+        { text: "Mỗi bức ảnh, mỗi dòng ghi chú ở đây đều là một mảnh ký ức thật trên hành trình lớn lên từ thuở nhỏ đến năm 2026.", source: SITE_NAME },
         { text: "Nơi lưu giữ những mảnh ghép thời gian, những cột mốc trưởng thành và cả những ngày bình yên không cần chụp ảnh.", source: "Lời tựa Khởi nguyên" },
         { text: "Thời gian trôi đi không lấy lại được, nhưng ký ức sẽ mãi ở lại trong tim người trân trọng nó.", source: "Góc tâm sự Tiến hóa" },
         { text: "Dù đi thật xa, hãy luôn nhớ về những ngày đầu tiên non nớt và ngây thơ nhất.", source: "Hành trình Tuổi thơ" },
@@ -2310,6 +3337,7 @@
     // 4. Print Button Click Event
     if (btnPrint) {
       btnPrint.addEventListener('click', () => {
+        if (!requireAuth(() => btnPrint.click())) return;
         updateTicket(true);
       });
     }
@@ -2317,6 +3345,7 @@
     // 5. Download Ticket as PNG Event (html2canvas)
     if (btnDownload) {
       btnDownload.addEventListener('click', () => {
+        if (!requireAuth(() => btnDownload.click())) return;
         if (typeof html2canvas === 'undefined') {
           alert('Thư viện chụp ảnh html2canvas đang được tải hoặc bị chặn kết nối. Vui lòng tải lại trang hoặc kiểm tra kết nối mạng!');
           return;
@@ -2910,22 +3939,76 @@
 
     let capsules = loadCapsules();
 
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
     // 3. Render Capsules List
     const listContainer = document.getElementById('capsule-items-container');
     const badgeCount = document.getElementById('capsule-total-badge');
+    let unlockTimer = null;
+
+    function normalizeUnlockDate(value) {
+      const timestamp = Date.parse(value || '');
+      return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : '';
+    }
+
+    function guestbookFingerprint(item) {
+      return `${item.sender || ''}\u0000${item.message || ''}\u0000${normalizeUnlockDate(item.unlockDate)}`;
+    }
+
+    function formatCapsuleDate(value) {
+      const date = new Date(value);
+      return Number.isNaN(date.getTime())
+        ? String(value || '')
+        : date.toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' });
+    }
+
+    async function loadGuestbook() {
+      if (!supabaseClient) return;
+      try {
+        const { data, error } = await supabaseClient
+          .from('guestbook')
+          .select('sender_name, message, unlock_date');
+        if (error || !Array.isArray(data)) return;
+
+        const remoteEntries = data.map((row, index) => ({
+          id: `guestbook-${index}`,
+          isGuestbook: true,
+          isDefault: false,
+          sender: String(row.sender_name || 'Người bạn ẩn danh'),
+          tag: 'wish',
+          tagLabel: '💌 Lời nhắn nhủ',
+          date: formatCapsuleDate(row.unlock_date),
+          message: String(row.message || ''),
+          unlockDate: row.unlock_date || ''
+        }));
+        const remoteFingerprints = new Set(remoteEntries.map(guestbookFingerprint));
+        const localEntries = capsules.filter(item =>
+          !item.isGuestbook || !remoteFingerprints.has(guestbookFingerprint(item))
+        );
+        capsules = [...remoteEntries, ...localEntries];
+        renderCapsules();
+      } catch (error) {
+        // Keep local and bundled time capsules available when the guestbook is offline.
+      }
+    }
 
     function renderCapsules() {
       if (!listContainer) return;
       listContainer.innerHTML = '';
+      if (unlockTimer) clearTimeout(unlockTimer);
 
       if (badgeCount) {
         badgeCount.textContent = `${capsules.length} viên nang`;
+      }
+
+      const nextUnlock = capsules
+        .filter(item => item.isGuestbook && item.unlockDate)
+        .map(item => Date.parse(item.unlockDate))
+        .filter(timestamp => Number.isFinite(timestamp) && timestamp > Date.now())
+        .sort((left, right) => left - right)[0];
+      if (nextUnlock) {
+        unlockTimer = setTimeout(
+          renderCapsules,
+          Math.min(nextUnlock - Date.now() + 50, 2147483647)
+        );
       }
 
       if (capsules.length === 0) {
@@ -2939,9 +4022,15 @@
       }
 
       capsules.forEach(c => {
+        const unlockTimestamp = c.isGuestbook && c.unlockDate ? Date.parse(c.unlockDate) : NaN;
+        const dateLocked = Number.isFinite(unlockTimestamp) && unlockTimestamp > Date.now();
+        const lockMessage = dateLocked
+          ? `Đang phong ấn tới ${formatCapsuleDate(c.unlockDate)}`
+          : 'Nội dung đã niêm phong';
         const card = document.createElement('div');
         card.className = 'capsule-card';
-        card.id = `card-${c.id}`;
+        if (dateLocked) card.classList.add('is-date-locked');
+        card.id = `card-${escapeHtml(c.id)}`;
 
         card.innerHTML = `
           <div class="capsule-card-top">
@@ -2949,7 +4038,7 @@
               <span class="capsule-sender-icon">${c.isDefault ? '💎' : '👤'}</span>
               <span class="capsule-sender-name">${escapeHtml(c.sender)}</span>
             </div>
-            <span class="capsule-tag-pill tag-${c.tag}">${escapeHtml(c.tagLabel)}</span>
+            <span class="capsule-tag-pill tag-${escapeHtml(c.tag)}">${escapeHtml(c.tagLabel)}</span>
           </div>
           <div class="capsule-meta-date">
             <span>🕒 Niêm phong: ${escapeHtml(c.date)}</span>
@@ -2957,18 +4046,18 @@
           <div class="capsule-sealed-banner">
             <div class="capsule-sealed-status">
               <span class="status-icon">🔒</span>
-              <span class="status-text">Nội dung đã niêm phong</span>
+              <span class="status-text">${escapeHtml(lockMessage)}</span>
             </div>
-            <button type="button" class="capsule-btn-toggle" data-id="${c.id}" aria-label="Mở niêm phong thông điệp">
-              <span class="toggle-text">👁️ Mở niêm phong</span>
+            <button type="button" class="capsule-btn-toggle" data-id="${escapeHtml(c.id)}" aria-label="${dateLocked ? escapeHtml(lockMessage) : 'Mở niêm phong thông điệp'}" ${dateLocked ? 'disabled' : ''}>
+              <span class="toggle-text">${dateLocked ? `🔒 ${escapeHtml(lockMessage)}` : '👁️ Mở niêm phong'}</span>
             </button>
           </div>
           <div class="capsule-message-body">
             <p>${escapeHtml(c.message)}</p>
           </div>
-          ${!c.isDefault ? `
+          ${!c.isDefault && !c.isGuestbook ? `
           <div class="capsule-card-footer">
-            <button type="button" class="capsule-btn-delete" data-id="${c.id}" title="Xóa viên nang này" aria-label="Xóa">
+            <button type="button" class="capsule-btn-delete" data-id="${escapeHtml(c.id)}" title="Xóa viên nang này" aria-label="Xóa">
               <span>🗑️ Xóa</span>
             </button>
           </div>` : ''}
@@ -2981,6 +4070,7 @@
         const statusText = card.querySelector('.status-text');
 
         toggleBtn.addEventListener('click', () => {
+          if (dateLocked) return;
           const isRevealed = card.classList.toggle('revealed');
           if (isRevealed) {
             toggleText.textContent = '🔒 Thu gọn';
@@ -3011,6 +4101,7 @@
     }
 
     renderCapsules();
+    void loadGuestbook();
 
     // 4. Form Character Counter
     const senderInput = document.getElementById('capsule-sender');
@@ -3027,7 +4118,8 @@
 
     // 5. Seal Submission Handler
     if (sealBtn) {
-      sealBtn.addEventListener('click', () => {
+      sealBtn.addEventListener('click', async () => {
+        if (!requireAuth(() => sealBtn.click())) return;
         const sender = senderInput.value.trim() || 'Người bạn bí ẩn';
         const tagVal = tagSelect.value;
         const tagText = tagSelect.options[tagSelect.selectedIndex].text;
@@ -3039,8 +4131,27 @@
           return;
         }
 
+        sealBtn.disabled = true;
         const now = new Date();
         const formattedDate = `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()}, ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+        const unlockDate = new Date('2027-01-01T00:00:00+07:00').toISOString();
+        let savedOnline = false;
+        let syncError = null;
+        if (supabaseClient) {
+          try {
+            const { error } = await supabaseClient.from('guestbook').insert({
+              sender_name: sender,
+              message,
+              unlock_date: unlockDate
+            });
+            if (error) throw error;
+            savedOnline = true;
+          } catch (error) {
+            syncError = error;
+            console.warn('Không thể đồng bộ lời nhắn lên sổ lưu bút:', error);
+          }
+        }
 
         const newCapsule = {
           id: 'capsule-' + Date.now(),
@@ -3049,7 +4160,9 @@
           tagLabel: tagText,
           date: formattedDate,
           message: message,
-          isDefault: false
+          isDefault: false,
+          isGuestbook: savedOnline,
+          unlockDate
         };
 
         capsules.unshift(newCapsule);
@@ -3072,7 +4185,13 @@
           }, 2000);
         }
 
-        showToast('Đã niêm phong thành công viên nang vào Hộp Thời Gian!', '🎉');
+        if (savedOnline) {
+          showToast('Đã lưu lời nhắn vào sổ lưu bút trực tuyến!', '🎉');
+        } else {
+          const reason = syncError ? ' Chưa thể đồng bộ lên sổ trực tuyến.' : ' Hiện chỉ lưu trên thiết bị này.';
+          showToast(`Đã lưu lời nhắn cục bộ.${reason}`, '📡');
+        }
+        sealBtn.disabled = false;
       });
     }
   }
