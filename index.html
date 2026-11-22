@@ -8,8 +8,8 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=60">
-   <link rel="stylesheet" href="css/style.css?v=60">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=61">
+   <link rel="stylesheet" href="css/style.css?v=61">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;600&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet">
@@ -30,6 +30,17 @@
         <circle cx="100" cy="136" r="7"></circle>
         <path d="M100 12v176M12 100h176M38 38l124 124M162 38 38 162"></path>
       </svg>
+    </div>
+
+    <div id="archive-lock-modal" class="archive-lock-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="archive-lock-title" hidden>
+      <div class="archive-lock-backdrop" id="archive-lock-backdrop"></div>
+      <section class="archive-lock-dialog">
+        <button type="button" class="archive-lock-close" id="archive-lock-close" aria-label="Đóng hộp thoại">✕</button>
+        <span class="archive-lock-seal" aria-hidden="true">🔒</span>
+        <h2 id="archive-lock-title">Kết Giới Tông Môn Đang Khóa!</h2>
+        <p>Đạo hữu chưa ghi danh nhập môn nên thiên cơ bất khả lộ — mau đăng nhập hoặc ghi danh đệ tử để phá giải phong ấn, chiêm ngưỡng toàn bộ ký ức bí truyền của Hải Thành Lão Tổ!</p>
+        <button type="button" class="btn btn-primary archive-lock-auth" id="archive-lock-auth">⚡ Ghi Danh / Đăng Nhập Ngay</button>
+      </section>
     </div>
     <svg class="floating-islands" viewBox="0 0 900 260" aria-hidden="true">
       <path d="M70 154 126 116l35 12 38-48 54 48 38-20 54 46 28 8-22 20H80z"></path>
@@ -163,17 +174,17 @@
           </div>
         </div>
 
-        <button type="button" class="nav-btn nav-btn-ticket" id="nav-ticket-btn" title="Quầy Thỉnh Lệnh Bài" aria-label="Thỉnh Lệnh Bài">
-          <span class="btn-icon">📜</span>
-          <span class="btn-text">Thỉnh Lệnh Bài</span>
+        <button type="button" class="nav-btn nav-btn-ticket" id="nav-ticket-btn" title="Cấp Thẻ Đệ Tử" aria-label="Cấp Thẻ Đệ Tử">
+          <span class="btn-icon">🎟️</span>
+          <span class="btn-text">Cấp Thẻ Đệ Tử</span>
         </button>
-        <button id="btn-nav-game" class="nav-btn nav-btn-game" title="Mini-game Bói Thiên Cơ" aria-label="Chơi Bói Thiên Cơ">
-          <span class="btn-icon">🔮</span>
-          <span class="btn-text">Bói Thiên Cơ</span>
+        <button id="btn-nav-game" class="nav-btn nav-btn-game" title="Đố Vui Độ Kiếp" aria-label="Chơi Đố Vui Độ Kiếp">
+          <span class="btn-icon">🎯</span>
+          <span class="btn-text">Đố Vui Độ Kiếp</span>
         </button>
-        <button id="global-audio-toggle" class="nav-btn playing" title="Tạm dừng Tiên Nhạc" aria-label="Tiên Nhạc">
-          <span class="btn-icon">🎶</span>
-          <span class="btn-text">Tiên Nhạc</span>
+        <button id="global-audio-toggle" class="nav-btn playing" title="Tạm dừng Nhạc Dưỡng Thần" aria-label="Nhạc Dưỡng Thần">
+          <span class="btn-icon">🎧</span>
+          <span class="btn-text">Nhạc Dưỡng Thần</span>
         </button>
       </div>
     </div>
@@ -207,23 +218,20 @@
             "Chào mừng đạo hữu hạ phàm ghé thăm thánh địa của Thành Chủ Hải Thành! Nơi đây phong ấn toàn bộ huyết lệ từ thuở luyện khí còn sợ bug đến khi độ kiếp thành chiến thần gõ phím Lv.21. Đã lỡ chân bước vào thì đừng vội quay xe — hãy dâng chút Linh Thạch lấy hên rồi cùng khám phá thiên cơ!"
           </p>
 
-          <!-- Action Buttons -->
-          <div class="hero-cta-group">
-            <button type="button" class="btn btn-invite" id="btn-invite-friends">
-              <span>🔗 Mời Đạo Hữu</span>
-            </button>
-          </div>
-          <div class="hero-badge-meta-row" id="visitor-count-row" hidden>
-            <span class="visitor-count-badge" id="visitor-count-badge" hidden>
-              ⚡ Đạo Hữu Lỡ Bước Nhập Môn: <strong id="visitor-count-number">0</strong>
-            </span>
-          </div>
-
         </div>
 
         <!-- Right: 3D Flip Card for Genesis Image -->
         <div class="hero-visual-col">
           <div class="genesis-card-wrapper">
+            <span class="hero-card-ornament hero-card-ornament--left-top" aria-hidden="true">天道</span>
+            <span class="hero-card-ornament hero-card-ornament--left-bottom" aria-hidden="true">劍心</span>
+            <span class="hero-card-ornament hero-card-ornament--right-top" aria-hidden="true">靈脈</span>
+            <span class="hero-card-ornament hero-card-ornament--right-bottom" aria-hidden="true">長生</span>
+            <span class="hero-card-sword-trail hero-card-sword-trail--left" aria-hidden="true"></span>
+            <span class="hero-card-sword-trail hero-card-sword-trail--right" aria-hidden="true"></span>
+            <span class="hero-card-firefly hero-card-firefly--one" aria-hidden="true"></span>
+            <span class="hero-card-firefly hero-card-firefly--two" aria-hidden="true"></span>
+            <span class="hero-card-firefly hero-card-firefly--three" aria-hidden="true"></span>
             <div class="genesis-flip-card" id="genesis-card" tabindex="0" role="button" aria-label="Chạm để lật thẻ Tông Chủ và xem thiên cơ">
               <div class="hero-flip-inner">
               
@@ -340,6 +348,11 @@
     <div class="container public-leaderboard-card">
       <span class="leaderboard-kicker">BẢNG VÀNG TU TIÊN</span>
       <h2 id="leaderboard-title">🏆 THIÊN KIÊU BẢNG • DANH SÁCH CAO THỦ</h2>
+      <div class="hero-badge-meta-row leaderboard-visitor-row" id="visitor-count-row" hidden>
+        <span class="visitor-count-badge" id="visitor-count-badge" hidden>
+          ⚡ Đạo Hữu Lỡ Bước Nhập Môn: <strong id="visitor-count-number">0</strong>
+        </span>
+      </div>
       <div class="leaderboard-tabs" role="tablist" aria-label="Chọn bảng xếp hạng">
         <button type="button" class="leaderboard-tab active" id="leaderboard-tab-cultivation" role="tab" aria-selected="true" aria-controls="cultivation-leaderboard-panel">⚡ Bảng Tu Vi Đạo Hữu</button>
         <button type="button" class="leaderboard-tab" id="leaderboard-tab-game" role="tab" aria-selected="false" aria-controls="game-leaderboard-panel">🎮 Cao Thủ Đoán Niên Hiệu</button>
@@ -1064,6 +1077,7 @@
     <button id="bg-music-next-btn" class="bg-music-skip-btn" title="Chuyển ngẫu nhiên bài kế tiếp">
       ⏭️
     </button>
+    <button type="button" id="bg-music-collapse-btn" class="bg-music-collapse-btn" aria-label="Thu nhỏ trình phát nhạc">⌄</button>
   </aside>
 
   <div id="auth-modal" class="admin-modal auth-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" hidden>
@@ -1125,7 +1139,16 @@
               <li>In Vé Lưu Niệm <strong>+15</strong></li>
               <li>Gửi lời nhắn Sổ Lưu Bút <strong>+20</strong></li>
               <li>Trả lời đúng Đoán Năm <strong>+5/câu</strong></li>
+              <li>Rút Quẻ Lời Răn Của Lão Tổ <strong>+5/ngày</strong></li>
             </ul>
+            <button type="button" class="btn btn-invite cultivation-invite-button" data-invite-friends>
+              <span>🔗 Mời Đạo Hữu</span>
+            </button>
+            <div class="cultivation-oracle">
+              <button type="button" class="btn btn-glass oracle-draw-button" id="btn-draw-oracle">🎲 Rút Quẻ Lời Răn Của Lão Tổ</button>
+              <blockquote class="cultivation-oracle-quote" id="cultivation-oracle-quote" hidden></blockquote>
+              <p class="cultivation-oracle-status" id="cultivation-oracle-status" role="status" aria-live="polite"></p>
+            </div>
           </section>
           <div id="auth-member-panel" class="auth-member-panel" hidden>
             <span class="admin-modal-kicker">THẺ ĐẠO HỮU</span>
@@ -1235,11 +1258,21 @@
   <footer class="museum-footer">
     <div class="container footer-container">
       <div class="footer-brand">
-        <h3>Thiên Mệnh Chi Thành</h3>
+        <h3>✦ THIÊN MỆNH CHI THÀNH • HẢI THÀNH LÃO TỔ ✦</h3>
+        <p>Truyền âm nhập mật hoặc kết giao đạo hữu với Thành Chủ tại hạ giới qua các linh phù bên dưới:</p>
       </div>
+      <nav class="footer-contact-links" aria-label="Kết giao với Hải Thành Lão Tổ">
+        <a class="footer-contact-link" id="footer-zalo-link" href="https://zalo.me/0988305473" target="_blank" rel="noopener noreferrer">💬 Zalo: 0988305473</a>
+        <a class="footer-contact-link" href="https://www.tiktok.com/@haithanh.05" target="_blank" rel="noopener noreferrer">🎵 TikTok: @haithanh.05</a>
+        <a class="footer-contact-link" href="https://www.instagram.com/haithanh.05" target="_blank" rel="noopener noreferrer">📸 Instagram: @haithanh.05</a>
+        <a class="footer-contact-link" href="https://www.facebook.com/haithanh2505" target="_blank" rel="noopener noreferrer">🌐 Facebook: haithanh2505</a>
+      </nav>
       <div class="footer-bottom">
-        <p>© 2007 - 2026 Thiên Mệnh Chi Thành. Tối ưu cho GitHub Pages &amp; Thiết bị di động.</p>
-        <a href="#hero" class="back-to-top">Lên đầu trang ↑</a>
+        <div class="footer-actions">
+          <button type="button" class="btn btn-invite footer-invite-button" id="btn-invite-friends" data-invite-friends>🔗 Mời Đạo Hữu</button>
+          <a href="#hero" class="back-to-top">Lên đầu trang ↑</a>
+        </div>
+        <p class="footer-copyright">© 2026 Thiên Mệnh Chi Thành • Chế tác bởi Kiếm Tốc Lập Code</p>
       </div>
     </div>
   </footer>
@@ -1252,8 +1285,8 @@
       document.write('<script src="js/html2canvas.min.js"><\/script>');
     }
   </script>
-   <script src="js/memories.js?v=60"></script>
+   <script src="js/memories.js?v=61"></script>
    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-   <script src="js/app.js?v=60"></script>
+   <script src="js/app.js?v=61"></script>
 </body>
 </html>

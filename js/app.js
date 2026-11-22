@@ -728,8 +728,8 @@
     };
   }
 
-  function getMemoryLikeId(stage, memory) {
-    return String(memory.dbId != null ? memory.dbId : `${stage.id}:${memory.id}`);
+  function getMemoryLikeId(memory) {
+    return String(memory.dbId != null ? memory.dbId : memory.id);
   }
 
   function memoryLikeButtonMarkup(stage, memory, extraClass = '') {
@@ -761,6 +761,27 @@
     status.classList.toggle('is-error', isError);
   }
 
+  function updateMemoryLikeControls(stage, memory, isLiked, count) {
+    const memoryId = String(memory.id);
+    const normalizedCount = Math.max(0, Number(count) || 0);
+    document.querySelectorAll('[data-memory-like-button], #lightbox-memory-like').forEach(button => {
+      if (button.dataset.memoryId !== memoryId || button.dataset.stageId !== stage.id) return;
+      const countLabel = button.querySelector('.memory-like-count');
+      if (countLabel) countLabel.textContent = String(normalizedCount);
+      button.classList.toggle('is-liked', isLiked);
+      button.setAttribute('aria-pressed', String(isLiked));
+    });
+  }
+
+  function setMemoryLikeControlsDisabled(stage, memory, disabled) {
+    const memoryId = String(memory.id);
+    document.querySelectorAll('[data-memory-like-button], #lightbox-memory-like').forEach(button => {
+      if (button.dataset.memoryId === memoryId && button.dataset.stageId === stage.id) {
+        button.disabled = disabled;
+      }
+    });
+  }
+
   function findMemoryForLikeButton(button) {
     if (!state.data || !button) return null;
     const stage = state.data.stages.find(item => item.id === button.dataset.stageId);
@@ -772,11 +793,14 @@
   async function refreshMemoryLikeButton(button, stage, memory) {
     if (!button || !stage || !memory) return;
     if (!supabaseClient) {
-      setMemoryLikeStatus(button, 'Linh mạch dữ liệu hiện chưa kết nối.', true);
+      setMemoryLikeStatus(button, 'Linh mạch dữ liệu chưa sẵn sàng.');
       return;
     }
 
-    const memoryId = getMemoryLikeId(stage, memory);
+    const memoryId = getMemoryLikeId(memory);
+    const userId = authenticatedUser && authenticatedUser.id;
+    const requestId = Number(button.dataset.likeRequestId || 0) + 1;
+    button.dataset.likeRequestId = String(requestId);
     try {
       const countRequest = supabaseClient.from('memory_likes')
         .select('*', { count: 'exact', head: true })
@@ -791,19 +815,19 @@
       const [countResult, ownResult] = await Promise.all([countRequest, ownLikeRequest]);
       if (countResult.error) throw countResult.error;
       if (ownResult.error) throw ownResult.error;
-      if (button.dataset.memoryId !== String(memory.id)) return;
+      if (!button.isConnected || button.dataset.likeRequestId !== String(requestId) ||
+          button.dataset.memoryId !== String(memory.id) ||
+          String(authenticatedUser && authenticatedUser.id || '') !== String(userId || '')) return;
 
       const count = Number(countResult.count) || 0;
       const isLiked = Boolean(ownResult.data);
-      const countLabel = button.querySelector('.memory-like-count');
-      if (countLabel) countLabel.textContent = String(count);
-      button.classList.toggle('is-liked', isLiked);
-      button.setAttribute('aria-pressed', String(isLiked));
+      updateMemoryLikeControls(stage, memory, isLiked, count);
       setMemoryLikeStatus(button, '');
     } catch (error) {
       console.error('Không thể tải số Linh Thạch:', error);
-      if (button.dataset.memoryId === String(memory.id)) {
-        setMemoryLikeStatus(button, 'Chưa thể tải Linh Thạch. Vui lòng thử lại.', true);
+      if (button.isConnected && button.dataset.likeRequestId === String(requestId) &&
+          button.dataset.memoryId === String(memory.id)) {
+        setMemoryLikeStatus(button, 'Linh mạch đang chậm; số lượt tặng sẽ cập nhật khi kết nối ổn định.');
       }
     }
   }
@@ -822,9 +846,13 @@
       setMemoryLikeStatus(button, 'Vui lòng đăng nhập để tặng Linh Thạch.', true);
       return;
     }
-    const memoryId = getMemoryLikeId(stage, memory);
-    button.disabled = true;
+    const memoryId = getMemoryLikeId(memory);
+    setMemoryLikeControlsDisabled(stage, memory, true);
     setMemoryLikeStatus(button, 'Đang truyền Linh Thạch…');
+    const previousCount = Number(button.querySelector('.memory-like-count')?.textContent) || 0;
+    const previousLiked = button.classList.contains('is-liked');
+    const optimisticLiked = !previousLiked;
+    updateMemoryLikeControls(stage, memory, optimisticLiked, previousCount + (optimisticLiked ? 1 : -1));
     try {
       const { data: existingLike, error: lookupError } = await supabaseClient.from('memory_likes')
         .select('memory_id')
@@ -834,12 +862,18 @@
       if (lookupError) throw lookupError;
 
       if (existingLike) {
+        if (optimisticLiked) {
+          updateMemoryLikeControls(stage, memory, false, previousCount - 1);
+        }
         const { error } = await supabaseClient.from('memory_likes')
           .delete()
           .eq('memory_id', memoryId)
           .eq('user_id', authenticatedUser.id);
         if (error) throw error;
       } else {
+        if (!optimisticLiked) {
+          updateMemoryLikeControls(stage, memory, true, previousCount + 1);
+        }
         const { error } = await supabaseClient.from('memory_likes')
           .upsert(
             { memory_id: memoryId, user_id: authenticatedUser.id },
@@ -855,9 +889,10 @@
       }
     } catch (error) {
       console.error('Không thể cập nhật Linh Thạch:', error);
+      updateMemoryLikeControls(stage, memory, previousLiked, previousCount);
       setMemoryLikeStatus(button, 'Không thể cập nhật Linh Thạch. Vui lòng thử lại.', true);
     } finally {
-      button.disabled = false;
+      setMemoryLikeControlsDisabled(stage, memory, false);
     }
   }
 
@@ -980,6 +1015,8 @@
       initModalNavbarSync();
       initUtilityPanels();
       initAuthPortal();
+      initArchiveLockModal();
+      initCultivationOracle();
       initLeaderboardTabs();
       void loadDynamicMemories();
       void loadSiteSettings().then(() => initVisitorCounter());
@@ -1949,6 +1986,93 @@
     }
   }
 
+  function initCultivationOracle() {
+    const button = document.getElementById('btn-draw-oracle');
+    const quoteElement = document.getElementById('cultivation-oracle-quote');
+    const status = document.getElementById('cultivation-oracle-status');
+    if (!button || !quoteElement || !status) return;
+
+    const maxims = [
+      'Tu tiên không sợ căn cơ mỏng, chỉ sợ mở IDE rồi quên mình định sửa bug gì.',
+      'Một lần bấm lưu bằng mười lần cầu nguyện; nhớ commit thì thiên đạo càng thương.',
+      'Kiếm khí có thể chém yêu, nhưng chỉ có backup mới chém được nỗi sợ mất file.',
+      'Độ kiếp là chuyện của trời; qua deadline hay không là chuyện của lịch nhắc việc.',
+      'Linh lực cạn thì nghỉ ngơi, đừng cố gõ code bằng ý chí đang ở mức 1 HP.',
+      'Người có đạo tâm biết tắt máy đúng giờ; người có bug thì nhớ ghi lại để mai xử.',
+      'Đừng hỏi vì sao build đỏ, hãy hỏi mình đã đọc dòng lỗi đầu tiên chưa.',
+      'Muốn thành đại năng phải biết tra cứu; không ai phi thăng nhờ đoán mò API.'
+    ];
+
+    button.addEventListener('click', async () => {
+      if (!authenticatedUser) {
+        requireAuth(() => button.click());
+        return;
+      }
+
+      const user = authenticatedUser;
+      const today = localDateKey();
+      const storageKey = `tmtc-daily-oracle-${user.id}`;
+      let previousClaim = null;
+      try {
+        const savedClaim = localStorage.getItem(storageKey);
+        if (savedClaim) {
+          try {
+            previousClaim = JSON.parse(savedClaim);
+          } catch (error) {
+            console.warn('Không thể đọc quẻ đã lưu:', error);
+            localStorage.removeItem(storageKey);
+          }
+        }
+      } catch (error) {
+        console.error('Không thể kiểm tra lượt rút quẻ hôm nay:', error);
+        status.textContent = 'Trình duyệt chưa cho phép lưu lượt rút quẻ; chưa thể nhận Tu Vi.';
+        status.classList.add('is-error');
+        return;
+      }
+
+      if (previousClaim && previousClaim.date === today && previousClaim.quote) {
+        quoteElement.textContent = `“${previousClaim.quote}”`;
+        quoteElement.hidden = false;
+        status.textContent = 'Hôm nay đạo hữu đã rút quẻ rồi — mai quay lại xin thêm thiên cơ nhé.';
+        status.classList.remove('is-error');
+        return;
+      }
+
+      const quote = maxims[Math.floor(Math.random() * maxims.length)];
+      quoteElement.textContent = `“${quote}”`;
+      quoteElement.hidden = false;
+      status.textContent = 'Đang ghi nhận quẻ vào sổ thiên cơ…';
+      status.classList.remove('is-error');
+      button.disabled = true;
+      try {
+        localStorage.setItem(storageKey, JSON.stringify({ date: today, quote }));
+        const isAdmin = isAdminUser(user);
+        const awarded = isAdmin || await awardCultivation(5, 'Rút Quẻ Lời Răn Của Lão Tổ');
+        if (!awarded) {
+          localStorage.removeItem(storageKey);
+          status.textContent = 'Chưa thể ghi nhận phần thưởng Tu Vi. Đạo hữu thử rút lại sau nhé.';
+          status.classList.add('is-error');
+          return;
+        }
+        status.textContent = isAdmin
+          ? 'Quẻ đã lưu; Tông Chủ Chí Tôn đã đạt mức Tu Vi tối đa.'
+          : 'Đã nhận quẻ hôm nay và được cộng +5 Tu Vi.';
+        status.classList.remove('is-error');
+      } catch (error) {
+        try {
+          localStorage.removeItem(storageKey);
+        } catch (storageError) {
+          console.error('Không thể hoàn tác lượt rút quẻ:', storageError);
+        }
+        console.error('Không thể lưu lượt rút quẻ:', error);
+        status.textContent = `Chưa thể lưu lượt rút quẻ: ${error.message || 'Lỗi lưu trữ trình duyệt.'}`;
+        status.classList.add('is-error');
+      } finally {
+        button.disabled = false;
+      }
+    });
+  }
+
   function renderAdminMemoryList() {
     const list = document.getElementById('admin-memory-list');
     if (!list || !state.data) return;
@@ -2518,7 +2642,8 @@
       '#lightbox-modal.active',
       '#filmstrip-modal.active',
       '#game-modal.active',
-      '#cinema-modal.active'
+      '#cinema-modal.active',
+      '#archive-lock-modal.active'
     ];
 
     function syncModalNavbar() {
@@ -2566,8 +2691,7 @@
     }
     if (heroIntro) heroIntro.textContent = HERO_INTRO;
 
-    const inviteButton = document.getElementById('btn-invite-friends');
-    if (inviteButton) {
+    document.querySelectorAll('[data-invite-friends]').forEach(inviteButton => {
       inviteButton.addEventListener('click', async () => {
         if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
           showCultivationToast('Trình duyệt chưa hỗ trợ sao chép. Hãy mở trang bằng HTTPS rồi thử lại.', '⚠️');
@@ -2580,6 +2704,22 @@
         } catch (error) {
           console.warn('Không thể sao chép thiệp mời:', error);
           showCultivationToast('Chưa thể sao chép thiệp mời. Hãy kiểm tra quyền clipboard của trình duyệt.', '⚠️');
+        }
+      });
+    });
+
+    const zaloLink = document.getElementById('footer-zalo-link');
+    if (zaloLink) {
+      zaloLink.addEventListener('click', async () => {
+        try {
+          if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+            throw new Error('Trình duyệt chưa hỗ trợ sao chép.');
+          }
+          await navigator.clipboard.writeText('0988305473');
+          showCultivationToast('Đã sao chép số Zalo 0988305473 vào linh phù!', '💬');
+        } catch (error) {
+          console.warn('Không thể sao chép số Zalo:', error);
+          showCultivationToast('Chưa thể sao chép số Zalo. Đạo hữu có thể sao chép thủ công: 0988305473.', '⚠️');
         }
       });
     }
@@ -2860,6 +3000,7 @@
     attachArchiveButtons();
 
     document.querySelectorAll('.stage-quotes-toggle').forEach(bindStageQuoteToggle);
+    refreshVisibleMemoryLikes();
     } catch (e) {
       console.error('Lỗi render 7 giai đoạn:', e);
     }
@@ -3122,8 +3263,59 @@
           : null;
         if (!archiveButton || archiveButton !== btn) return;
         const stageId = archiveButton.dataset.stageId;
-        openFilmstripModal(stageId);
+        if (authenticatedUser) {
+          openFilmstripModal(stageId);
+        } else {
+          openArchiveLockModal(stageId);
+        }
       });
+    });
+  }
+
+  function openArchiveLockModal(stageId) {
+    const modal = document.getElementById('archive-lock-modal');
+    const authButton = document.getElementById('archive-lock-auth');
+    if (!modal || !authButton) return;
+    authButton.dataset.stageId = stageId;
+    modal.hidden = false;
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeArchiveLockModal() {
+    const modal = document.getElementById('archive-lock-modal');
+    if (!modal) return;
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+    modal.hidden = true;
+    if (!document.querySelector('.admin-modal.active') &&
+        !document.querySelector('.modal.active') &&
+        !document.querySelector('.lightbox-modal.active')) {
+      document.body.style.overflow = '';
+    }
+  }
+
+  function initArchiveLockModal() {
+    const modal = document.getElementById('archive-lock-modal');
+    const closeButton = document.getElementById('archive-lock-close');
+    const backdrop = document.getElementById('archive-lock-backdrop');
+    const authButton = document.getElementById('archive-lock-auth');
+    if (!modal || !closeButton || !backdrop || !authButton) return;
+    closeButton.addEventListener('click', closeArchiveLockModal);
+    backdrop.addEventListener('click', closeArchiveLockModal);
+    authButton.addEventListener('click', () => {
+      const stageId = authButton.dataset.stageId;
+      closeArchiveLockModal();
+      if (!requireAuth(() => openFilmstripModal(stageId))) {
+        return;
+      }
+      openFilmstripModal(stageId);
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && modal.classList.contains('active')) {
+        closeArchiveLockModal();
+      }
     });
   }
 
@@ -3301,6 +3493,7 @@
         ? `<video src="${escapeHtml(imgSource)}" muted playsinline preload="metadata" aria-label="${escapeHtml(mem.title)}"></video>`
         : `<img src="${escapeHtml(imgSource)}" alt="${escapeHtml(mem.title)}" loading="lazy" decoding="async" ${focalStyle} onerror="this.src='images/Lúc nhỏ/IMG_0025_Original.JPG';">`;
 
+      const stage = state.currentStageForModal;
       frame.innerHTML = `
         <span class="film-number">#${frameNumber}</span>
         <div class="film-thumb-box">
@@ -3310,17 +3503,20 @@
           <span class="film-frame-time">${escapeHtml(mem.time)}</span>
           <h5 class="film-frame-title">${escapeHtml(mem.title)}</h5>
         </div>
+        ${stage ? memoryLikeButtonMarkup(stage, mem, 'film-frame-like') : ''}
       `;
 
-      frame.addEventListener('click', () => {
+      frame.addEventListener('click', event => {
+        if (event.target instanceof Element && event.target.closest('[data-memory-like-button]')) return;
         if (mem.image && mem.image.length > 0) {
-          openLightbox(mem, 0, state.currentStageForModal || null);
+          openLightbox(mem, 0, stage || null);
         }
       });
 
       grid.appendChild(frame);
     });
     state.archive.renderedCount += batch.length;
+    refreshVisibleMemoryLikes(grid);
   }
 
   // ========================================================
@@ -3860,9 +4056,8 @@
     setLeaderboardStatus(statusId, 'Đang triệu hồi Bảng Tu Vi...');
     try {
       const { data, error } = await supabaseClient.from('user_cultivation')
-        .select('user_id,display_name,tu_vi')
-        .order('tu_vi', { ascending: false })
-        .limit(10);
+        .select('*')
+        .order('tu_vi', { ascending: false });
       if (error) throw error;
       const rows = data || [];
       if (isAdminUser()) {
@@ -4960,6 +5155,27 @@
       toggleBtn.addEventListener('click', toggleBgMusic);
     }
 
+    const playerWidget = document.getElementById('floating-bg-player');
+    const collapseBtn = document.getElementById('bg-music-collapse-btn');
+    if (toggleBtn && playerWidget) {
+      toggleBtn.addEventListener('click', event => {
+        if (window.matchMedia && window.matchMedia('(max-width: 767px)').matches &&
+            !playerWidget.classList.contains('is-expanded')) {
+          event.stopImmediatePropagation();
+          playerWidget.classList.add('is-expanded');
+          toggleBtn.setAttribute('aria-expanded', 'true');
+          updateBgMusicUI();
+        }
+      }, true);
+    }
+    if (collapseBtn && playerWidget && toggleBtn) {
+      collapseBtn.addEventListener('click', () => {
+        playerWidget.classList.remove('is-expanded');
+        toggleBtn.setAttribute('aria-expanded', 'false');
+        updateBgMusicUI();
+      });
+    }
+
     // Nút Chuyển ngẫu nhiên bài kế tiếp
     const nextBtn = document.getElementById('bg-music-next-btn');
     if (nextBtn) {
@@ -5053,17 +5269,27 @@
     const globalAudioToggle = document.getElementById('global-audio-toggle');
 
     const isActive = !state.bgMusic.isUserMuted;
+    const isMobile = Boolean(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
+    const isExpanded = Boolean(playerWidget && playerWidget.classList.contains('is-expanded'));
 
     if (isActive && !state.currentAudio) {
       if (playerWidget) playerWidget.classList.add('playing');
-      if (diskIcon) diskIcon.textContent = '🎵';
-      if (toggleBtn) toggleBtn.title = 'Tạm dừng nhạc nền';
       if (globalAudioToggle) globalAudioToggle.classList.add('playing');
     } else {
       if (playerWidget) playerWidget.classList.remove('playing');
-      if (diskIcon) diskIcon.textContent = '🔇';
-      if (toggleBtn) toggleBtn.title = 'Bật nhạc nền tổng';
       if (globalAudioToggle && !state.currentAudio) globalAudioToggle.classList.remove('playing');
+    }
+    if (diskIcon) diskIcon.textContent = '🎵';
+    if (toggleBtn) {
+      toggleBtn.title = isMobile && !isExpanded
+        ? 'Mở trình phát nhạc'
+        : isActive ? 'Tạm dừng nhạc nền' : 'Bật nhạc nền tổng';
+      toggleBtn.setAttribute('aria-label', toggleBtn.title);
+      toggleBtn.setAttribute('aria-expanded', String(isMobile && isExpanded));
+    }
+    if (globalAudioToggle) {
+      globalAudioToggle.title = isActive ? 'Tạm dừng Nhạc Dưỡng Thần' : 'Bật Nhạc Dưỡng Thần';
+      globalAudioToggle.setAttribute('aria-label', 'Nhạc Dưỡng Thần');
     }
   }
 
