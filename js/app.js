@@ -15,12 +15,14 @@
   const INVITE_URL = 'https://haithanh05.github.io/thien_menh_chi_thanh';
   const INVITE_MESSAGE = `Mời đạo hữu ghé thăm Thiên Mệnh Chi Thành – nơi Thành Chủ Hải Thành lưu giữ hành trình độ kiếp từ phàm nhân sợ bug đến chiến thần gõ phím: ${INVITE_URL}`;
   const GENESIS_IMAGE = 'images/%E1%BA%A3nh%20ch%C3%ADnh/avt.jpg';
+  const CULTIVATION_PROFILE_COLUMNS = 'user_id,display_name,tu_vi,last_daily_claim,daily_like_xp,last_like_date,ticket_claimed,guestbook_claimed,updated_at';
   const supabaseClient = window.supabase && typeof window.supabase.createClient === 'function'
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
   let authenticatedUser = null;
   let pendingAuthAction = null;
   let activeAuthMode = 'login';
+  let pauseCanvasAnimation = null;
 
   // State Management
   const state = {
@@ -28,12 +30,20 @@
     currentFilter: 'all', // 'all' | 'photos' | 'quotes'
     siteSettings: {},
     cultivationOverrides: {},
+    customAttributes: {},
+    originalMemoriesByStage: new Map(),
+    hiddenMemories: new Set(),
+    adminMemoryFilter: 'all',
+    archive: {
+      memories: [],
+      renderedCount: 0,
+      closeTimer: null
+    },
     adminEditingMemory: null,
     cultivation: {
       userId: null,
       profile: null,
       tuVi: 0,
-      supportsDisplayName: false,
       syncPromise: null,
       awardQueue: Promise.resolve(),
       pendingClaims: new Set()
@@ -141,11 +151,87 @@
     return level.match(/Lv\.\s*\d+/i)?.[0] || level.trim();
   }
 
+  function getCultivationMainStats(stage) {
+    const customStats = state.customAttributes[stage.id]?.mainStats || [];
+    return stage.mainStats.map((stat, index) => ({
+      ...stat,
+      ...(customStats[index] || {})
+    }));
+  }
+
   function getCultivationSubStats(stage) {
     const override = state.cultivationOverrides[stage.id];
-    return override && Array.isArray(override.subStats)
+    const baseStats = override && Array.isArray(override.subStats) && override.subStats.length
       ? override.subStats
       : stage.subStats;
+    const customStats = state.customAttributes[stage.id]?.subStats || [];
+    return baseStats.map((stat, index) => ({
+      ...stat,
+      ...(customStats[index] || {})
+    }));
+  }
+
+  const STAT_QUALITIES = [
+    { value: 'cuc-pham', label: 'Cực Phẩm', className: 'cuc-pham' },
+    { value: 'thuong-pham', label: 'Thượng Phẩm', className: 'thuong-pham' },
+    { value: 'trung-pham', label: 'Trung Phẩm', className: 'trung-pham' },
+    { value: 'ha-pham', label: 'Hạ Phẩm', className: 'ha-pham' },
+    { value: 'tiem-nang', label: 'Tiềm Năng', className: 'tiem-nang' }
+  ];
+
+  function getStatQuality(qualityValue, value) {
+    const quality = String(qualityValue || '').trim().toLowerCase();
+    const selected = STAT_QUALITIES.find(item =>
+      item.value === quality || item.label.toLowerCase() === quality
+    );
+    if (selected) return selected;
+    if (value >= 90) return STAT_QUALITIES[0];
+    if (value >= 80) return STAT_QUALITIES[1];
+    return STAT_QUALITIES[4];
+  }
+
+  function renderMainStatsMarkup(stage) {
+    return getCultivationMainStats(stage).map(stat => {
+      const value = Math.max(0, Math.min(100, Number(stat.value) || 0));
+      const quality = getStatQuality(stat.quality, value);
+      const label = escapeHtml(stat.label);
+      return `
+        <div class="stat-bar-item">
+          <div class="stat-bar-labels">
+            <span class="stat-bar-name">${label}</span>
+            <span class="stat-bar-value-group">
+              <span class="stat-bar-val">${value}%</span>
+              <span class="rpg-mainstat-badge ${quality.className}">${quality.label}</span>
+            </span>
+          </div>
+          <div class="rpg-mainstat-bar" role="img" aria-label="${label}: ${value}%">
+            <div class="rpg-mainstat-bar-inner" style="width: ${value}%">
+              <span class="rpg-mainstat-bar-dot" aria-hidden="true"></span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderSubStatsMarkup(stage) {
+    return getCultivationSubStats(stage).map(stat => {
+      const hasAttributeMeta = Number.isFinite(Number(stat.percent)) || Boolean(stat.quality);
+      const percent = Math.max(0, Math.min(100, Number(stat.percent) || 0));
+      const quality = getStatQuality(stat.quality, percent);
+      return `
+        <div class="rpg-substat-card">
+          <span class="rpg-substat-name">${escapeHtml(stat.label)}</span>
+          ${renderStars(stat.value)}
+          ${hasAttributeMeta ? `
+            <div class="rpg-substat-attribute">
+              <span>${percent}%</span>
+              <span class="rpg-mainstat-badge ${quality.className}">${quality.label}</span>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }).join('');
   }
 
   const CULTIVATION_RANKS = [
@@ -168,23 +254,58 @@
     const rankEl = document.getElementById('auth-cultivation-rank');
     const totalEl = document.getElementById('auth-cultivation-total');
     const navTotal = document.getElementById('nav-cultivation-total');
+    const navLabel = document.getElementById('nav-cultivation-label');
+    const navBadge = document.getElementById('nav-cultivation-badge');
     const progress = document.getElementById('auth-cultivation-progress');
     const progressLabel = document.getElementById('auth-cultivation-progress-label');
     const status = document.getElementById('auth-cultivation-status');
     if (!card) return;
 
     card.hidden = !authenticatedUser;
-    if (navTotal) navTotal.textContent = String(authenticatedUser ? Math.max(0, Number(state.cultivation.tuVi) || 0) : 0);
+    const displayedPoints = !authenticatedUser
+      ? 0
+      : isAdminUser()
+        ? 9999
+        : Math.max(0, Number(state.cultivation.tuVi) || 0);
+    if (navTotal) navTotal.textContent = String(displayedPoints);
+    if (navBadge && navLabel) {
+      const isAdmin = isAdminUser();
+      const pointsRank = getCultivationRank(displayedPoints);
+      const rankLabel = pointsRank.name
+        .replace(' Nhập Môn', '')
+        .replace(' Kỳ', '')
+        .replace(' Đại Năng', '');
+      navLabel.textContent = rankLabel;
+      if (navTotal) {
+        if (isAdmin) {
+          navBadge.replaceChildren(document.createTextNode('👑 Chí Tôn • '), navTotal);
+        } else {
+          navBadge.replaceChildren(
+            document.createTextNode('✦ '),
+            navLabel,
+            document.createTextNode(' • '),
+            navTotal
+          );
+        }
+      }
+      navBadge.setAttribute('aria-label', isAdmin
+        ? 'Chí Tôn • 9999'
+        : `${rankLabel} • ${displayedPoints}`);
+    }
     if (!authenticatedUser) return;
     const points = Math.max(0, Number(state.cultivation.tuVi) || 0);
     const rank = getCultivationRank(points);
-    if (rankEl) rankEl.textContent = rank.name;
+    if (rankEl) rankEl.textContent = isAdminUser()
+      ? 'Độ Kiếp Chí Tôn • Thành Chủ Sáng Thế'
+      : rank.name;
     if (totalEl) totalEl.textContent = String(points);
     if (status) status.textContent = state.cultivation.profileError || '';
     if (progress) {
-      if (rank.next == null) {
+      if (isAdminUser() || rank.next == null) {
         progress.value = 100;
-        if (progressLabel) progressLabel.textContent = `${points} Tu Vi · Đã đạt cảnh giới tối cao`;
+        if (progressLabel) progressLabel.textContent = isAdminUser()
+          ? '9999 Tu Vi · Độ Kiếp Chí Tôn'
+          : `${points} Tu Vi · Đã đạt cảnh giới tối cao`;
       } else {
         progress.value = Math.max(0, Math.min(100, ((points - rank.min) / (rank.next - rank.min)) * 100));
         if (progressLabel) progressLabel.textContent = `${points} / ${rank.next} Tu Vi`;
@@ -218,6 +339,11 @@
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   }
 
+  function normalizeDateKey(value) {
+    const dateKey = String(value || '').slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : null;
+  }
+
   function parseSettingValue(value) {
     if (typeof value !== 'string') return value && typeof value === 'object' ? value : {};
     try {
@@ -249,6 +375,45 @@
     return normalized;
   }
 
+  function normalizeCustomAttributes(value) {
+    const source = parseSettingValue(value);
+    const normalized = {};
+    const stages = new Map((state.data && state.data.stages || []).map(stage => [stage.id, stage]));
+    Object.entries(source).forEach(([stageId, override]) => {
+      const stage = stages.get(stageId);
+      if (!stage || !override || typeof override !== 'object') return;
+      const stageAttributes = {};
+      if (Array.isArray(override.mainStats)) {
+        stageAttributes.mainStats = override.mainStats.slice(0, stage.mainStats.length).map((stat, index) => {
+          const fallback = stage.mainStats[index] || {};
+          const value = Math.max(0, Math.min(100, Number(stat && stat.value) || 0));
+          return {
+            label: String(stat && stat.label || fallback.label || '').trim(),
+            value,
+            quality: getStatQuality(stat && stat.quality, value).value
+          };
+        });
+      }
+      if (Array.isArray(override.subStats)) {
+        stageAttributes.subStats = override.subStats.slice(0, stage.subStats.length).map((stat, index) => {
+          const fallback = stage.subStats[index] || {};
+          const starValue = Math.max(0, Math.min(5, Number(stat && stat.value) || 0));
+          const percent = Math.max(0, Math.min(100,
+            Number(stat && stat.percent != null ? stat.percent : (Number(fallback.value) || 0) * 20) || 0
+          ));
+          return {
+            label: String(stat && stat.label || fallback.label || '').trim(),
+            value: starValue,
+            percent,
+            quality: getStatQuality(stat && stat.quality, percent).value
+          };
+        });
+      }
+      normalized[stageId] = stageAttributes;
+    });
+    return normalized;
+  }
+
   function refreshCultivationStageCards() {
     if (!state.data) return;
     state.data.stages.forEach(stage => {
@@ -257,18 +422,13 @@
       const levelBadge = section.querySelector('.rpg-avatar-lv');
       const levelName = section.querySelector('.rpg-level-name');
       const fate = section.querySelector('.rpg-fate-badge');
+      const mainStats = section.querySelector('.stat-bar-group');
       const subStats = section.querySelector('.rpg-substats-grid');
       if (levelBadge) levelBadge.textContent = getCultivationLevel(stage);
       if (levelName) levelName.textContent = getCultivationLevelName(stage);
       if (fate) fate.textContent = `🔮 Mệnh Cách: ${getCultivationFate(stage.id)}`;
-      if (subStats) {
-        subStats.innerHTML = getCultivationSubStats(stage).map(stat => `
-          <div class="rpg-substat-card">
-            <span class="rpg-substat-name">${escapeHtml(stat.label)}</span>
-            ${renderStars(stat.value)}
-          </div>
-        `).join('');
-      }
+      if (mainStats) mainStats.innerHTML = renderMainStatsMarkup(stage);
+      if (subStats) subStats.innerHTML = renderSubStatsMarkup(stage);
     });
   }
 
@@ -277,16 +437,23 @@
     try {
       const { data, error } = await supabaseClient.from('site_settings')
         .select('key,value')
-        .in('key', ['cultivation_overrides', 'visitor_config']);
+        .in('key', ['cultivation_overrides', 'custom_attributes', 'visitor_config', 'hidden_memories']);
       if (error) throw error;
 
       (data || []).forEach(row => {
         state.siteSettings[row.key] = parseSettingValue(row.value);
       });
       state.cultivationOverrides = normalizeCultivationOverrides(state.siteSettings.cultivation_overrides);
+      state.customAttributes = normalizeCustomAttributes(state.siteSettings.custom_attributes);
+      state.hiddenMemories = new Set(Array.isArray(state.siteSettings.hidden_memories)
+        ? state.siteSettings.hidden_memories.map(String)
+        : []);
+      applyHiddenMemories();
       const visitorConfig = state.siteSettings.visitor_config || {};
       state.visitor.visible = visitorConfig.visible === true;
       refreshCultivationStageCards();
+      renderStages();
+      renderAdminMemoryList();
       updateVisitorBadge();
       syncAdminSettingsForm();
     } catch (error) {
@@ -296,9 +463,11 @@
 
   function updateVisitorBadge() {
     const badge = document.getElementById('visitor-count-badge');
+    const row = document.getElementById('visitor-count-row');
     const count = document.getElementById('visitor-count-number');
     if (!badge) return;
     badge.hidden = !state.visitor.visible;
+    if (row) row.hidden = !state.visitor.visible;
     if (count) count.textContent = String(Math.max(0, Number(state.visitor.count) || 0));
   }
 
@@ -349,53 +518,73 @@
     state.siteSettings[key] = value;
   }
 
+  function applyHiddenMemories() {
+    if (!state.data) return;
+    state.data.stages.forEach(stage => {
+      const sourceMemories = state.originalMemoriesByStage.get(stage.id) || [];
+      const dynamicMemories = stage.memories.filter(memory => memory.isDynamic);
+      stage.memories = [
+        ...sourceMemories.filter(memory => !state.hiddenMemories.has(String(memory.id))),
+        ...dynamicMemories
+      ];
+    });
+    updateStageMemoryCounts();
+  }
+
   function applyCultivationProfile(profile) {
-    state.cultivation.profile = profile || null;
-    state.cultivation.tuVi = Math.max(0, Number(profile && profile.tu_vi) || 0);
+    const effectiveProfile = profile && isAdminUser()
+      ? { ...profile, tu_vi: 9999 }
+      : profile;
+    state.cultivation.profile = effectiveProfile || null;
+    state.cultivation.tuVi = Math.max(0, Number(effectiveProfile && effectiveProfile.tu_vi) || 0);
     state.cultivation.profileError = '';
     renderCultivationCard();
   }
 
-  function getAuthDisplayName(user) {
+  function getUserDisplayName(user) {
     const email = String(user && user.email || '');
     const metadata = user && user.user_metadata || {};
     return String(metadata.display_name || metadata.full_name || email.split('@')[0] || 'Đạo Hữu').trim();
   }
 
+  function buildCultivationPayload(user, profile, changes = {}) {
+    const values = { ...(profile || {}), ...changes };
+    return {
+      user_id: user.id,
+      display_name: String(values.display_name || getUserDisplayName(user)),
+      tu_vi: Math.max(0, Number(values.tu_vi) || 0),
+      last_daily_claim: normalizeDateKey(values.last_daily_claim),
+      daily_like_xp: Math.max(0, Number(values.daily_like_xp) || 0),
+      last_like_date: normalizeDateKey(values.last_like_date),
+      ticket_claimed: Boolean(values.ticket_claimed),
+      guestbook_claimed: Boolean(values.guestbook_claimed),
+      updated_at: new Date().toISOString()
+    };
+  }
+
   async function fetchCultivationProfile(userId) {
-    let result = await supabaseClient.from('user_cultivation')
-      .select('user_id,tu_vi,last_daily_claim,daily_like_date,daily_like_points,ticket_reward_claimed,guestbook_reward_claimed,display_name')
+    const result = await supabaseClient.from('user_cultivation')
+      .select(CULTIVATION_PROFILE_COLUMNS)
       .eq('user_id', userId)
       .maybeSingle();
-    if (result.error && isMissingDatabaseColumn(result.error, 'display_name')) {
-      state.cultivation.supportsDisplayName = false;
-      result = await supabaseClient.from('user_cultivation')
-        .select('user_id,tu_vi,last_daily_claim,daily_like_date,daily_like_points,ticket_reward_claimed,guestbook_reward_claimed')
-        .eq('user_id', userId)
-        .maybeSingle();
-    } else if (!result.error) {
-      state.cultivation.supportsDisplayName = true;
-    }
     if (result.error) throw result.error;
     return result.data;
   }
 
   async function claimDailyCultivation(user, profile) {
     const today = localDateKey();
-    if (String(profile && profile.last_daily_claim || '').slice(0, 10) === today) return;
-    const updatedProfile = {
-      user_id: user.id,
+    if (normalizeDateKey(profile && profile.last_daily_claim) === today) return false;
+    const updatedProfile = buildCultivationPayload(user, profile, {
       tu_vi: (Number(profile && profile.tu_vi) || 0) + 20,
       last_daily_claim: today
-    };
-    if (state.cultivation.supportsDisplayName) updatedProfile.display_name = getAuthDisplayName(user);
+    });
     const { error } = await supabaseClient.from('user_cultivation')
       .upsert(updatedProfile, { onConflict: 'user_id' });
     if (error) throw error;
 
-    const nextProfile = { ...(profile || {}), ...updatedProfile };
-    applyCultivationProfile(nextProfile);
+    applyCultivationProfile(updatedProfile);
     showCultivationToast('+20 Tu Vi · Điểm danh hằng ngày', '☀️');
+    return true;
   }
 
   async function syncCultivationForUser(user) {
@@ -414,19 +603,19 @@
     state.cultivation.syncPromise = (async () => {
       const profile = await fetchCultivationProfile(user.id);
       if (state.cultivation.userId !== user.id) return;
-      applyCultivationProfile(profile);
-      if (profile && state.cultivation.supportsDisplayName && !profile.display_name) {
-        const displayName = getAuthDisplayName(user);
-        const { error } = await supabaseClient.from('user_cultivation')
-          .update({ display_name: displayName })
-          .eq('user_id', user.id);
-        if (error) console.warn('Không thể đồng bộ Đạo Hiệu lên hồ sơ Tu Vi:', error);
-        else applyCultivationProfile({ ...profile, display_name: displayName });
-      }
+      const syncedProfile = buildCultivationPayload(user, profile, isAdminUser(user) ? { tu_vi: 9999 } : {});
+      const { error } = await supabaseClient.from('user_cultivation')
+        .upsert(syncedProfile, { onConflict: 'user_id' });
+      if (error) throw error;
+      applyCultivationProfile(syncedProfile);
       const dailyClaim = state.cultivation.awardQueue.then(async () => {
         const latestProfile = await fetchCultivationProfile(user.id);
         if (state.cultivation.userId !== user.id) return;
-        await claimDailyCultivation(user, latestProfile);
+        if (isAdminUser(user)) {
+          applyCultivationProfile({ ...(latestProfile || syncedProfile), tu_vi: 9999 });
+        } else {
+          await claimDailyCultivation(user, latestProfile);
+        }
       });
       state.cultivation.awardQueue = dailyClaim.then(() => undefined, () => undefined);
       await dailyClaim;
@@ -434,6 +623,7 @@
 
     try {
       await state.cultivation.syncPromise;
+      void loadLeaderboard();
     } catch (error) {
       console.error('Không thể tải Tu Vi Đạo Hữu:', error);
       state.cultivation.profileError = 'Chưa thể đồng bộ Tu Vi. Vui lòng thử lại sau.';
@@ -465,6 +655,10 @@
     if (!authenticatedUser || authenticatedUser.id !== userId) return false;
     const user = authenticatedUser;
     try {
+      if (isAdminUser(user)) {
+        showCultivationToast('Tông Chủ đã đạt Chí Tôn • 9999 Tu Vi.', '👑');
+        return false;
+      }
       const profile = await fetchCultivationProfile(user.id);
       if (authenticatedUser?.id !== user.id) return false;
 
@@ -476,29 +670,22 @@
       const changes = {};
       if (options.dailyLike) {
         const today = localDateKey();
-        const claimedToday = String(profile && profile.daily_like_date || '').slice(0, 10) === today;
-        const pointsClaimedToday = claimedToday ? Number(profile && profile.daily_like_points) || 0 : 0;
+        const claimedToday = normalizeDateKey(profile && profile.last_like_date) === today;
+        const pointsClaimedToday = claimedToday ? Number(profile && profile.daily_like_xp) || 0 : 0;
         awardedPoints = Math.min(points, Math.max(0, 50 - pointsClaimedToday));
         if (awardedPoints <= 0) {
           showCultivationToast('Đạo hữu đã nhận đủ 50 Tu Vi Linh Thạch hôm nay.', '💠');
           return false;
         }
-        changes.daily_like_date = today;
-        changes.daily_like_points = pointsClaimedToday + awardedPoints;
+        changes.last_like_date = today;
+        changes.daily_like_xp = pointsClaimedToday + awardedPoints;
       }
 
-      const updatedProfile = {
-        user_id: user.id,
-        tu_vi: (Number(profile && profile.tu_vi) || 0) + awardedPoints,
-        ...changes
-      };
-      if (state.cultivation.supportsDisplayName) {
-        updatedProfile.display_name = profile && profile.display_name || getAuthDisplayName(user);
-      }
-      if (profile && profile.last_daily_claim) updatedProfile.last_daily_claim = profile.last_daily_claim;
-      if (profile && profile.ticket_reward_claimed) updatedProfile.ticket_reward_claimed = true;
-      if (profile && profile.guestbook_reward_claimed) updatedProfile.guestbook_reward_claimed = true;
-      if (options.claimField) updatedProfile[options.claimField] = true;
+      if (options.claimField) changes[options.claimField] = true;
+      const updatedProfile = buildCultivationPayload(user, profile, {
+        ...changes,
+        tu_vi: (Number(profile && profile.tu_vi) || 0) + awardedPoints
+      });
 
       const { error } = await supabaseClient.from('user_cultivation')
         .upsert(updatedProfile, { onConflict: 'user_id' });
@@ -507,10 +694,11 @@
 
       applyCultivationProfile({ ...(profile || {}), ...updatedProfile });
       showCultivationToast(`+${awardedPoints} Tu Vi · ${reason}`, '✨');
+      void loadCultivationLeaderboard();
       return true;
     } catch (error) {
       console.error(`Không thể cộng Tu Vi (${reason}):`, error);
-      const message = 'Chưa thể cộng Tu Vi. Kiểm tra cấu hình user_cultivation.';
+      const message = `Không thể cộng Tu Vi: ${error.message || 'Lỗi kết nối cơ sở dữ liệu.'}`;
       state.cultivation.profileError = message;
       renderCultivationCard();
       showCultivationToast(message, '⚠️');
@@ -750,7 +938,7 @@
           </svg>
         </span>`;
     }
-    html += `<span class="rpg-substat-tier">Tầng ${num}/${maxStars}</span></div>`;
+    html += `</div><span class="rpg-substat-tier">Tầng ${num}/${maxStars}</span>`;
     return html;
   }
 
@@ -773,6 +961,10 @@
         memories: Array.isArray(stage.memories) ? [...stage.memories] : [],
         themeSong: stage.themeSong || { title: 'Giai điệu hoài niệm', src: '', startTime: 0 }
       }));
+      state.originalMemoriesByStage = new Map(state.data.stages.map(stage => [
+        stage.id,
+        stage.memories.filter(memory => !memory.isDynamic)
+      ]));
 
       initHeroSection();
       initStickyNav();
@@ -804,6 +996,39 @@
     );
   }
 
+  function isVideoUrl(url) {
+    if (typeof url !== 'string') return false;
+    try {
+      return /\.(mp4|m4v|mov|webm|ogv)$/i.test(new URL(url, window.location.href).pathname);
+    } catch (error) {
+      return /\.(mp4|m4v|mov|webm|ogv)(?:[?#]|$)/i.test(url);
+    }
+  }
+
+  function getVideoExtension(file) {
+    const nameExtension = String(file.name || '').match(/\.(mp4|m4v|mov|webm|ogv)$/i);
+    if (nameExtension) return nameExtension[1].toLowerCase();
+    const typeExtensions = {
+      'video/mp4': 'mp4',
+      'video/webm': 'webm',
+      'video/quicktime': 'mov',
+      'video/ogg': 'ogv'
+    };
+    return typeExtensions[file.type] || '';
+  }
+
+  function getVideoContentType(file, extension) {
+    if (file.type.startsWith('video/')) return file.type;
+    const extensionTypes = {
+      mp4: 'video/mp4',
+      m4v: 'video/mp4',
+      mov: 'video/quicktime',
+      webm: 'video/webm',
+      ogv: 'video/ogg'
+    };
+    return extensionTypes[extension] || '';
+  }
+
   function mapDynamicMemory(row) {
     if (!row || row.id == null) return null;
     const source = row.image_url || row.image || row.imageUrl || row.photo_url;
@@ -822,6 +1047,7 @@
       month: row.month == null || row.month === '' ? null : Number(row.month),
       description: String(row.description || ''),
       image: images,
+      mediaType: isVideoUrl(images[0]) ? 'video' : 'image',
       tag: 'Kỷ niệm',
       isHighlight: false
     };
@@ -934,7 +1160,8 @@
 
       let changed = false;
       state.data.stages.forEach(stage => {
-        const staticMemories = stage.memories.filter(memory => !memory.isDynamic);
+        const staticMemories = (state.originalMemoriesByStage.get(stage.id) || [])
+          .filter(memory => !state.hiddenMemories.has(String(memory.id)));
         const dynamicMemories = data
           .filter(row => findStageForMemoryRow(row) === stage)
           .map(mapDynamicMemory)
@@ -1032,8 +1259,7 @@
     const memberEmail = document.getElementById('auth-member-email');
     const email = String(user && user.email || '');
     const admin = isAdminUser(user);
-    const displayName = user && user.user_metadata &&
-      (user.user_metadata.display_name || user.user_metadata.full_name);
+    const displayName = user ? getUserDisplayName(user) : '';
     const headerLabel = !user
       ? '◈ Đăng nhập'
       : admin
@@ -1067,12 +1293,7 @@
   }
 
   function fillAuthenticatedForms(user) {
-    const email = String(user.email || '');
-    const userName = String(
-      user.user_metadata && (user.user_metadata.display_name || user.user_metadata.full_name) ||
-      email.split('@')[0] ||
-      'Đạo Hữu'
-    ).trim();
+    const userName = getUserDisplayName(user);
     const fields = [
       document.getElementById('ticket-visitor-name'),
       document.getElementById('capsule-sender')
@@ -1239,24 +1460,69 @@
     const level = document.getElementById('admin-cultivation-level');
     const name = document.getElementById('admin-cultivation-name');
     const fate = document.getElementById('admin-cultivation-fate');
+    const mainStatsContainer = document.getElementById('admin-cultivation-mainstats');
     const skills = document.getElementById('admin-cultivation-skills');
     if (level) level.value = override.level || (String(stage.level || '').match(/Lv\.\s*\d+/i) || [''])[0];
     if (name) name.value = override.levelName || getCultivationLevelName(stage).replace(/^.*?•\s*/, '');
     if (fate) fate.value = override.fate || getCultivationFate(stage.id);
+    if (mainStatsContainer) {
+      mainStatsContainer.innerHTML = getCultivationMainStats(stage).map((stat, index) => {
+        const quality = getStatQuality(stat.quality, Number(stat.value) || 0).value;
+        return `
+          <div class="admin-attribute-row">
+            <h6>${escapeHtml(stat.label || `Linh Căn ${index + 1}`)}</h6>
+            <label for="admin-mainstat-name-${index}">Tên</label>
+            <input id="admin-mainstat-name-${index}" type="text" maxlength="60" value="${escapeHtml(stat.label)}" required>
+            <label for="admin-mainstat-value-${index}">Chỉ số (%)</label>
+            <input id="admin-mainstat-value-${index}" type="number" min="0" max="100" step="1" value="${Math.max(0, Math.min(100, Number(stat.value) || 0))}" required>
+            <label for="admin-mainstat-quality-${index}">Phẩm chất</label>
+            <select id="admin-mainstat-quality-${index}" required>
+              ${STAT_QUALITIES.map(item => `<option value="${item.value}" ${item.value === quality ? 'selected' : ''}>${item.label}</option>`).join('')}
+            </select>
+          </div>
+        `;
+      }).join('');
+    }
     if (!skills) return;
 
-    const stats = override.subStats || stage.subStats || [];
+    const stats = getCultivationSubStats(stage);
     skills.innerHTML = Array.from({ length: 4 }, (_, index) => {
       const stat = stats[index] || { label: `Linh Thạch ${index + 1}`, value: 0 };
+      const percent = stat.percent == null
+        ? Math.round((Number(stat.value) || 0) * 20)
+        : Math.max(0, Math.min(100, Number(stat.percent) || 0));
+      const quality = getStatQuality(stat.quality, percent).value;
       return `
         <div class="admin-skill-row">
-          <label for="admin-skill-name-${index}">Linh Thạch ${index + 1} · Tên</label>
+          <h6>Thiên Phú Phụ ${index + 1}</h6>
+          <label for="admin-skill-name-${index}">Tên</label>
           <input id="admin-skill-name-${index}" type="text" maxlength="60" value="${escapeHtml(stat.label)}" required>
           <label for="admin-skill-value-${index}">Số sao (0–5)</label>
           <input id="admin-skill-value-${index}" type="number" min="0" max="5" step="0.5" value="${escapeHtml(stat.value)}" required>
+          <label for="admin-substat-percent-${index}">Chỉ số (%)</label>
+          <input id="admin-substat-percent-${index}" type="number" min="0" max="100" step="1" value="${percent}" required>
+          <label for="admin-substat-quality-${index}">Phẩm chất</label>
+          <select id="admin-substat-quality-${index}" required>
+            ${STAT_QUALITIES.map(item => `<option value="${item.value}" ${item.value === quality ? 'selected' : ''}>${item.label}</option>`).join('')}
+          </select>
         </div>
       `;
     }).join('');
+  }
+
+  function activateAdminPanel(panelId) {
+    const tabs = Array.from(document.querySelectorAll('[data-admin-panel-target]'));
+    const panels = Array.from(document.querySelectorAll('.admin-dashboard-panel'));
+    if (!tabs.some(tab => tab.dataset.adminPanelTarget === panelId)) return;
+    tabs.forEach(tab => {
+      const selected = tab.dataset.adminPanelTarget === panelId;
+      tab.classList.toggle('active', selected);
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+    });
+    panels.forEach(panel => {
+      panel.hidden = panel.id !== panelId;
+    });
   }
 
   function syncAdminSettingsForm() {
@@ -1267,6 +1533,23 @@
   }
 
   function initAdminSettingsControls() {
+    const dashboardTabs = Array.from(document.querySelectorAll('[data-admin-panel-target]'));
+    dashboardTabs.forEach(tab => {
+      tab.addEventListener('click', () => activateAdminPanel(tab.dataset.adminPanelTarget));
+    });
+    const initialDashboardTab = dashboardTabs.find(tab => tab.getAttribute('aria-selected') === 'true') || dashboardTabs[0];
+    if (initialDashboardTab) activateAdminPanel(initialDashboardTab.dataset.adminPanelTarget);
+
+    document.querySelectorAll('[data-admin-memory-filter]').forEach(button => {
+      button.addEventListener('click', () => {
+        const filter = button.dataset.adminMemoryFilter;
+        const hasStage = filter === 'all' || state.data.stages.some(stage => stage.id === filter);
+        if (!hasStage) return;
+        state.adminMemoryFilter = filter;
+        renderAdminMemoryList();
+      });
+    });
+
     const visitorToggle = document.getElementById('admin-visitor-visible');
     if (visitorToggle) {
       visitorToggle.addEventListener('change', async () => {
@@ -1283,8 +1566,8 @@
           state.visitor.visible = nextConfig.visible;
           updateVisitorBadge();
           setAdminToolStatus('admin-visitor-status', nextConfig.visible
-            ? 'Đã bật huy hiệu Đạo hữu viếng thăm.'
-            : 'Đã ẩn huy hiệu Đạo hữu viếng thăm.');
+            ? 'Đã bật huy hiệu Đạo Hữu Lỡ Bước Nhập Môn.'
+            : 'Đã ẩn huy hiệu Đạo Hữu Lỡ Bước Nhập Môn.');
         } catch (error) {
           visitorToggle.checked = state.visitor.visible;
           setAdminToolStatus('admin-visitor-status', `Không thể lưu cài đặt: ${error.message || 'Lỗi kết nối.'}`, true);
@@ -1314,8 +1597,27 @@
           label: document.getElementById(`admin-skill-name-${index}`).value.trim(),
           value: Number(document.getElementById(`admin-skill-value-${index}`).value)
         }));
-        if (subStats.some(stat => !stat.label || !Number.isFinite(stat.value) || stat.value < 0 || stat.value > 5)) {
-          setAdminToolStatus('admin-cultivation-status', 'Hãy nhập đủ 4 Linh Thạch với số sao từ 0 đến 5.', true);
+        const mainStats = getCultivationMainStats(stage).map((stat, index) => ({
+          label: document.getElementById(`admin-mainstat-name-${index}`).value.trim(),
+          value: Number(document.getElementById(`admin-mainstat-value-${index}`).value),
+          quality: document.getElementById(`admin-mainstat-quality-${index}`).value
+        }));
+        const customSubStats = subStats.map((stat, index) => ({
+          ...stat,
+          percent: Number(document.getElementById(`admin-substat-percent-${index}`).value),
+          quality: document.getElementById(`admin-substat-quality-${index}`).value
+        }));
+        const invalidMainStats = mainStats.some(stat =>
+          !stat.label || !Number.isFinite(stat.value) || stat.value < 0 || stat.value > 100 ||
+          !STAT_QUALITIES.some(quality => quality.value === stat.quality)
+        );
+        const invalidSubStats = customSubStats.some(stat =>
+          !stat.label || !Number.isFinite(stat.value) || stat.value < 0 || stat.value > 5 ||
+          !Number.isFinite(stat.percent) || stat.percent < 0 || stat.percent > 100 ||
+          !STAT_QUALITIES.some(quality => quality.value === stat.quality)
+        );
+        if (invalidMainStats || invalidSubStats) {
+          setAdminToolStatus('admin-cultivation-status', 'Hãy kiểm tra tên, chỉ số 0–100%, phẩm chất và số sao của các thuộc tính.', true);
           return;
         }
 
@@ -1328,12 +1630,27 @@
             subStats
           }
         };
+        const nextCustomAttributes = {
+          ...state.customAttributes,
+          [stageId]: {
+            ...(state.customAttributes[stageId] || {}),
+            mainStats,
+            subStats: customSubStats
+          }
+        };
         const submitButton = cultivationForm.querySelector('button[type="submit"]');
         if (submitButton) submitButton.disabled = true;
         setAdminToolStatus('admin-cultivation-status', 'Đang khắc ghi thuộc tính tu tiên…');
         try {
-          await saveSiteSetting('cultivation_overrides', nextOverrides);
+          const { error } = await supabaseClient.from('site_settings').upsert([
+            { key: 'cultivation_overrides', value: nextOverrides },
+            { key: 'custom_attributes', value: nextCustomAttributes }
+          ], { onConflict: 'key' });
+          if (error) throw error;
+          state.siteSettings.cultivation_overrides = nextOverrides;
+          state.siteSettings.custom_attributes = nextCustomAttributes;
           state.cultivationOverrides = normalizeCultivationOverrides(nextOverrides);
+          state.customAttributes = normalizeCustomAttributes(nextCustomAttributes);
           refreshCultivationStageCards();
           setAdminToolStatus('admin-cultivation-status', 'Đã lưu và áp dụng thuộc tính cho giai đoạn này.');
         } catch (error) {
@@ -1524,13 +1841,19 @@
       const file = fileInput.files && fileInput.files[0];
       const editing = state.adminEditingMemory;
       const submitButton = memoryForm.querySelector('button[type="submit"]');
-      if ((!editing && !file) || (file && !file.type.startsWith('image/'))) {
-        setAdminStatus('Vui lòng chọn một tệp ảnh hợp lệ.', true);
+      const videoExtension = file && (file.type.startsWith('video/') || isVideoUrl(file.name))
+        ? getVideoExtension(file)
+        : '';
+      const videoFile = Boolean(videoExtension);
+      if ((!editing && !file) || (file && !file.type.startsWith('image/') && !videoFile)) {
+        setAdminStatus('Hãy chọn ảnh hoặc video MP4, WebM, MOV, OGV hợp lệ.', true);
         return;
       }
 
       if (submitButton) submitButton.disabled = true;
-      setAdminStatus(editing ? 'Đang cập nhật kỷ niệm…' : 'Đang nén ảnh và khai ấn kỷ niệm…');
+      setAdminStatus(editing
+        ? 'Đang cập nhật kỷ niệm…'
+        : videoFile ? 'Đang tải video và khai ấn kỷ niệm…' : 'Đang nén ảnh và khai ấn kỷ niệm…');
       let uploadedPath = '';
       let recordInserted = false;
       try {
@@ -1538,11 +1861,15 @@
           ? editing.memory.image[0]
           : '';
         if (file) {
-          const compressedImage = await compressImage(file);
-          const filePath = `${stageId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.jpg`;
+          const uploadedFile = videoFile ? file : await compressImage(file);
+          const extension = videoFile ? videoExtension : 'jpg';
+          const filePath = `${stageId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`;
           const { data: uploaded, error: uploadError } = await supabaseClient.storage
             .from('museum-images')
-            .upload(filePath, compressedImage, { contentType: 'image/jpeg', upsert: false });
+            .upload(filePath, uploadedFile, {
+              contentType: videoFile ? getVideoContentType(file, extension) : 'image/jpeg',
+              upsert: false
+            });
           if (uploadError) throw uploadError;
           uploadedPath = uploaded.path;
 
@@ -1626,54 +1953,101 @@
     const list = document.getElementById('admin-memory-list');
     if (!list || !state.data) return;
     list.replaceChildren();
-    const memories = state.data.stages.flatMap(stage => stage.memories
-      .filter(memory => memory.isDynamic)
-      .sort((left, right) => left.sortOrder - right.sortOrder)
-      .map((memory, index, stageMemories) => ({ stage, memory, index, stageMemories })));
+    const filter = state.adminMemoryFilter || 'all';
+    document.querySelectorAll('[data-admin-memory-filter]').forEach(button => {
+      const active = button.dataset.adminMemoryFilter === filter;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    const memories = state.data.stages
+      .filter(stage => filter === 'all' || stage.id === filter)
+      .flatMap(stage => {
+      const dynamicMemories = stage.memories
+        .filter(memory => memory.isDynamic)
+        .sort((left, right) => left.sortOrder - right.sortOrder)
+        .map((memory, index, stageMemories) => ({ stage, memory, index, stageMemories }));
+      const originalMemories = (state.originalMemoriesByStage.get(stage.id) || [])
+        .map(memory => ({ stage, memory, isOriginal: true }));
+      return [...dynamicMemories, ...originalMemories];
+    });
     if (!memories.length) {
       const empty = document.createElement('p');
       empty.className = 'admin-memory-empty';
-      empty.textContent = 'Chưa có kỷ niệm động nào.';
+      empty.textContent = filter === 'all'
+        ? 'Chưa có kỷ niệm nào trong kho lưu trữ.'
+        : 'Giai đoạn này chưa có ảnh hoặc kỷ niệm.';
       list.appendChild(empty);
       return;
     }
 
-    memories.forEach(({ stage, memory, index, stageMemories }) => {
+    memories.forEach(({ stage, memory, index, stageMemories, isOriginal }) => {
       const item = document.createElement('div');
       item.className = 'admin-memory-item';
       const label = document.createElement('span');
-      label.textContent = `${stage.period} · ${memory.title}`;
+      const isHidden = isOriginal && state.hiddenMemories.has(String(memory.id));
+      label.textContent = `${stage.period} · ${isOriginal ? 'Ảnh gốc' : 'Kỷ niệm động'}${isHidden ? ' · Đã ẩn' : ''} · ${memory.title}`;
       const actions = document.createElement('div');
       actions.className = 'admin-memory-actions';
-      const editButton = document.createElement('button');
-      editButton.type = 'button';
-      editButton.className = 'admin-secondary-button';
-      editButton.textContent = 'Sửa';
-      editButton.addEventListener('click', () => editDynamicMemory(stage, memory));
-      const moveUpButton = document.createElement('button');
-      moveUpButton.type = 'button';
-      moveUpButton.className = 'admin-secondary-button';
-      moveUpButton.textContent = '↑';
-      moveUpButton.setAttribute('aria-label', `Di chuyển ${memory.title} lên`);
-      moveUpButton.disabled = index === 0;
-      moveUpButton.addEventListener('click', () => moveDynamicMemory(stage, memory, -1));
-      const moveDownButton = document.createElement('button');
-      moveDownButton.type = 'button';
-      moveDownButton.className = 'admin-secondary-button';
-      moveDownButton.textContent = '↓';
-      moveDownButton.setAttribute('aria-label', `Di chuyển ${memory.title} xuống`);
-      moveDownButton.disabled = index === stageMemories.length - 1;
-      moveDownButton.addEventListener('click', () => moveDynamicMemory(stage, memory, 1));
+      if (!isOriginal) {
+        const editButton = document.createElement('button');
+        editButton.type = 'button';
+        editButton.className = 'admin-secondary-button';
+        editButton.textContent = 'Sửa';
+        editButton.addEventListener('click', () => editDynamicMemory(stage, memory));
+        const moveUpButton = document.createElement('button');
+        moveUpButton.type = 'button';
+        moveUpButton.className = 'admin-secondary-button';
+        moveUpButton.textContent = '↑';
+        moveUpButton.setAttribute('aria-label', `Di chuyển ${memory.title} lên`);
+        moveUpButton.disabled = index === 0;
+        moveUpButton.addEventListener('click', () => moveDynamicMemory(stage, memory, -1));
+        const moveDownButton = document.createElement('button');
+        moveDownButton.type = 'button';
+        moveDownButton.className = 'admin-secondary-button';
+        moveDownButton.textContent = '↓';
+        moveDownButton.setAttribute('aria-label', `Di chuyển ${memory.title} xuống`);
+        moveDownButton.disabled = index === stageMemories.length - 1;
+        moveDownButton.addEventListener('click', () => moveDynamicMemory(stage, memory, 1));
+        actions.append(editButton, moveUpButton, moveDownButton);
+      }
       const removeButton = document.createElement('button');
       removeButton.type = 'button';
       removeButton.className = 'admin-delete-button';
-      removeButton.textContent = 'Xóa';
-      removeButton.disabled = memory.dbId == null;
-      removeButton.addEventListener('click', () => deleteDynamicMemory(stage, memory, removeButton));
-      actions.append(editButton, moveUpButton, moveDownButton, removeButton);
+      removeButton.textContent = '🗑️ Xóa Ảnh / Kỷ Niệm';
+      removeButton.addEventListener('click', () => isOriginal
+        ? hideOriginalMemory(stage, memory, removeButton)
+        : deleteDynamicMemory(stage, memory, removeButton));
+      actions.appendChild(removeButton);
       item.append(label, actions);
       list.appendChild(item);
     });
+  }
+
+  async function hideOriginalMemory(stage, memory, button) {
+    if (!isAdminUser() || !supabaseClient) {
+      setAdminStatus('Chỉ chủ bảo tàng mới được ẩn kỷ niệm gốc.', true);
+      return;
+    }
+    if (state.hiddenMemories.has(String(memory.id))) {
+      setAdminStatus('Kỷ niệm này đã được ẩn khỏi trang.');
+      return;
+    }
+    if (!window.confirm(`Ẩn vĩnh viễn ảnh/kỷ niệm “${memory.title}” khỏi trang?`)) return;
+    button.disabled = true;
+    setAdminStatus('Đang ẩn kỷ niệm gốc…');
+    const nextHidden = [...state.hiddenMemories, String(memory.id)];
+    try {
+      await saveSiteSetting('hidden_memories', nextHidden);
+      state.hiddenMemories = new Set(nextHidden);
+      applyHiddenMemories();
+      renderStages();
+      if (state.currentStageForModal) refreshOpenArchive(state.currentStageForModal);
+      renderAdminMemoryList();
+      setAdminStatus('Đã ẩn ảnh/kỷ niệm gốc khỏi trang.');
+    } catch (error) {
+      button.disabled = false;
+      setAdminStatus(`Không thể ẩn kỷ niệm: ${error.message || 'Lỗi kết nối.'}`, true);
+    }
   }
 
   function editDynamicMemory(stage, memory) {
@@ -1684,6 +2058,7 @@
     const submitButton = document.getElementById('admin-memory-submit');
     const cancelButton = document.getElementById('admin-memory-cancel-edit');
     if (!form || !stageInput || !imageInput) return;
+    activateAdminPanel('admin-panel-add-memory');
     state.adminEditingMemory = { stage, memory };
     stageInput.value = stage.id;
     document.getElementById('admin-memory-title').value = memory.title;
@@ -1706,7 +2081,7 @@
     if (form) form.reset();
     if (imageInput) imageInput.required = true;
     if (title) title.textContent = 'Thêm Kỷ Niệm Mới';
-    if (submitButton) submitButton.textContent = 'Nén ảnh & khai ấn kỷ niệm';
+    if (submitButton) submitButton.textContent = 'Tải ảnh/video & khai ấn kỷ niệm';
     if (cancelButton) cancelButton.hidden = true;
     state.adminEditingMemory = null;
   }
@@ -2111,13 +2486,19 @@
       frameId = window.requestAnimationFrame(animate);
     };
     const start = () => {
-      if (reducedMotion || document.hidden || frameId) return;
+      if (reducedMotion || document.hidden || canvasPaused || frameId) return;
       frameId = window.requestAnimationFrame(animate);
     };
     const stop = () => {
       if (!frameId) return;
       window.cancelAnimationFrame(frameId);
       frameId = 0;
+    };
+    let canvasPaused = false;
+    pauseCanvasAnimation = paused => {
+      canvasPaused = paused;
+      if (paused) stop();
+      else start();
     };
 
     resize();
@@ -2141,8 +2522,10 @@
     ];
 
     function syncModalNavbar() {
-      const hasOpenModal = modalSelectors.some(selector => document.querySelector(selector));
+      const hasOpenModal = modalSelectors.some(selector => document.querySelector(selector)) ||
+        Boolean(document.querySelector('.admin-modal.active'));
       document.body.classList.toggle('modal-open', hasOpenModal);
+      if (pauseCanvasAnimation) pauseCanvasAnimation(hasOpenModal);
 
       const nav = document.getElementById('sticky-header');
       const themeDropdown = document.getElementById('theme-selector-dropdown');
@@ -2151,6 +2534,15 @@
     }
 
     syncModalNavbar();
+    const filmstripBody = document.querySelector('.filmstrip-grid-body');
+    if (filmstripBody) {
+      filmstripBody.addEventListener('scroll', () => {
+        if (filmstripBody.scrollTop + filmstripBody.clientHeight >= filmstripBody.scrollHeight - 360 &&
+            state.archive.renderedCount < state.archive.memories.length) {
+          appendFilmstripBatch();
+        }
+      }, { passive: true });
+    }
 
     if ('MutationObserver' in window) {
       const observer = new MutationObserver(syncModalNavbar);
@@ -2195,12 +2587,12 @@
     const genesisImg = document.getElementById('genesis-img');
     if (genesisImg) {
       genesisImg.src = GENESIS_IMAGE;
-      genesisImg.alt = 'Ấn Ký Tông Môn của Thiên Mệnh Chi Thành';
+      genesisImg.alt = 'Tông Chủ Hải Thành của Thiên Mệnh Chi Thành';
     }
 
     const genesisTitle = document.getElementById('genesis-title');
     const genesisDescription = document.getElementById('genesis-description');
-    if (genesisTitle) genesisTitle.textContent = 'Thánh Vật Trấn Thành • Thiên Mệnh Ấn';
+    if (genesisTitle) genesisTitle.textContent = 'Hải Thành Lão Tổ • Đệ Nhất Gõ Phím';
     if (genesisDescription) genesisDescription.textContent = GENESIS_PREFACE;
 
     const genesisCard = document.getElementById('genesis-card');
@@ -2322,8 +2714,8 @@
             <!-- RPG Character Profile Card -->
             <div class="rpg-card">
               <div class="rpg-header">
-                <div class="rpg-avatar">
-                  <img src="${escapeHtml(stage.coverImage)}" alt="${escapeHtml(stage.title)}" loading="lazy">
+                <div class="rpg-avatar" data-stage-id="${escapeHtml(stage.id)}">
+                  <img src="${escapeHtml(stage.coverImage)}" alt="${escapeHtml(stage.title)}" loading="lazy" decoding="async">
                   <span class="rpg-avatar-lv">${escapeHtml(getCultivationLevel(stage))}</span>
                 </div>
                 <div class="rpg-title-group">
@@ -2342,31 +2734,7 @@
                   <div class="stat-bar-group">
       `;
 
-      // Main stats rendering
-      stage.mainStats.forEach(stat => {
-        const value = Math.max(0, Math.min(100, Number(stat.value) || 0));
-        const quality = value >= 90
-          ? { label: 'Cực Phẩm', className: 'cuc-pham' }
-          : value >= 80
-            ? { label: 'Thượng Phẩm', className: 'thuong-pham' }
-            : { label: 'Tiềm Năng', className: 'tiem-nang' };
-        html += `
-          <div class="stat-bar-item">
-            <div class="stat-bar-labels">
-              <span class="stat-bar-name">${stat.label}</span>
-              <span class="stat-bar-value-group">
-                <span class="stat-bar-val">${stat.value}%</span>
-                <span class="rpg-mainstat-badge ${quality.className}">${quality.label}</span>
-              </span>
-            </div>
-            <div class="rpg-mainstat-bar" role="img" aria-label="${stat.label}: ${stat.value}%">
-              <div class="rpg-mainstat-bar-inner" style="width: ${value}%">
-                <span class="rpg-mainstat-bar-dot" aria-hidden="true"></span>
-              </div>
-            </div>
-          </div>
-        `;
-      });
+      html += renderMainStatsMarkup(stage);
 
       html += `
                   </div>
@@ -2380,14 +2748,7 @@
                   <div class="rpg-substats-grid">
       `;
 
-      getCultivationSubStats(stage).forEach(stat => {
-        html += `
-          <div class="rpg-substat-card">
-            <span class="rpg-substat-name">${escapeHtml(stat.label)}</span>
-            ${renderStars(stat.value)}
-          </div>
-        `;
-      });
+      html += renderSubStatsMarkup(stage);
 
       html += `
                   </div>
@@ -2507,6 +2868,18 @@
   // ========================================================
   // 5. MEMORY CARD HTML BUILDER (Photo / Stack / Quote)
   // ========================================================
+  function renderMemoryMediaMarkup(url, alt, className = '', options = {}) {
+    const source = escapeHtml(url);
+    const safeClass = escapeHtml(className);
+    if (isVideoUrl(url)) {
+      return `<video class="${safeClass}" src="${source}" ${options.controls ? 'controls' : ''} playsinline preload="metadata" aria-label="${escapeHtml(alt)}"></video>`;
+    }
+    const focalStyle = options.focalPoint
+      ? `style="object-position: ${escapeHtml(options.focalPoint)};"`
+      : '';
+    return `<img class="${safeClass}" src="${source}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async" ${focalStyle}>`;
+  }
+
   function renderMemoryCardHTML(mem) {
     const imgList = mem.image || [];
     const hasImages = imgList.length > 0;
@@ -2516,7 +2889,6 @@
     const memoryTime = escapeHtml(mem.time);
     const memoryDescription = escapeHtml(mem.description);
     const memoryTag = escapeHtml(mem.tag || 'Kỷ niệm');
-    const focalStyle = mem.focalPoint ? `style="object-position: ${escapeHtml(mem.focalPoint)};"` : '';
 
     // Type 1: Quote Card (No image -> Warm Paper Journal Card)
     if (!hasImages) {
@@ -2549,15 +2921,15 @@
 
             <!-- Stack Layers -->
             <div class="stack-layer stack-layer-1">
-              <img src="${escapeHtml(imgList[1])}" alt="${memoryTitle}" loading="lazy" ${focalStyle}>
+              ${renderMemoryMediaMarkup(imgList[1], mem.title, '', { focalPoint: mem.focalPoint })}
             </div>
             ${imgList.length > 2 ? `
               <div class="stack-layer stack-layer-2">
-                <img src="${escapeHtml(imgList[2])}" alt="${memoryTitle}" loading="lazy" ${focalStyle}>
+                ${renderMemoryMediaMarkup(imgList[2], mem.title, '', { focalPoint: mem.focalPoint })}
               </div>
             ` : ''}
             <div class="stack-layer stack-layer-main">
-              <img src="${escapeHtml(imgList[0])}" alt="${memoryTitle}" loading="lazy" ${focalStyle}>
+              ${renderMemoryMediaMarkup(imgList[0], mem.title, '', { focalPoint: mem.focalPoint })}
             </div>
           </div>
 
@@ -2575,7 +2947,7 @@
       <div class="memory-card card-photo" data-type="photo" data-id="${memoryId}">
         <div class="card-img-container" data-memory-id="${memoryId}">
           <span class="card-tag-badge">${memoryTag}</span>
-          <img src="${escapeHtml(imgList[0])}" alt="${memoryTitle}" loading="lazy" ${focalStyle}>
+          ${renderMemoryMediaMarkup(imgList[0], mem.title, '', { controls: isVideoUrl(imgList[0]), focalPoint: mem.focalPoint })}
         </div>
         <div class="card-body-content">
           <div class="card-time-text">${memoryTime}</div>
@@ -2715,7 +3087,8 @@
     const cardTriggers = document.querySelectorAll('[data-memory-id]');
 
     cardTriggers.forEach(el => {
-      el.addEventListener('click', () => {
+      el.addEventListener('click', event => {
+        if (event.target instanceof Element && event.target.closest('video')) return;
         const memId = el.dataset.memoryId;
         const memory = findMemoryById(memId);
         if (memory && memory.image && memory.image.length > 0) {
@@ -2762,6 +3135,11 @@
     state.currentModalMonth = 'all';
 
     const modal = document.getElementById('filmstrip-modal');
+    if (state.archive.closeTimer) {
+      window.clearTimeout(state.archive.closeTimer);
+      state.archive.closeTimer = null;
+    }
+    if (modal) modal.classList.remove('is-closing');
     const modalTitle = document.getElementById('modal-stage-title');
     const modalSubtitle = document.getElementById('modal-stage-subtitle');
     if (modalTitle) modalTitle.textContent = stage.title;
@@ -2787,8 +3165,20 @@
   function closeFilmstripModal() {
     const modal = document.getElementById('filmstrip-modal');
     if (modal) {
-      modal.classList.remove('active');
       modal.setAttribute('aria-hidden', 'true');
+      if (!modal.classList.contains('is-closing')) {
+        modal.classList.add('is-closing');
+        state.archive.closeTimer = window.setTimeout(() => {
+          window.requestAnimationFrame(() => {
+            const grid = document.getElementById('modal-filmstrip-grid');
+            if (grid) grid.replaceChildren();
+            state.archive.memories = [];
+            state.archive.renderedCount = 0;
+            modal.classList.remove('active', 'is-closing');
+            state.archive.closeTimer = null;
+          });
+        }, 160);
+      }
     }
     document.body.style.overflow = '';
 
@@ -2859,6 +3249,8 @@
         chipsContainer.querySelectorAll('.month-chip').forEach(c => c.classList.remove('active'));
         chip.classList.add('active');
         state.currentModalMonth = chip.dataset.month;
+        const gridBody = document.querySelector('.filmstrip-grid-body');
+        if (gridBody) gridBody.scrollTop = 0;
         renderFilmstripGrid(stage, chip.dataset.month);
       });
     });
@@ -2867,7 +3259,7 @@
   function renderFilmstripGrid(stage, monthFilter) {
     const grid = document.getElementById('modal-filmstrip-grid');
     const emptyState = document.getElementById('modal-empty-state');
-    grid.innerHTML = '';
+    grid.replaceChildren();
 
     let filtered = stage.memories;
     if (monthFilter === 'other') {
@@ -2878,12 +3270,23 @@
     }
 
     if (filtered.length === 0) {
+      state.archive.memories = [];
+      state.archive.renderedCount = 0;
       emptyState.style.display = 'block';
       return;
     }
     emptyState.style.display = 'none';
+    state.archive.memories = filtered;
+    state.archive.renderedCount = 0;
+    appendFilmstripBatch();
+  }
 
-    filtered.forEach((mem, idx) => {
+  function appendFilmstripBatch() {
+    const grid = document.getElementById('modal-filmstrip-grid');
+    if (!grid) return;
+    const batch = state.archive.memories.slice(state.archive.renderedCount, state.archive.renderedCount + 12);
+    batch.forEach((mem, batchIndex) => {
+      const idx = state.archive.renderedCount + batchIndex;
       const frameNumber = (idx + 1).toString().padStart(2, '0');
       const frame = document.createElement('div');
       frame.className = 'film-frame';
@@ -2894,11 +3297,14 @@
         : 'images/Lúc nhỏ/IMG_0025_Original.JPG';
 
       const focalStyle = mem.focalPoint ? `style="object-position: ${escapeHtml(mem.focalPoint)};"` : '';
+      const mediaMarkup = isVideoUrl(imgSource)
+        ? `<video src="${escapeHtml(imgSource)}" muted playsinline preload="metadata" aria-label="${escapeHtml(mem.title)}"></video>`
+        : `<img src="${escapeHtml(imgSource)}" alt="${escapeHtml(mem.title)}" loading="lazy" decoding="async" ${focalStyle} onerror="this.src='images/Lúc nhỏ/IMG_0025_Original.JPG';">`;
 
       frame.innerHTML = `
         <span class="film-number">#${frameNumber}</span>
         <div class="film-thumb-box">
-          <img src="${escapeHtml(imgSource)}" alt="${escapeHtml(mem.title)}" loading="lazy" ${focalStyle} onerror="this.src='images/Lúc nhỏ/IMG_0025_Original.JPG';">
+          ${mediaMarkup}
         </div>
         <div class="film-frame-info">
           <span class="film-frame-time">${escapeHtml(mem.time)}</span>
@@ -2914,6 +3320,7 @@
 
       grid.appendChild(frame);
     });
+    state.archive.renderedCount += batch.length;
   }
 
   // ========================================================
@@ -2958,6 +3365,7 @@
     const currentImgUrl = images[currentIndex];
 
     const imgEl = document.getElementById('lightbox-img');
+    const videoEl = document.getElementById('lightbox-video');
     const counterEl = document.getElementById('lightbox-counter');
     const tagEl = document.getElementById('lightbox-tag');
     const titleEl = document.getElementById('lightbox-title');
@@ -2975,9 +3383,25 @@
     wrapper.classList.remove('zoomed');
     state.lightbox.isZoomed = false;
 
-    // Image & Counter
-    imgEl.src = currentImgUrl;
-    imgEl.alt = memory.title;
+    // Image/video & counter
+    const isVideo = isVideoUrl(currentImgUrl);
+    imgEl.hidden = isVideo;
+    if (videoEl) {
+      if (isVideo) {
+        videoEl.hidden = false;
+        videoEl.src = currentImgUrl;
+        videoEl.load();
+      } else {
+        videoEl.pause();
+        videoEl.removeAttribute('src');
+        videoEl.load();
+        videoEl.hidden = true;
+      }
+    }
+    if (!isVideo) {
+      imgEl.src = currentImgUrl;
+      imgEl.alt = memory.title;
+    }
     counterEl.textContent = `${currentIndex + 1} / ${images.length}`;
 
     // Nav buttons visibility
@@ -3003,7 +3427,9 @@
       images.forEach((imgUrl, idx) => {
         const thumb = document.createElement('div');
         thumb.className = `lightbox-thumb ${idx === currentIndex ? 'active' : ''}`;
-        thumb.innerHTML = `<img src="${imgUrl}" alt="Thumb" loading="lazy">`;
+        thumb.innerHTML = isVideoUrl(imgUrl)
+          ? `<video src="${escapeHtml(imgUrl)}" muted playsinline preload="metadata" aria-label="Video ${idx + 1}"></video>`
+          : `<img src="${escapeHtml(imgUrl)}" alt="Thumb" loading="lazy" decoding="async">`;
         thumb.addEventListener('click', () => {
           state.lightbox.currentIndex = idx;
           updateLightboxView();
@@ -3023,6 +3449,13 @@
     const filmModal = document.getElementById('filmstrip-modal');
     if (!filmModal.classList.contains('active')) {
       document.body.style.overflow = '';
+    }
+    const video = document.getElementById('lightbox-video');
+    if (video) {
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      video.hidden = true;
     }
   }
 
@@ -3061,7 +3494,7 @@
       stage.memories.forEach(mem => {
         const imgs = mem.image || [];
         imgs.forEach(imgUrl => {
-          if (imgUrl && typeof imgUrl === 'string' && !seenImages.has(imgUrl)) {
+          if (imgUrl && typeof imgUrl === 'string' && !isVideoUrl(imgUrl) && !seenImages.has(imgUrl)) {
             seenImages.add(imgUrl);
             pool.push({
               imageUrl: imgUrl,
@@ -3351,25 +3784,28 @@
     list.replaceChildren();
     if (!rows.length) {
       const emptyRow = document.createElement('li');
-      emptyRow.textContent = 'Bảng Tu Vi đang chờ các Đạo Hữu khai mở cảnh giới.';
+      emptyRow.textContent = 'Bảng Tu Vi còn trống! Đạo Hữu đăng nhập điểm danh nhận +20, kẻo Linh Thạch mọc rêu nhé.';
       list.appendChild(emptyRow);
       return;
     }
 
     rows.forEach((row, index) => {
       const rankNumber = index + 1;
+      const currentAdmin = isAdminUser() && String(row.user_id) === String(authenticatedUser.id);
       const item = document.createElement('li');
-      item.className = `cultivation-leaderboard-row${rankNumber <= 3 ? ` podium-rank-${rankNumber}` : ''}`;
+      item.className = `cultivation-leaderboard-row${rankNumber <= 3 ? ` podium-rank-${rankNumber}` : ''}${currentAdmin ? ' admin-champion' : ''}`;
       const place = document.createElement('span');
       place.className = 'leaderboard-place';
-      place.textContent = `Hạng ${rankNumber}`;
+      place.textContent = currentAdmin ? '👑 Hạng 1' : `Hạng ${rankNumber}`;
 
       const identity = document.createElement('span');
       identity.className = 'leaderboard-identity';
       if (rankNumber <= 3) {
         const title = document.createElement('span');
         title.className = 'podium-title';
-        title.textContent = CULTIVATION_PODIUM_TITLES[rankNumber - 1];
+        title.textContent = currentAdmin
+          ? 'Độ Kiếp Chí Tôn • Thành Chủ Sáng Thế'
+          : CULTIVATION_PODIUM_TITLES[rankNumber - 1];
         identity.appendChild(title);
       }
 
@@ -3378,7 +3814,9 @@
       name.textContent = String(row.display_name || nameByUser.get(String(row.user_id)) || 'Đạo Hữu');
       const rank = document.createElement('span');
       rank.className = 'cultivation-rank-badge';
-      rank.textContent = getCultivationRank(row.tu_vi).name;
+      rank.textContent = currentAdmin
+        ? 'Độ Kiếp Chí Tôn'
+        : getCultivationRank(row.tu_vi).name;
       identity.append(name, rank);
 
       const points = document.createElement('span');
@@ -3395,7 +3833,7 @@
     list.replaceChildren();
     if (!rows.length) {
       const emptyRow = document.createElement('li');
-      emptyRow.textContent = 'Chưa có Thiên Kiêu nào ghi danh trong trò Đoán Niên Hiệu.';
+      emptyRow.textContent = 'Chưa ai đoán năm thắng cả — mời Đạo Hữu thử vận, đừng để bảng trống tới hóa thạch!';
       list.appendChild(emptyRow);
       return;
     }
@@ -3421,21 +3859,18 @@
     const statusId = 'cultivation-leaderboard-status';
     setLeaderboardStatus(statusId, 'Đang triệu hồi Bảng Tu Vi...');
     try {
-      let result = await supabaseClient.from('user_cultivation')
-        .select('user_id,tu_vi,display_name')
+      const { data, error } = await supabaseClient.from('user_cultivation')
+        .select('user_id,display_name,tu_vi')
         .order('tu_vi', { ascending: false })
         .limit(10);
-      if (result.error && isMissingDatabaseColumn(result.error, 'display_name')) {
-        state.cultivation.supportsDisplayName = false;
-        result = await supabaseClient.from('user_cultivation')
-          .select('user_id,tu_vi')
-          .order('tu_vi', { ascending: false })
-          .limit(10);
-      } else if (!result.error) {
-        state.cultivation.supportsDisplayName = true;
+      if (error) throw error;
+      const rows = data || [];
+      if (isAdminUser()) {
+        rows.sort((left, right) =>
+          String(right.user_id) === String(authenticatedUser.id) ? 1 :
+            String(left.user_id) === String(authenticatedUser.id) ? -1 : 0
+        );
       }
-      if (result.error) throw result.error;
-      const rows = result.data || [];
       const idsWithoutNames = rows
         .filter(row => !row.display_name)
         .map(row => String(row.user_id || ''))
@@ -3443,15 +3878,12 @@
       const nameByUser = new Map();
 
       if (authenticatedUser) {
-        const metadata = authenticatedUser.user_metadata || {};
-        nameByUser.set(String(authenticatedUser.id), String(
-          metadata.display_name || metadata.full_name || authenticatedUser.email?.split('@')[0] || 'Đạo Hữu'
-        ));
+        nameByUser.set(String(authenticatedUser.id), getUserDisplayName(authenticatedUser));
       }
       if (idsWithoutNames.length) {
         try {
           const { data: names, error } = await supabaseClient.from('leaderboard')
-            .select('user_id,display_name')
+            .select('*')
             .in('user_id', idsWithoutNames);
           if (error) throw error;
           (names || []).forEach(row => {
@@ -3473,7 +3905,7 @@
         row.textContent = 'Bảng Tu Vi tạm thời ẩn trong màn sương.';
         list.appendChild(row);
       }
-      setLeaderboardStatus(statusId, 'Không thể tải Top 10 Tu Vi. Kiểm tra cấu trúc và quyền đọc user_cultivation.', true);
+      setLeaderboardStatus(statusId, 'Linh mạch bảng xếp hạng đang tạm nghẽn; các Đạo Hữu cứ thong thả thử lại.', false);
     }
   }
 
@@ -3482,7 +3914,7 @@
     setLeaderboardStatus(statusId, 'Đang triệu hồi Cao Thủ Đoán Niên Hiệu...');
     try {
       const { data, error } = await supabaseClient.from('leaderboard')
-        .select('user_id,display_name,best_score,best_streak')
+        .select('*')
         .order('best_score', { ascending: false })
         .order('best_streak', { ascending: false })
         .limit(10);
@@ -3498,7 +3930,7 @@
         row.textContent = 'Bảng Đoán Niên Hiệu tạm thời ẩn trong màn sương.';
         list.appendChild(row);
       }
-      setLeaderboardStatus(statusId, 'Không thể tải Top 10. Kiểm tra cấu trúc và quyền đọc leaderboard.', true);
+      setLeaderboardStatus(statusId, 'Bảng Đoán Niên Hiệu đang lạc trong sương mù; mời Đạo Hữu quay lại sau.', false);
     }
   }
 
@@ -3541,14 +3973,12 @@
     setLeaderboardStatus('leaderboard-save-status', 'Đang khắc thành tích vào Thiên Kiêu Bảng…');
     try {
       const { data: previous, error: readError } = await supabaseClient.from('leaderboard')
-        .select('best_score,best_streak')
+        .select('*')
         .eq('user_id', authenticatedUser.id)
         .maybeSingle();
       if (readError) throw readError;
 
-      const email = String(authenticatedUser.email || '');
-      const metadata = authenticatedUser.user_metadata || {};
-      const displayName = String(metadata.display_name || metadata.full_name || email.split('@')[0] || 'Đạo Hữu');
+      const displayName = getUserDisplayName(authenticatedUser);
       const score = Math.max(Number(previous && previous.best_score) || 0, state.game.score);
       const bestStreak = Math.max(Number(previous && previous.best_streak) || 0, state.game.bestStreak);
       const { error: saveError } = await supabaseClient.from('leaderboard').upsert({
@@ -3785,7 +4215,7 @@
     } else {
       slideEl.className = 'cinema-slide cinema-slide-photo active';
       slideEl.innerHTML = `
-        <img class="cinema-img" src="${slide.image}" alt="${slide.title}">
+        <img class="cinema-img" src="${slide.image}" alt="${slide.title}" loading="lazy" decoding="async">
       `;
     }
     viewport.appendChild(slideEl);
@@ -4315,7 +4745,7 @@
       btnPrint.addEventListener('click', () => {
         if (!requireAuth(() => btnPrint.click())) return;
         updateTicket(true);
-        void awardCultivation(15, 'In Vé Lưu Niệm', { claimField: 'ticket_reward_claimed' });
+        void awardCultivation(15, 'In Vé Lưu Niệm', { claimField: 'ticket_claimed' });
       });
     }
 
@@ -5167,7 +5597,7 @@
         }
 
         if (savedOnline) {
-          await awardCultivation(20, 'Gửi lời nhắn Sổ Lưu Bút', { claimField: 'guestbook_reward_claimed' });
+          await awardCultivation(20, 'Gửi lời nhắn Sổ Lưu Bút', { claimField: 'guestbook_claimed' });
         }
 
         const newCapsule = {

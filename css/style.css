@@ -10226,6 +10226,535 @@ html[data-theme="xianxia"] .nav-btn-auth::before {
   }
 }
 
+/* iOS 26 liquid glass and stable Safari card flipping */
+.sticky-nav,
+.nav-btn,
+.nav-chip,
+.rpg-card,
+.public-leaderboard-card,
+.leaderboard-tab,
+.btn-invite,
+.utility-launch-btn {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.11), rgba(45, 212, 191, 0.04) 55%, rgba(255, 255, 255, 0.03));
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-top-color: rgba(255, 255, 255, 0.48);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.35), 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+
+.sticky-nav {
+  border-right: 0;
+  border-left: 0;
+}
+
+.nav-btn,
+.nav-chip,
+.leaderboard-tab,
+.btn-invite,
+.utility-launch-btn {
+  color: var(--text-primary);
+}
+
+.museum-body button {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.11), rgba(45, 212, 191, 0.04) 55%, rgba(255, 255, 255, 0.03));
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-top-color: rgba(255, 255, 255, 0.48);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.35), 0 8px 28px rgba(0, 0, 0, 0.22);
+}
+
+.nav-cultivation-badge {
+  color: #fff0b0;
+  font-weight: 800;
+  text-shadow: 0 0 12px rgba(253, 224, 71, 0.55);
+}
+
+.rpg-card,
+.public-leaderboard-card {
+  overflow: hidden;
+}
+
+.hero-badge {
+  gap: 0.45rem;
+  margin-bottom: -1.6rem;
+  padding: 0.35rem 0.75rem;
+  border-color: rgba(255, 223, 143, 0.44);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(45, 212, 191, 0.04) 55%, rgba(255, 255, 255, 0.025));
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+}
+
+.badge-text {
+  color: #ffe28a;
+  font-size: clamp(0.72rem, 2.9vw, 0.85rem);
+  letter-spacing: 0.035em;
+  white-space: nowrap;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7);
+}
+
+.hero-cta-group {
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.hero-cta-group .btn-invite {
+  margin: 0 auto;
+}
+
+.brand-logo-img,
+.nav-brand-row .brand-logo-img {
+  width: 38px !important;
+  height: 38px !important;
+  border: 1.5px solid #f6d77e;
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.7), 0 0 16px rgba(245, 196, 81, 0.62);
+}
+
+.nav-brand .brand-title,
+.nav-brand-row .brand-title {
+  color: #fff0bd;
+  font-size: 0.98rem;
+  font-weight: 900;
+  letter-spacing: 0.055em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.22), 0 0 14px rgba(245, 196, 81, 0.34);
+}
+
+.hero-flip-front,
+.hero-flip-back,
+.hero-flip-front *,
+.hero-flip-back * {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  z-index: auto !important;
+}
+
+.hero-flip-front,
+.hero-flip-back {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  transition: opacity 0.25s ease;
+}
+
+.hero-flip-front {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  background: linear-gradient(145deg, rgba(16, 43, 41, 0.96), rgba(9, 23, 29, 0.94) 58%, rgba(39, 31, 23, 0.92));
+}
+
+.hero-flip-front .genesis-tag {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.14), rgba(45, 212, 191, 0.1), rgba(245, 196, 81, 0.13));
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.hero-flip-back {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  background: linear-gradient(145deg, rgba(18, 45, 43, 0.97), rgba(8, 22, 30, 0.96) 58%, rgba(43, 32, 21, 0.95));
+}
+
+.genesis-flip-card.flipped .hero-flip-front,
+.genesis-flip-card.is-flipped .hero-flip-front {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.genesis-flip-card.flipped .hero-flip-back,
+.genesis-flip-card.is-flipped .hero-flip-back {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transition: opacity 0.25s ease;
+}
+
+.rpg-substat-flames {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.rpg-substat-tier {
+  position: static;
+  display: inline-block;
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
+.filmstrip-modal {
+  transition: opacity 0.16s ease;
+}
+
+.filmstrip-modal.is-closing {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.film-frame,
+.film-frame * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+.stage-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 1100px;
+}
+
+.memory-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 420px;
+}
+
+@media (max-width: 767px) {
+  .hero-badge {
+    max-width: 100%;
+    align-self: center;
+    margin-bottom: -2rem;
+    padding-right: 0.45rem;
+    padding-left: 0.45rem;
+  }
+
+  .badge-text {
+    letter-spacing: 0;
+  }
+
+  .nav-brand-row .brand-title {
+    font-size: clamp(0.56rem, 2.45vw, 0.76rem) !important;
+  }
+}
+
+/* Cultivation-ranked account badge */
+.nav-cultivation-badge {
+  color: #fff0bd;
+  letter-spacing: 0.01em;
+}
+
+.nav-cultivation-badge #nav-cultivation-label {
+  color: #ffe28a;
+}
+
+#theme-toggle-btn .btn-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 768px) and (max-width: 1100px) {
+  #theme-toggle-btn .btn-text {
+    max-width: 88px;
+  }
+}
+
+/* Layered sect seal */
+.emblem-aura-box {
+  width: min(255px, 100%);
+  height: 255px;
+  max-width: 100%;
+  margin: 8px auto 10px;
+  flex: 0 0 auto;
+}
+
+.emblem-aura-box .bagua-array {
+  animation: bagua-orbit 72s linear infinite;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+.bagua-script {
+  fill: rgba(255, 226, 138, 0.88);
+  font-family: 'Noto Serif', serif;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.celestial-array {
+  position: absolute;
+  inset: 5%;
+  width: 90%;
+  height: 90%;
+  overflow: visible;
+  fill: none;
+  stroke: rgba(103, 232, 249, 0.78);
+  stroke-width: 1.15;
+  filter: drop-shadow(0 0 8px rgba(45, 212, 191, 0.55));
+  animation: celestial-orbit 58s linear infinite reverse;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  pointer-events: none;
+}
+
+.celestial-array polygon:first-of-type {
+  stroke: rgba(192, 132, 252, 0.72);
+  stroke-dasharray: 3 4;
+}
+
+.celestial-array polygon:last-of-type {
+  stroke: rgba(245, 196, 81, 0.82);
+  stroke-dasharray: 1 4;
+}
+
+.emblem-photo-frame {
+  position: relative;
+  display: block;
+  width: min(176px, 100%);
+  height: 176px;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 2px solid rgba(245, 196, 81, 0.92);
+  border-radius: 50%;
+  background: rgba(4, 17, 15, 0.9);
+  box-shadow: 0 0 28px rgba(45, 212, 191, 0.55), inset 0 0 18px rgba(245, 196, 81, 0.45);
+}
+
+.emblem-aura-box .emblem-photo-frame img#genesis-img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  aspect-ratio: 1 / 1;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 18px rgba(245, 196, 81, 0.45);
+  object-fit: cover;
+  object-position: center;
+}
+
+.emblem-photo-frame::after {
+  position: absolute;
+  inset: -30% auto -30% -55%;
+  width: 38%;
+  content: '';
+  transform: rotate(22deg);
+  background: linear-gradient(90deg, transparent, rgba(237, 255, 248, 0.48), rgba(255, 224, 138, 0.24), transparent);
+  animation: emblem-awakening-sweep 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.emblem-particle {
+  position: absolute;
+  z-index: auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff4bf 0 18%, #34d399 48%, transparent 74%);
+  box-shadow: 0 0 12px rgba(52, 211, 153, 0.9), 0 0 20px rgba(245, 196, 81, 0.56);
+  pointer-events: none;
+}
+
+.particle-one {
+  top: 16%;
+  left: 18%;
+  animation: qi-float 4.5s ease-in-out infinite;
+}
+
+.particle-two {
+  top: 21%;
+  right: 12%;
+  animation: qi-float 5.2s ease-in-out -1.6s infinite;
+}
+
+.particle-three {
+  right: 17%;
+  bottom: 14%;
+  animation: qi-float 4.8s ease-in-out -2.7s infinite;
+}
+
+.particle-four {
+  bottom: 20%;
+  left: 12%;
+  animation: qi-float 5.6s ease-in-out -0.8s infinite;
+}
+
+@keyframes celestial-orbit {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes emblem-awakening-sweep {
+  0%, 62% { left: -55%; }
+  100% { left: 125%; }
+}
+
+/* Per-stage rotating avatar arrays, sized around the existing portrait. */
+.rpg-avatar {
+  overflow: visible;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: none;
+  isolation: isolate;
+}
+
+.rpg-avatar::before,
+.rpg-avatar::after {
+  position: absolute;
+  inset: -5px;
+  content: '';
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.rpg-avatar::before {
+  background: repeating-conic-gradient(
+    from 0deg,
+    var(--stage-rune-color, #34d399) 0deg 1deg,
+    transparent 1deg 15deg
+  );
+  -webkit-mask: radial-gradient(transparent 62%, #000 63% 73%, transparent 74%);
+  mask: radial-gradient(transparent 62%, #000 63% 73%, transparent 74%);
+  filter: drop-shadow(0 0 5px var(--stage-rune-color, #34d399));
+  animation: avatar-array-clockwise 32s linear infinite;
+}
+
+.rpg-avatar::after {
+  inset: -9px;
+  border: 1px solid var(--stage-rune-color, #34d399);
+  border-radius: 0;
+  clip-path: polygon(50% 0, 94% 25%, 94% 75%, 50% 100%, 6% 75%, 6% 25%);
+  filter: drop-shadow(0 0 5px var(--stage-rune-color, #34d399));
+  opacity: 0.76;
+  animation: avatar-array-counterclockwise 46s linear infinite;
+}
+
+.rpg-avatar img {
+  position: relative;
+  z-index: 1;
+  border: 2px solid var(--stage-rune-color, #34d399);
+  border-radius: 50%;
+  box-shadow: 0 0 12px var(--stage-rune-color, #34d399);
+}
+
+.rpg-avatar-lv {
+  z-index: 3;
+}
+
+#stage-luc-nho .rpg-avatar { --stage-rune-color: #34d399; }
+#stage-2021 .rpg-avatar { --stage-rune-color: #38bdf8; }
+#stage-2022 .rpg-avatar { --stage-rune-color: #c084fc; }
+#stage-2023 .rpg-avatar { --stage-rune-color: #fbbf24; }
+#stage-2024 .rpg-avatar { --stage-rune-color: #fb7185; }
+#stage-2025 .rpg-avatar { --stage-rune-color: #2dd4bf; }
+#stage-2026 .rpg-avatar { --stage-rune-color: #f59e0b; }
+
+@keyframes avatar-array-clockwise {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes avatar-array-counterclockwise {
+  to { transform: rotate(-360deg); }
+}
+
+/* Authenticated account/admin perimeter light */
+#btn-header-auth.is-member,
+#btn-header-auth.is-admin {
+  position: relative;
+  isolation: isolate;
+  border-color: rgba(110, 231, 183, 0.62);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.3), 0 0 18px rgba(45, 212, 191, 0.2);
+}
+
+#btn-header-auth.is-admin {
+  border-color: rgba(250, 204, 21, 0.74);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.34), 0 0 18px rgba(250, 204, 21, 0.25);
+}
+
+#btn-header-auth.is-member::after,
+#btn-header-auth.is-admin::after {
+  position: absolute;
+  inset: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  width: auto;
+  height: auto;
+  padding: 1.5px;
+  border-radius: inherit;
+  content: '';
+  transform: none;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 265deg,
+    rgba(45, 212, 191, 0.12) 285deg,
+    rgba(45, 212, 191, 0.96) 315deg,
+    rgba(255, 224, 138, 0.98) 338deg,
+    transparent 360deg
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 1;
+  animation: borderOrbit 3.2s linear infinite;
+  pointer-events: none;
+}
+
+#btn-header-auth.is-admin::after {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 265deg,
+    rgba(255, 224, 138, 0.12) 285deg,
+    rgba(255, 224, 138, 0.98) 315deg,
+    rgba(45, 212, 191, 0.96) 338deg,
+    transparent 360deg
+  );
+}
+
+@keyframes borderOrbit {
+  to { transform: rotate(360deg); }
+}
+
+/* Clearer liquid-glass treatment for independent controls and music player. */
+html[data-theme] .sticky-nav,
+html[data-theme] .nav-btn,
+html[data-theme] .nav-chip,
+html[data-theme] .leaderboard-tab,
+html[data-theme] .btn-open-archive,
+html[data-theme] .utility-launch-btn,
+.btn-toggle-stage-quotes,
+.btn-invite,
+.utility-launch-btn {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(45, 212, 191, 0.025) 60%, rgba(255, 255, 255, 0.02)) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(185%) !important;
+  backdrop-filter: blur(20px) saturate(185%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.24) !important;
+  border-top-color: rgba(255, 255, 255, 0.5) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.35), 0 8px 24px rgba(0, 0, 0, 0.22) !important;
+}
+
+.floating-bg-player {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(45, 212, 191, 0.025) 60%, rgba(255, 255, 255, 0.02)) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(185%) !important;
+  backdrop-filter: blur(20px) saturate(185%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.24) !important;
+  border-top-color: rgba(255, 255, 255, 0.5) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.35), 0 8px 24px rgba(0, 0, 0, 0.22) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .emblem-aura-box .bagua-array,
+  .celestial-array,
+  .emblem-photo-frame::after,
+  .emblem-particle,
+  .rpg-avatar::before,
+  .rpg-avatar::after,
+  #btn-header-auth.is-member::after,
+  #btn-header-auth.is-admin::after {
+    animation: none;
+  }
+}
+
 body {
   overflow-x: clip !important;
 }
@@ -10314,5 +10843,536 @@ body {
     padding: 0.4rem 0.8rem;
     font-size: 0.72rem;
     flex-shrink: 0;
+  }
+}
+
+/* Compact hero pill and a separate visitor-count row on narrow screens. */
+.hero-badge-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-bottom: -1.6rem;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  width: auto;
+  max-width: calc(100vw - 32px);
+  height: auto;
+  aspect-ratio: auto;
+  margin: 0;
+  padding: 7px 16px;
+  border-radius: 999px;
+  text-align: center;
+  white-space: normal;
+}
+
+.badge-text {
+  min-width: 0;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+.hero-badge-meta-row {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.hero-badge-meta-row[hidden] {
+  display: none !important;
+}
+
+.visitor-count-badge {
+  justify-content: center;
+  max-width: 100%;
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+.card-frame {
+  position: relative;
+  isolation: isolate;
+}
+
+.hero-card-corner {
+  position: absolute;
+  z-index: 5;
+  width: 27px;
+  height: 27px;
+  border-top: 2px solid rgba(255, 224, 138, 0.95);
+  border-left: 2px solid rgba(45, 212, 191, 0.94);
+  border-radius: 8px 0 0;
+  filter: drop-shadow(0 0 5px rgba(245, 196, 81, 0.7));
+  pointer-events: none;
+}
+
+.hero-card-corner::after {
+  position: absolute;
+  inset: 4px;
+  content: '';
+  border-top: 1px solid rgba(45, 212, 191, 0.64);
+  border-left: 1px solid rgba(255, 224, 138, 0.62);
+  border-radius: 5px 0 0;
+}
+
+.hero-card-corner--tl {
+  top: 8px;
+  left: 8px;
+}
+
+.hero-card-corner--tr {
+  top: 8px;
+  right: 8px;
+  transform: scaleX(-1);
+}
+
+.hero-card-corner--bl {
+  bottom: 8px;
+  left: 8px;
+  transform: scaleY(-1);
+}
+
+.hero-card-corner--br {
+  right: 8px;
+  bottom: 8px;
+  transform: rotate(180deg);
+}
+
+.emblem-aura-box::before {
+  position: absolute;
+  z-index: 0;
+  inset: 4%;
+  content: '';
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 42% 38%, rgba(245, 196, 81, 0.34), transparent 34%),
+    radial-gradient(circle at 60% 62%, rgba(16, 185, 129, 0.32), transparent 48%),
+    radial-gradient(circle, rgba(45, 212, 191, 0.22), transparent 72%);
+  filter: blur(14px);
+  pointer-events: none;
+}
+
+.emblem-aura-box .celestial-array {
+  z-index: 1;
+}
+
+.emblem-aura-box .emblem-photo-frame {
+  z-index: 2;
+}
+
+.emblem-particle {
+  z-index: 3;
+}
+
+.emblem-glyph {
+  position: absolute;
+  z-index: 4;
+  color: #b7ffe6;
+  font-size: 0.78rem;
+  line-height: 1;
+  text-shadow: 0 0 7px rgba(45, 212, 191, 0.95), 0 0 13px rgba(245, 196, 81, 0.72);
+  animation: emblem-glyph-drift 4.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.emblem-glyph--left-top {
+  top: 26%;
+  left: 3%;
+}
+
+.emblem-glyph--left-mid {
+  top: 49%;
+  left: 0;
+  animation-delay: -1.5s;
+}
+
+.emblem-glyph--left-low {
+  bottom: 24%;
+  left: 5%;
+  color: #ffe28a;
+  animation-delay: -2.7s;
+}
+
+.emblem-glyph--right-top {
+  top: 28%;
+  right: 3%;
+  animation-delay: -2s;
+}
+
+.emblem-glyph--right-mid {
+  top: 53%;
+  right: 0;
+  color: #ffe28a;
+  animation-delay: -3.2s;
+}
+
+.emblem-glyph--right-low {
+  right: 5%;
+  bottom: 22%;
+  animation-delay: -0.8s;
+}
+
+@keyframes emblem-glyph-drift {
+  0%, 100% { opacity: 0.56; transform: translateY(3px) rotate(-8deg); }
+  50% { opacity: 1; transform: translateY(-4px) rotate(8deg); }
+}
+
+#auth-account-panel .admin-dashboard-heading {
+  min-width: 0;
+}
+
+#auth-user-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#auth-sign-out {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .hero-badge-stack {
+    margin-bottom: -1.6rem;
+  }
+
+  .hero-badge {
+    max-width: calc(100vw - 32px);
+    padding: 7px 12px;
+  }
+}
+
+.hero-badge-meta-row {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin: 8px auto 0;
+}
+
+.visitor-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-top-color: rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(45, 212, 191, 0.025) 60%, rgba(255, 255, 255, 0.02));
+  -webkit-backdrop-filter: blur(20px) saturate(185%);
+  backdrop-filter: blur(20px) saturate(185%);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.35), 0 8px 24px rgba(0, 0, 0, 0.22);
+  color: #e7fff5;
+  font-size: clamp(0.65rem, 3.2vw, 0.82rem);
+  line-height: 1.25;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.hero-flip-front::after {
+  position: absolute;
+  inset: -55% -65%;
+  z-index: 4;
+  content: '';
+  transform: translateX(-58%) rotate(18deg);
+  background: linear-gradient(
+    112deg,
+    transparent 42%,
+    rgba(45, 212, 191, 0.04) 46%,
+    rgba(166, 255, 226, 0.28) 49%,
+    rgba(255, 226, 138, 0.42) 50%,
+    rgba(45, 212, 191, 0.12) 53%,
+    transparent 58%
+  );
+  animation: sect-sword-light 7s ease-in-out infinite;
+  pointer-events: none;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+@keyframes sect-sword-light {
+  0%, 62% { transform: translateX(-58%) rotate(18deg); opacity: 0.3; }
+  82% { opacity: 0.82; }
+  100% { transform: translateX(58%) rotate(18deg); opacity: 0.28; }
+}
+
+.five-element-orbit {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  animation: five-element-orbit 30s linear infinite;
+  pointer-events: none;
+}
+
+.five-element-gem {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  width: 19px;
+  height: 19px;
+  place-items: center;
+  border: 1px solid var(--gem-color);
+  border-radius: 5px;
+  background: radial-gradient(circle at 34% 26%, rgba(255, 255, 255, 0.96), var(--gem-color) 38%, rgba(4, 17, 15, 0.92) 100%);
+  box-shadow: 0 0 8px var(--gem-color), inset 0 0 5px rgba(255, 255, 255, 0.8);
+  color: #fff;
+  font-family: var(--font-serif);
+  font-size: 0.58rem;
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: 0 0 5px var(--gem-color);
+}
+
+.gem-metal {
+  --gem-color: #ffe28a;
+  transform: translate(-50%, -50%) rotate(0deg) translateY(-117px);
+}
+
+.gem-wood {
+  --gem-color: #34d399;
+  transform: translate(-50%, -50%) rotate(72deg) translateY(-117px);
+}
+
+.gem-water {
+  --gem-color: #38bdf8;
+  transform: translate(-50%, -50%) rotate(144deg) translateY(-117px);
+}
+
+.gem-fire {
+  --gem-color: #fb7185;
+  transform: translate(-50%, -50%) rotate(216deg) translateY(-117px);
+}
+
+.gem-earth {
+  --gem-color: #c084fc;
+  transform: translate(-50%, -50%) rotate(288deg) translateY(-117px);
+}
+
+@keyframes five-element-orbit {
+  to { transform: rotate(360deg); }
+}
+
+.genesis-status-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 7px;
+  margin: 0.35rem 0 0.55rem;
+}
+
+.genesis-status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid rgba(157, 255, 221, 0.28);
+  border-radius: 999px;
+  background: linear-gradient(120deg, rgba(10, 78, 64, 0.58), rgba(91, 64, 23, 0.42));
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 0 12px rgba(45, 212, 191, 0.16);
+  color: #f2ffe8;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.rpg-mainstat-badge.trung-pham {
+  border-color: rgba(96, 165, 250, 0.42);
+  background: rgba(30, 64, 175, 0.25);
+  color: #bfdbfe;
+}
+
+.rpg-mainstat-badge.ha-pham {
+  border-color: rgba(203, 213, 225, 0.35);
+  background: rgba(71, 85, 105, 0.25);
+  color: #e2e8f0;
+}
+
+.rpg-substat-attribute {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+  width: 100%;
+  margin-top: 5px;
+  color: #b6ffe2;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.admin-dashboard-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0 18px;
+}
+
+.admin-dashboard-tab {
+  min-width: 0;
+  padding: 10px 8px;
+  border: 1px solid rgba(214, 255, 239, 0.2);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e7fff5;
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+}
+
+.admin-dashboard-tab.active {
+  border-color: rgba(255, 224, 138, 0.7);
+  background: linear-gradient(130deg, rgba(11, 111, 83, 0.54), rgba(128, 88, 27, 0.4));
+  color: #ffe8a3;
+  box-shadow: 0 0 15px rgba(45, 212, 191, 0.15);
+}
+
+.admin-dashboard-panel[hidden] {
+  display: none !important;
+}
+
+.admin-memory-filters {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 12px;
+  overflow-x: auto;
+  padding: 2px 1px 7px;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-memory-filter {
+  flex: 0 0 auto;
+  padding: 6px 10px;
+  border: 1px solid rgba(214, 255, 239, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e7fff5;
+  font-size: 0.76rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-memory-filter.active {
+  border-color: rgba(255, 224, 138, 0.68);
+  background: rgba(90, 72, 26, 0.48);
+  color: #ffe8a3;
+}
+
+.admin-attribute-section-title {
+  margin: 12px 0 0;
+  color: #ffe8a3;
+}
+
+.admin-attribute-list {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-attribute-row,
+.admin-skill-row {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(214, 255, 239, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.admin-attribute-row h6,
+.admin-skill-row h6 {
+  margin: 0 0 5px;
+  color: #b9ffe8;
+  font-size: 0.82rem;
+}
+
+.admin-cultivation-skills {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.film-thumb-box video,
+.card-img-container video,
+.stack-layer video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lightbox-img-wrapper video {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.lightbox-img-wrapper video[hidden] {
+  display: none;
+}
+
+.lightbox-img-wrapper img[hidden] {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  #nav-chapters-bar.nav-chapters {
+    gap: 4px !important;
+  }
+
+  #nav-chapters-bar .nav-chip {
+    padding: 5px 10px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .visitor-count-badge {
+    padding: 7px 10px;
+  }
+
+  .genesis-status-badges {
+    gap: 5px;
+  }
+
+  .genesis-status-badge {
+    font-size: 0.67rem;
+  }
+
+  .admin-dashboard-tabs {
+    gap: 5px;
+  }
+
+  .admin-dashboard-tab {
+    padding: 8px 5px;
+    font-size: 0.68rem;
+  }
+
+  .admin-cultivation-skills {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-flip-front::after,
+  .five-element-orbit,
+  .emblem-glyph {
+    animation: none;
   }
 }
