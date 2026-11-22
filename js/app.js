@@ -15,7 +15,68 @@
   const INVITE_URL = 'https://haithanh05.github.io/thien_menh_chi_thanh';
   const INVITE_MESSAGE = `Mời đạo hữu ghé thăm Thiên Mệnh Chi Thành – nơi Thành Chủ Hải Thành lưu giữ hành trình độ kiếp từ phàm nhân sợ bug đến chiến thần gõ phím: ${INVITE_URL}`;
   const GENESIS_IMAGE = 'images/%E1%BA%A3nh%20ch%C3%ADnh/avt.jpg';
-  const CULTIVATION_PROFILE_COLUMNS = 'user_id,display_name,tu_vi,last_daily_claim,daily_like_xp,last_like_date,ticket_claimed,guestbook_claimed,updated_at';
+  const CULTIVATION_PROFILE_COLUMNS = 'user_id,email,display_name,tu_vi,last_daily_claim,daily_like_xp,last_like_date,ticket_claimed,guestbook_claimed,streak_days,last_checkin_date,updated_at';
+  const DEFAULT_FEATURE_TOGGLES = Object.freeze({
+    decrees: true,
+    oracle: true,
+    ticket: true,
+    game: true,
+    audio: true,
+    attributes: true,
+    leaderboard: true,
+    hideAdminFromLeaderboard: false,
+    comments: true,
+    footerUtilities: true
+  });
+  const THEME_KEYS = ['xianxia', 'obsidian', 'sepia', 'midnight', 'daylight'];
+  const DECREE_TYPES = Object.freeze({
+    'phap-chi': '📜 Pháp Chỉ Tông Môn',
+    'cao-thi': '🔥 Cáo Thị Khẩn',
+    'tam-dac': '✨ Tâm Đắc Lão Tổ',
+    'tin-mung': '🎉 Tin Mừng Tông Môn'
+  });
+  const CULTIVATION_MAXIMS = [
+    'Code chạy ngay lần đầu không phải thiên tài — là bug đang giả vờ ngủ để mai phục.',
+    'Thi cử đừng cầu đề dễ; hãy cầu trí nhớ đừng đăng xuất giữa phòng thi.',
+    'Thức khuya tu luyện thì được, nhưng sáng mai đừng hỏi sao mặt mình giống NPC mất kết nối.',
+    'Tình duyên như merge code: không đọc kỹ xung đột thì sớm muộn cũng phải ngồi gỡ.',
+    'Nhân phẩm có thể quyết định gacha, nhưng không quyết định được bài kiểm tra đã ôn hay chưa.',
+    'Độ kiếp qua môn nhờ ôn bài; độ kiếp qua deadline nhờ bắt đầu trước đêm cuối.',
+    'Một dòng code thiếu dấu chấm phẩy có thể khiến cả tông môn thức trắng.',
+    'Nếu bug biến mất khi mở màn hình chia sẻ, đó không phải phép màu — hãy kiểm tra lại log.',
+    'Đừng thức đến canh năm để sửa một lỗi có thể sửa sau khi ngủ đủ giấc.',
+    'Tỏ tình cũng như deploy: chọn đúng thời điểm, chuẩn bị rollback nếu bị từ chối.',
+    'Lắc xăm không làm bài hộ được đâu; Lão Tổ chỉ ban lời khuyên, không ban đáp án.',
+    'Tự tin là tốt, nhưng trước khi nộp bài nhớ nhìn lại xem đã ghi tên chưa.',
+    'Commit lúc nửa đêm là một môn độ kiếp; nhớ backup trước khi gọi thiên lôi.',
+    'Người có căn cơ mạnh không phải người không gặp bug, mà là người biết đọc thông báo lỗi.',
+    'Deadline không biết thương người; hãy thương bản thân bằng cách đừng để sát giờ mới mở file.',
+    'Điểm thấp chưa tận thế, nhưng quên lưu bài thì đúng là thiên đạo đang thử lòng.',
+    'Đừng so vận đào hoa với người khác — có người đang yêu, có người đang yêu cầu đổi mật khẩu.',
+    'Tâm ma lớn nhất của sĩ tử là câu “chắc phần này không ra” ngay trước lúc nó xuất hiện.',
+    'Muốn code sạch thì dọn từng dòng; muốn phòng sạch thì đừng gọi đó là gió cuốn.',
+    'Tóc rụng vì thức khuya không được tính là tóc hiến tế để tăng Tu Vi.',
+    'Nhân phẩm tốt là bốc trúng quẻ hay; đạo tâm tốt là vẫn học dù quẻ bảo đi ngủ.',
+    'Nếu bài làm có vẻ quá dễ, hãy kiểm tra xem mình có đang làm nhầm đề của năm ngoái.',
+    'Tình yêu cần chân thành, còn tin nhắn lúc 2 giờ sáng cần xem lại vào buổi sáng.',
+    'Đừng sửa production bằng trực giác; thiên cơ API nằm trong tài liệu, không nằm trong bói toán.',
+    'Tu tiên đường dài, học hành cũng vậy: nghỉ giải lao một chút chứ đừng nghỉ luôn cả học kỳ.',
+    'Một bài kiểm thử nhỏ hôm nay cứu đạo hữu khỏi màn hình đỏ và lời giải thích dài ngày mai.',
+    'Độ kiếp thất bại thì luyện lại; gửi nhầm tin nhắn thì… cầu mong đối phương chưa đọc.',
+    'Đừng để tab hướng dẫn mở nhiều hơn số trang đã ôn — đó là trận pháp gây ảo giác chăm chỉ.'
+  ];
+  const ORACLE_REPEAT_NOTES = [
+    '⚠️ Thiên cơ hôm nay đã tiết lộ hết rồi! Đạo hữu tham lam lắc tiếp coi chừng tẩu hỏa nhập ma, rụng sạch tóc đấy — mai quay lại nhé!',
+    '🛑 Ống xăm của Lão Tổ đã bốc khói! Mỗi ngày chỉ được 1 quẻ duy nhất, cố bấm nữa là Lão Tổ trừ ngược 100 Tu Vi bây giờ!',
+    '🎋 Xăm đã nghỉ phép! Đạo hữu bấm thêm cũng chỉ nghe tiếng lá tre xào xạc thôi, mai hãy quay lại.',
+    '👀 Lão Tổ thấy hết nhé: quẻ hôm nay vẫn nguyên xi, chỉ có ngón tay đạo hữu là đang tập thể lực.',
+    '☯ Thiên cơ không phải máy bán nước tự động — một ngày một quẻ, lắc nữa chỉ hao công đức!',
+    '💨 Ống xăm đang hồi khí! Bấm thêm lần nữa là phải tự viết bản kiểm điểm gửi Thiên Đạo đó.',
+    '📜 Quẻ hôm nay đã đóng dấu niêm phong. Đạo hữu hãy đọc kỹ rồi hẵng đòi spoiler ngày mai.',
+    '🧘 Tham thì thâm, lắc nhiều chỉ khiến Lão Tổ chóng mặt chứ không khiến vận may tăng đâu!',
+    '🌙 Hết lượt gieo quẻ hôm nay. Đi ngủ sớm đi, biết đâu ngày mai tóc vẫn còn nguyên.',
+    '🔒 Thiên cơ đã khóa! Nút này không phải nút tua nhanh sang ngày mai đâu đạo hữu.'
+  ];
   const supabaseClient = window.supabase && typeof window.supabase.createClient === 'function'
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
@@ -23,16 +84,28 @@
   let pendingAuthAction = null;
   let activeAuthMode = 'login';
   let pauseCanvasAnimation = null;
+  let adminToastTimer = null;
+  let cultivationCardControlsBound = false;
 
   // State Management
   const state = {
     data: null,
     currentFilter: 'all', // 'all' | 'photos' | 'quotes'
     siteSettings: {},
+    siteConfig: {},
+    liveConfigChannel: null,
+    featureToggles: { ...DEFAULT_FEATURE_TOGGLES },
+    themeSettings: { theme: 'xianxia', sky: 'cosmic' },
+    decrees: [],
+    milestoneCommentCounts: new Map(),
+    milestoneCountsPromise: null,
+    currentMilestoneStage: null,
     cultivationOverrides: {},
     customAttributes: {},
+    cultivationCardExpansion: new Map(),
     originalMemoriesByStage: new Map(),
     hiddenMemories: new Set(),
+    deletedMemories: [],
     adminMemoryFilter: 'all',
     archive: {
       memories: [],
@@ -40,6 +113,7 @@
       closeTimer: null
     },
     adminEditingMemory: null,
+    adminEditingDecreeId: null,
     cultivation: {
       userId: null,
       profile: null,
@@ -234,6 +308,79 @@
     }).join('');
   }
 
+  function renderHomeCultivationAttributes() {
+    const container = document.getElementById('home-cultivation-details-content');
+    const stage = state.data && state.data.stages.find(item => item.id === '2026');
+    if (!container || !stage) return;
+    container.innerHTML = `
+      <div class="home-cultivation-fate">🔮 Mệnh Cách: ${escapeHtml(getCultivationFate(stage.id))}</div>
+      <div class="rpg-stats-container home-cultivation-stats">
+        <div class="rpg-stat-col">
+          <div class="rpg-stat-col-title"><span>❖ LINH CĂN &amp; CĂN CỐT CHÍNH</span></div>
+          <div class="stat-bar-group">${renderMainStatsMarkup(stage)}</div>
+        </div>
+        <div class="rpg-stat-col">
+          <div class="rpg-stat-col-title"><span>◈ THIÊN PHÚ &amp; HUYẾT MẠCH PHỤ</span></div>
+          <div class="rpg-substats-grid">${renderSubStatsMarkup(stage)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function initHomeCultivationCard() {
+    const section = document.getElementById('home-cultivation-section');
+    const button = document.getElementById('home-cultivation-toggle');
+    const details = document.getElementById('home-cultivation-details');
+    if (!section || !button || !details || button.dataset.bound === 'true') return;
+    button.dataset.bound = 'true';
+    button.addEventListener('click', () => {
+      const expanded = button.getAttribute('aria-expanded') !== 'true';
+      section.classList.toggle('is-expanded', expanded);
+      button.setAttribute('aria-expanded', String(expanded));
+      details.setAttribute('aria-hidden', String(!expanded));
+      button.textContent = expanded
+        ? '✧ Thu Gọn ▴'
+        : '✧ Khai Mở ▾';
+    });
+  }
+
+  function initStageCultivationCardControls() {
+    if (cultivationCardControlsBound) return;
+    cultivationCardControlsBound = true;
+    document.addEventListener('click', event => {
+      const toggle = event.target instanceof Element
+        ? event.target.closest('.rpg-collapsed-summary, .rpg-expanded-summary, .rpg-collapse-trigger')
+        : null;
+      if (!toggle) return;
+      const card = toggle.closest('.rpg-card-collapsible');
+      if (!card) return;
+      const stageId = card.dataset.cultivationStageId;
+      if (!stageId) return;
+
+      const expanded = !card.classList.contains('is-expanded');
+      state.cultivationCardExpansion.set(stageId, expanded);
+      card.classList.toggle('is-expanded', expanded);
+      card.querySelectorAll('.rpg-collapsed-summary, .rpg-expanded-summary, .rpg-collapse-trigger')
+        .forEach(button => button.setAttribute('aria-expanded', String(expanded)));
+      const panel = card.querySelector('.rpg-expanded-panel');
+      const collapsedSummary = card.querySelector('.rpg-collapsed-summary');
+      const expandedSummary = card.querySelector('.rpg-expanded-summary');
+      if (panel) {
+        panel.setAttribute('aria-hidden', String(!expanded));
+        panel.toggleAttribute('inert', !expanded);
+      }
+      if (collapsedSummary) {
+        collapsedSummary.setAttribute('aria-hidden', String(expanded));
+        collapsedSummary.toggleAttribute('inert', expanded);
+      }
+      if (expandedSummary) expandedSummary.setAttribute('aria-hidden', String(!expanded));
+      const activeToggle = card.querySelector(expanded
+        ? '.rpg-expanded-summary'
+        : '.rpg-collapsed-summary');
+      if (activeToggle) activeToggle.focus({ preventScroll: true });
+    });
+  }
+
   const CULTIVATION_RANKS = [
     { min: 0, next: 50, name: 'Phàm Nhân Nhập Môn' },
     { min: 50, next: 150, name: 'Luyện Khí Kỳ' },
@@ -259,6 +406,7 @@
     const progress = document.getElementById('auth-cultivation-progress');
     const progressLabel = document.getElementById('auth-cultivation-progress-label');
     const status = document.getElementById('auth-cultivation-status');
+    const streakBadge = document.getElementById('auth-cultivation-streak');
     if (!card) return;
 
     card.hidden = !authenticatedUser;
@@ -270,6 +418,7 @@
     if (navTotal) navTotal.textContent = String(displayedPoints);
     if (navBadge && navLabel) {
       const isAdmin = isAdminUser();
+      const hideAdminPoints = isAdmin && state.featureToggles.hideAdminFromLeaderboard;
       const pointsRank = getCultivationRank(displayedPoints);
       const rankLabel = pointsRank.name
         .replace(' Nhập Môn', '')
@@ -277,6 +426,7 @@
         .replace(' Đại Năng', '');
       navLabel.textContent = rankLabel;
       if (navTotal) {
+        navTotal.hidden = hideAdminPoints;
         if (isAdmin) {
           navBadge.replaceChildren(document.createTextNode('👑 Chí Tôn • '), navTotal);
         } else {
@@ -289,11 +439,15 @@
         }
       }
       navBadge.setAttribute('aria-label', isAdmin
-        ? 'Chí Tôn • 9999'
+        ? (hideAdminPoints ? 'Chí Tôn' : 'Chí Tôn • 9999')
         : `${rankLabel} • ${displayedPoints}`);
     }
     if (!authenticatedUser) return;
     const points = Math.max(0, Number(state.cultivation.tuVi) || 0);
+    if (streakBadge) {
+      const streakDays = Math.max(0, Number(state.cultivation.profile && state.cultivation.profile.streak_days) || 0);
+      streakBadge.textContent = `🔥 Chuỗi ${streakDays} ngày`;
+    }
     const rank = getCultivationRank(points);
     if (rankEl) rankEl.textContent = isAdminUser()
       ? 'Độ Kiếp Chí Tôn • Thành Chủ Sáng Thế'
@@ -335,8 +489,74 @@
     cultivationToastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
   }
 
+  function spawnTuViBurst(sourceElement) {
+    const target = document.getElementById('nav-cultivation-badge');
+    const targetRect = target && target.getBoundingClientRect();
+    const targetX = targetRect && targetRect.width
+      ? targetRect.left + targetRect.width / 2
+      : window.innerWidth - 86;
+    const targetY = targetRect && targetRect.height
+      ? targetRect.top + targetRect.height / 2
+      : 32;
+    const sourceRect = sourceElement instanceof Element
+      ? sourceElement.getBoundingClientRect()
+      : null;
+    const sourceX = sourceRect && sourceRect.width
+      ? sourceRect.left + sourceRect.width / 2
+      : window.innerWidth / 2;
+    const sourceY = sourceRect && sourceRect.height
+      ? sourceRect.top + sourceRect.height / 2
+      : window.innerHeight * 0.62;
+
+    for (let index = 0; index < 10; index += 1) {
+      const particle = document.createElement('span');
+      const startX = sourceX + (Math.random() - 0.5) * 34;
+      const startY = sourceY + (Math.random() - 0.5) * 22;
+      const curveX = (Math.random() - 0.5) * 80;
+      const curveY = -28 - Math.random() * 62;
+      particle.className = 'tuvi-burst-gem';
+      particle.setAttribute('aria-hidden', 'true');
+      particle.style.left = `${startX}px`;
+      particle.style.top = `${startY}px`;
+      particle.style.setProperty('--tuvi-dx', `${targetX - startX}px`);
+      particle.style.setProperty('--tuvi-dy', `${targetY - startY}px`);
+      particle.style.setProperty('--tuvi-mid-x', `${(targetX - startX) * 0.46 + curveX}px`);
+      particle.style.setProperty('--tuvi-mid-y', `${(targetY - startY) * 0.46 + curveY}px`);
+      particle.style.animationDelay = `${index * 18}ms`;
+      document.body.appendChild(particle);
+      particle.addEventListener('animationend', () => particle.remove(), { once: true });
+      window.setTimeout(() => particle.remove(), 1100);
+    }
+
+    if (target && targetRect && targetRect.width) {
+      target.classList.remove('tuvi-burst-arrival');
+      void target.offsetWidth;
+      target.classList.add('tuvi-burst-arrival');
+      window.setTimeout(() => target.classList.remove('tuvi-burst-arrival'), 620);
+    }
+  }
+
+  window.spawnTuViBurst = spawnTuViBurst;
+
   function localDateKey(date = new Date()) {
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  function vietnamDateKey(date = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  }
+
+  function shiftDateKey(dateKey, days) {
+    const date = new Date(`${dateKey}T00:00:00.000Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
   }
 
   function normalizeDateKey(value) {
@@ -416,16 +636,21 @@
 
   function refreshCultivationStageCards() {
     if (!state.data) return;
+    renderHomeCultivationAttributes();
     state.data.stages.forEach(stage => {
       const section = document.getElementById(`stage-${stage.id}`);
       if (!section) return;
-      const levelBadge = section.querySelector('.rpg-avatar-lv');
-      const levelName = section.querySelector('.rpg-level-name');
+      const levelBadges = section.querySelectorAll('.rpg-avatar-lv');
+      const levelNames = section.querySelectorAll('.rpg-level-name');
       const fate = section.querySelector('.rpg-fate-badge');
       const mainStats = section.querySelector('.stat-bar-group');
       const subStats = section.querySelector('.rpg-substats-grid');
-      if (levelBadge) levelBadge.textContent = getCultivationLevel(stage);
-      if (levelName) levelName.textContent = getCultivationLevelName(stage);
+      levelBadges.forEach(levelBadge => {
+        levelBadge.textContent = getCultivationLevel(stage);
+      });
+      levelNames.forEach(levelName => {
+        levelName.textContent = getCultivationLevelName(stage);
+      });
       if (fate) fate.textContent = `🔮 Mệnh Cách: ${getCultivationFate(stage.id)}`;
       if (mainStats) mainStats.innerHTML = renderMainStatsMarkup(stage);
       if (subStats) subStats.innerHTML = renderSubStatsMarkup(stage);
@@ -491,7 +716,9 @@
       if (error) throw error;
       sessionStorage.setItem(sessionKey, '1');
       const count = getVisitorCount(data);
-      if (count != null) state.visitor.count = count;
+      const configuredCount = getVisitorCount(state.siteConfig.visitor_count);
+      if (configuredCount != null) state.visitor.count = configuredCount;
+      else if (count != null) state.visitor.count = count;
 
       const { data: configRow, error: settingsError } = await supabaseClient.from('site_settings')
         .select('value')
@@ -502,9 +729,11 @@
       state.siteSettings.visitor_config = config;
       state.visitor.visible = config.visible === true;
       if (count == null) {
-        state.visitor.count = getVisitorCount(config.count ?? config.visitor_count) || 0;
+        const savedCount = getVisitorCount(state.siteConfig.visitor_count);
+        state.visitor.count = savedCount ?? getVisitorCount(config.count ?? config.visitor_count) ?? 0;
       }
       updateVisitorBadge();
+      syncAdminVisitorCounterForm();
     } catch (error) {
       console.warn('Không thể cập nhật bộ đếm viếng thăm:', error);
     }
@@ -516,6 +745,315 @@
       .upsert({ key, value }, { onConflict: 'key' });
     if (error) throw error;
     state.siteSettings[key] = value;
+  }
+
+  function normalizeFeatureToggles(value) {
+    const saved = parseSettingValue(value);
+    return Object.fromEntries(Object.keys(DEFAULT_FEATURE_TOGGLES).map(key => [
+      key,
+      saved[key] !== false
+    ]));
+  }
+
+  function normalizeThemeSettings(value) {
+    const saved = parseSettingValue(value);
+    return {
+      theme: THEME_KEYS.includes(saved.theme) ? saved.theme : 'xianxia',
+      sky: saved.sky === 'mountain' ? 'mountain' : 'cosmic'
+    };
+  }
+
+  function applyGlobalThemeSettings(value) {
+    state.themeSettings = normalizeThemeSettings(value);
+    document.documentElement.dataset.theme = state.themeSettings.theme;
+    document.documentElement.dataset.skyMood = state.themeSettings.sky;
+    const themeSelect = document.getElementById('admin-global-theme');
+    const skySelect = document.getElementById('admin-global-sky');
+    if (themeSelect) themeSelect.value = state.themeSettings.theme;
+    if (skySelect) skySelect.value = state.themeSettings.sky;
+  }
+
+  function applyFeatureToggles() {
+    const toggles = state.featureToggles;
+    const setVisibility = (selector, visible) => {
+      document.querySelectorAll(selector).forEach(element => {
+        element.hidden = !visible;
+      });
+    };
+    setVisibility('#nav-thien-co-btn', toggles.oracle);
+    setVisibility('#nav-ticket-btn', toggles.ticket);
+    setVisibility('#btn-nav-game', toggles.game);
+    setVisibility('#global-audio-toggle, #floating-bg-player', toggles.audio);
+    setVisibility('.rpg-card', toggles.attributes);
+    setVisibility('#home-cultivation-section', toggles.attributes);
+    setVisibility('#public-leaderboard', toggles.leaderboard);
+    setVisibility('.milestone-comments-open', toggles.comments);
+    setVisibility('#utility-launcher', toggles.footerUtilities);
+
+    document.querySelectorAll('[data-feature-toggle]').forEach(input => {
+      input.checked = toggles[input.dataset.featureToggle] !== false;
+    });
+    renderFeaturedDecree();
+  }
+
+  async function saveSiteConfig(configKey, value) {
+    if (!supabaseClient) throw new Error('Dịch vụ cấu hình toàn trang chưa kết nối.');
+    const updatedAt = new Date().toISOString();
+    const payload = { config_key: configKey, config_value: value, updated_at: updatedAt };
+    const { error: upsertError } = await supabaseClient.from('site_config')
+      .upsert(payload, { onConflict: 'config_key' });
+    if (upsertError) {
+      const { data: existing, error: lookupError } = await supabaseClient.from('site_config')
+        .select('config_key')
+        .eq('config_key', configKey)
+        .maybeSingle();
+      if (lookupError) {
+        throw new Error(`${upsertError.message || 'Không thể lưu cấu hình.'} (dự phòng cũng lỗi: ${lookupError.message || 'không thể kiểm tra cấu hình hiện có'})`);
+      }
+
+      const values = { config_value: value, updated_at: updatedAt };
+      const fallbackWrite = async useTimestamp => {
+        const rowValues = useTimestamp ? values : { config_value: value };
+        return existing
+          ? await supabaseClient.from('site_config').update(rowValues)
+            .eq('config_key', configKey).select('config_key').maybeSingle()
+          : await supabaseClient.from('site_config').insert({
+            config_key: configKey,
+            ...rowValues
+          }).select('config_key').maybeSingle();
+      };
+      let result = await fallbackWrite(true);
+      if (result.error && isMissingDatabaseColumn(result.error, 'updated_at')) {
+        result = await fallbackWrite(false);
+      }
+      if (result.error) throw result.error;
+      if (!result.data) {
+        if (existing) throw new Error('Không thể cập nhật cấu hình hiện có; hãy kiểm tra quyền truy cập Supabase.');
+        throw new Error('Không thể thêm cấu hình mới; hãy kiểm tra quyền truy cập Supabase.');
+      }
+    }
+    state.siteConfig[configKey] = value;
+  }
+
+  async function loadGlobalSiteConfig() {
+    if (!supabaseClient) {
+      applyFeatureToggles();
+      applyGlobalThemeSettings(state.themeSettings);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabaseClient.from('site_config')
+        .select('config_key,config_value')
+        .in('config_key', ['theme_settings', 'feature_toggles', 'visitor_count']);
+      if (error) throw error;
+      (data || []).forEach(row => {
+        state.siteConfig[row.config_key] = parseSettingValue(row.config_value);
+      });
+      state.featureToggles = normalizeFeatureToggles(state.siteConfig.feature_toggles);
+      const savedVisitorCount = getVisitorCount(state.siteConfig.visitor_count);
+      if (savedVisitorCount != null) state.visitor.count = savedVisitorCount;
+      applyGlobalThemeSettings(state.siteConfig.theme_settings);
+      updateVisitorBadge();
+    } catch (error) {
+      console.warn('Không thể tải cấu hình toàn trang:', error);
+    }
+    applyFeatureToggles();
+    syncAdminGlobalSettingsForms();
+  }
+
+  function syncAdminGlobalSettingsForms() {
+    const themeSelect = document.getElementById('admin-global-theme');
+    const skySelect = document.getElementById('admin-global-sky');
+    if (themeSelect) themeSelect.value = state.themeSettings.theme;
+    if (skySelect) skySelect.value = state.themeSettings.sky;
+    document.querySelectorAll('[data-feature-toggle]').forEach(input => {
+      input.checked = state.featureToggles[input.dataset.featureToggle] !== false;
+    });
+    syncAdminVisitorCounterForm();
+  }
+
+  function formatDecreeDate(value) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return 'Thời gian đang được hiệu chỉnh';
+    const formatter = new Intl.DateTimeFormat('vi-VN', {
+      timeZone: 'Asia/Ho_Chi_Minh',
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hourCycle: 'h23'
+    });
+    const parts = Object.fromEntries(formatter.formatToParts(date).map(part => [part.type, part.value]));
+    return `⏳ Ban hành lúc ${parts.hour}:${parts.minute} • Ngày ${parts.day}/${parts.month}/${parts.year}`;
+  }
+
+  function renderDecreeCard(decree) {
+    const article = document.createElement('article');
+    article.className = 'decree-history-card';
+    const type = document.createElement('span');
+    type.className = 'decree-type-badge';
+    type.textContent = DECREE_TYPES[decree.decree_type] || DECREE_TYPES['phap-chi'];
+    const time = document.createElement('p');
+    time.className = 'decree-time';
+    time.textContent = formatDecreeDate(decree.created_at);
+    const title = document.createElement('h3');
+    title.textContent = String(decree.title || '');
+    const content = document.createElement('p');
+    content.className = 'decree-content';
+    content.textContent = String(decree.content || '');
+    article.append(type, time, title, content);
+    if (decree.is_pinned) {
+      const pin = document.createElement('span');
+      pin.className = 'decree-pinned-label';
+      pin.textContent = '📌 Đang ghim';
+      article.appendChild(pin);
+    }
+    return article;
+  }
+
+  function renderFeaturedDecree() {
+    const section = document.getElementById('tong-chu-decree-section');
+    const type = document.getElementById('featured-decree-type');
+    const time = document.getElementById('featured-decree-time');
+    const title = document.getElementById('tong-chu-decree-title');
+    const content = document.getElementById('featured-decree-content');
+    const historyButton = document.getElementById('open-decree-history');
+    const featured = state.decrees.find(decree => decree.is_pinned) || state.decrees[0];
+    if (!section || !type || !time || !title || !content) return;
+    section.hidden = !featured || state.featureToggles.decrees === false;
+    if (!featured) return;
+    type.textContent = DECREE_TYPES[featured.decree_type] || DECREE_TYPES['phap-chi'];
+    time.textContent = formatDecreeDate(featured.created_at);
+    title.textContent = String(featured.title || '');
+    content.textContent = String(featured.content || '');
+    if (historyButton) {
+      historyButton.hidden = state.decrees.length < 2;
+      historyButton.textContent = `📜 Xem Tất Cả Chiếu Thư (${state.decrees.length})`;
+    }
+  }
+
+  function renderAdminDecreeList() {
+    document.querySelectorAll('#admin-decree-list, #admin-decree-list-memory').forEach(list => {
+      list.replaceChildren();
+      if (!state.decrees.length) {
+        const empty = document.createElement('p');
+        empty.className = 'admin-memory-empty';
+        empty.textContent = 'Chưa có chiếu thư nào được ban bố.';
+        list.appendChild(empty);
+        return;
+      }
+
+      state.decrees.forEach(decree => {
+        const item = document.createElement('article');
+        item.className = 'admin-decree-item';
+        const details = renderDecreeCard(decree);
+        const actions = document.createElement('div');
+        actions.className = 'admin-decree-actions';
+        const editButton = document.createElement('button');
+        editButton.type = 'button';
+        editButton.className = 'admin-secondary-button';
+        editButton.dataset.decreeAction = 'edit';
+        editButton.dataset.decreeId = String(decree.id);
+        editButton.textContent = '✏️ Sửa';
+        const pinButton = document.createElement('button');
+        pinButton.type = 'button';
+        pinButton.className = 'admin-secondary-button';
+        pinButton.dataset.decreeAction = 'pin';
+        pinButton.dataset.decreeId = String(decree.id);
+        pinButton.textContent = decree.is_pinned ? 'Bỏ ghim' : '📌 Ghim';
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'admin-delete-button';
+        deleteButton.dataset.decreeAction = 'delete';
+        deleteButton.dataset.decreeId = String(decree.id);
+          deleteButton.textContent = '🗑️ Xóa';
+        actions.append(editButton, pinButton, deleteButton);
+        item.append(details, actions);
+        list.appendChild(item);
+      });
+    });
+  }
+
+  async function loadTongChuDecrees({ throwOnError = false } = {}) {
+    if (!supabaseClient) {
+      state.decrees = [];
+      renderFeaturedDecree();
+      renderAdminDecreeList();
+      return;
+    }
+    try {
+      const { data, error } = await supabaseClient.from('tong_chu_decrees')
+        .select('*')
+        .order('is_pinned', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      state.decrees = data || [];
+      renderFeaturedDecree();
+      renderAdminDecreeList();
+    } catch (error) {
+      console.warn('Không thể tải Chiếu Thư Tông Chủ:', error);
+      renderFeaturedDecree();
+      renderAdminDecreeList();
+      if (throwOnError) throw error;
+    }
+  }
+
+  function renderDecreeHistory() {
+    const list = document.getElementById('decree-history-list');
+    if (!list) return;
+    list.replaceChildren();
+    state.decrees.forEach(decree => list.appendChild(renderDecreeCard(decree)));
+  }
+
+  function initGlobalSiteRealtime() {
+    if (!supabaseClient || typeof supabaseClient.channel !== 'function' || state.liveConfigChannel) return;
+    try {
+      state.liveConfigChannel = supabaseClient.channel('tmtc-site-live')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'site_config'
+        }, payload => {
+          const row = payload.new && payload.new.config_key
+            ? payload.new
+            : payload.old;
+          if (!row || !row.config_key) return;
+          const value = payload.eventType === 'DELETE' ? null : parseSettingValue(row.config_value);
+          if (row.config_key === 'theme_settings') {
+            state.siteConfig.theme_settings = value;
+            applyGlobalThemeSettings(value);
+          } else if (row.config_key === 'feature_toggles') {
+            state.siteConfig.feature_toggles = value;
+            state.featureToggles = normalizeFeatureToggles(value);
+            applyFeatureToggles();
+            renderCultivationCard();
+            void loadCultivationLeaderboard();
+          } else if (row.config_key === 'visitor_count') {
+            state.siteConfig.visitor_count = value;
+            state.visitor.count = getVisitorCount(value) ?? 0;
+            syncAdminVisitorCounterForm();
+            updateVisitorBadge();
+          }
+        })
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'tong_chu_decrees'
+        }, () => {
+          void loadTongChuDecrees();
+        })
+        .subscribe(status => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            console.warn(`Không thể đồng bộ cấu hình/chiếu thư trực tiếp: ${status}`);
+          }
+        });
+    } catch (error) {
+      state.liveConfigChannel = null;
+      console.warn('Không thể khởi tạo đồng bộ cấu hình trực tiếp:', error);
+    }
   }
 
   function applyHiddenMemories() {
@@ -536,7 +1074,9 @@
       ? { ...profile, tu_vi: 9999 }
       : profile;
     state.cultivation.profile = effectiveProfile || null;
-    state.cultivation.tuVi = Math.max(0, Number(effectiveProfile && effectiveProfile.tu_vi) || 0);
+    state.cultivation.tuVi = Math.max(0, Number(
+      effectiveProfile && (effectiveProfile.cultivation_points ?? effectiveProfile.tu_vi)
+    ) || 0);
     state.cultivation.profileError = '';
     renderCultivationCard();
   }
@@ -549,41 +1089,100 @@
 
   function buildCultivationPayload(user, profile, changes = {}) {
     const values = { ...(profile || {}), ...changes };
+    const changedTuVi = Object.prototype.hasOwnProperty.call(changes, 'cultivation_points')
+      ? changes.cultivation_points
+      : Object.prototype.hasOwnProperty.call(changes, 'tu_vi')
+        ? changes.tu_vi
+        : values.cultivation_points ?? values.tu_vi;
+    const tuVi = Math.max(0, Number(changedTuVi) || 0);
     return {
       user_id: user.id,
+      email: String(user.email || values.email || ''),
       display_name: String(values.display_name || getUserDisplayName(user)),
-      tu_vi: Math.max(0, Number(values.tu_vi) || 0),
+      tu_vi: tuVi,
+      cultivation_points: tuVi,
       last_daily_claim: normalizeDateKey(values.last_daily_claim),
       daily_like_xp: Math.max(0, Number(values.daily_like_xp) || 0),
       last_like_date: normalizeDateKey(values.last_like_date),
       ticket_claimed: Boolean(values.ticket_claimed),
       guestbook_claimed: Boolean(values.guestbook_claimed),
+      streak_days: Math.max(0, Number(values.streak_days) || 0),
+      last_checkin_date: normalizeDateKey(values.last_checkin_date),
       updated_at: new Date().toISOString()
     };
   }
 
+  function getCultivationPoints(profile) {
+    return Math.max(0, Number(profile && (profile.cultivation_points ?? profile.tu_vi)) || 0);
+  }
+
   async function fetchCultivationProfile(userId) {
-    const result = await supabaseClient.from('user_cultivation')
+    let result = await supabaseClient.from('user_cultivation')
       .select(CULTIVATION_PROFILE_COLUMNS)
       .eq('user_id', userId)
       .maybeSingle();
+    if (result.error && isMissingDatabaseColumn(result.error, 'email')) {
+      console.warn('user_cultivation chưa có cột email; cần bổ sung cột để bật chỉnh Tu Vi theo Gmail.');
+      result = await supabaseClient.from('user_cultivation')
+        .select(CULTIVATION_PROFILE_COLUMNS.split(',').filter(column => column !== 'email').join(','))
+        .eq('user_id', userId)
+        .maybeSingle();
+    }
     if (result.error) throw result.error;
     return result.data;
   }
 
+  async function upsertCultivationProfile(profile) {
+    const payload = { ...profile };
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const { error } = await supabaseClient.from('user_cultivation')
+        .upsert(payload, { onConflict: 'user_id' });
+      if (!error) return;
+      const unsupportedColumn = ['email', 'cultivation_points'].find(column =>
+        Object.prototype.hasOwnProperty.call(payload, column) && isMissingDatabaseColumn(error, column)
+      );
+      if (!unsupportedColumn) throw error;
+      console.warn(`user_cultivation chưa có cột ${unsupportedColumn}; bỏ cột này khỏi lần lưu hiện tại.`);
+      delete payload[unsupportedColumn];
+    }
+    throw new Error('Không thể đồng bộ hồ sơ Tu Vi với cấu trúc bảng hiện tại.');
+  }
+
   async function claimDailyCultivation(user, profile) {
-    const today = localDateKey();
-    if (normalizeDateKey(profile && profile.last_daily_claim) === today) return false;
+    const today = vietnamDateKey();
+    const previousCheckin = normalizeDateKey(profile && profile.last_checkin_date);
+    const previousDailyClaim = normalizeDateKey(profile && profile.last_daily_claim);
+    const currentStreak = Math.max(0, Number(profile && profile.streak_days) || 0);
+
+    if (previousCheckin === today) return false;
+    if (previousDailyClaim === today) {
+      const migratedStreak = previousCheckin === shiftDateKey(today, -1)
+        ? currentStreak + 1
+        : Math.max(currentStreak, 1);
+      const migratedProfile = buildCultivationPayload(user, profile, {
+        streak_days: migratedStreak,
+        last_checkin_date: today
+      });
+      await upsertCultivationProfile(migratedProfile);
+      applyCultivationProfile(migratedProfile);
+      return false;
+    }
+
+    const streakDays = previousCheckin === shiftDateKey(today, -1) ? currentStreak + 1 : 1;
+    const reward = isAdminUser(user) ? 0 : streakDays >= 7 ? 35 : streakDays >= 3 ? 20 : 10;
     const updatedProfile = buildCultivationPayload(user, profile, {
-      tu_vi: (Number(profile && profile.tu_vi) || 0) + 20,
-      last_daily_claim: today
+      tu_vi: isAdminUser(user) ? 9999 : getCultivationPoints(profile) + reward,
+      last_daily_claim: today,
+      last_checkin_date: today,
+      streak_days: streakDays
     });
-    const { error } = await supabaseClient.from('user_cultivation')
-      .upsert(updatedProfile, { onConflict: 'user_id' });
-    if (error) throw error;
+    await upsertCultivationProfile(updatedProfile);
 
     applyCultivationProfile(updatedProfile);
-    showCultivationToast('+20 Tu Vi · Điểm danh hằng ngày', '☀️');
+    showCultivationToast(isAdminUser(user)
+      ? `🔥 Tông Chủ duy trì chuỗi điểm danh ${streakDays} ngày.`
+      : `🔥 Chuỗi ${streakDays} ngày · +${reward} Tu Vi điểm danh`, '☀️');
+    if (reward > 0) spawnTuViBurst(document.getElementById('nav-cultivation-badge'));
     return true;
   }
 
@@ -604,18 +1203,12 @@
       const profile = await fetchCultivationProfile(user.id);
       if (state.cultivation.userId !== user.id) return;
       const syncedProfile = buildCultivationPayload(user, profile, isAdminUser(user) ? { tu_vi: 9999 } : {});
-      const { error } = await supabaseClient.from('user_cultivation')
-        .upsert(syncedProfile, { onConflict: 'user_id' });
-      if (error) throw error;
+      await upsertCultivationProfile(syncedProfile);
       applyCultivationProfile(syncedProfile);
       const dailyClaim = state.cultivation.awardQueue.then(async () => {
         const latestProfile = await fetchCultivationProfile(user.id);
         if (state.cultivation.userId !== user.id) return;
-        if (isAdminUser(user)) {
-          applyCultivationProfile({ ...(latestProfile || syncedProfile), tu_vi: 9999 });
-        } else {
-          await claimDailyCultivation(user, latestProfile);
-        }
+        await claimDailyCultivation(user, latestProfile);
       });
       state.cultivation.awardQueue = dailyClaim.then(() => undefined, () => undefined);
       await dailyClaim;
@@ -684,16 +1277,15 @@
       if (options.claimField) changes[options.claimField] = true;
       const updatedProfile = buildCultivationPayload(user, profile, {
         ...changes,
-        tu_vi: (Number(profile && profile.tu_vi) || 0) + awardedPoints
+        tu_vi: getCultivationPoints(profile) + awardedPoints
       });
 
-      const { error } = await supabaseClient.from('user_cultivation')
-        .upsert(updatedProfile, { onConflict: 'user_id' });
-      if (error) throw error;
+      await upsertCultivationProfile(updatedProfile);
       if (authenticatedUser?.id !== user.id) return false;
 
       applyCultivationProfile({ ...(profile || {}), ...updatedProfile });
       showCultivationToast(`+${awardedPoints} Tu Vi · ${reason}`, '✨');
+      spawnTuViBurst(options.sourceElement);
       void loadCultivationLeaderboard();
       return true;
     } catch (error) {
@@ -885,7 +1477,7 @@
       await refreshMemoryLikeButton(button, stage, memory);
       setMemoryLikeStatus(button, existingLike ? 'Đã thu hồi Linh Thạch.' : 'Linh Thạch đã được dâng lên!');
       if (!existingLike) {
-        await awardCultivation(10, 'Dâng Linh Thạch', { dailyLike: true });
+        await awardCultivation(10, 'Dâng Linh Thạch', { dailyLike: true, sourceElement: button });
       }
     } catch (error) {
       console.error('Không thể cập nhật Linh Thạch:', error);
@@ -993,7 +1585,9 @@
         ...stage,
         mainStats: Array.isArray(stage.mainStats) ? stage.mainStats : [],
         subStats: Array.isArray(stage.subStats) ? stage.subStats : [],
-        memories: Array.isArray(stage.memories) ? [...stage.memories] : [],
+        memories: Array.isArray(stage.memories)
+          ? stage.memories.filter(memory => memory.is_deleted !== true)
+          : [],
         themeSong: stage.themeSong || { title: 'Giai điệu hoài niệm', src: '', startTime: 0 }
       }));
       state.originalMemoriesByStage = new Map(state.data.stages.map(stage => [
@@ -1003,10 +1597,13 @@
 
       initHeroSection();
       initStickyNav();
-      initThemeSwitcher();
+      applyGlobalThemeSettings(state.themeSettings);
+      applyFeatureToggles();
       renderStages();
+      initHomeCultivationCard();
       initCultivationBackground();
       initXianxiaCanvas();
+      initSpiritParticlesCanvas();
       initAchievements();
       initTimeCapsule();
       initTicketStation();
@@ -1017,9 +1614,13 @@
       initAuthPortal();
       initArchiveLockModal();
       initCultivationOracle();
+      initFeatureModals();
       initLeaderboardTabs();
       void loadDynamicMemories();
-      void loadSiteSettings().then(() => initVisitorCounter());
+      void Promise.all([loadSiteSettings(), loadGlobalSiteConfig()])
+        .then(() => initVisitorCounter());
+      void loadTongChuDecrees();
+      initGlobalSiteRealtime();
       void loadLeaderboard();
     } catch (e) {
       console.error('Không thể khởi tạo trang:', e);
@@ -1027,7 +1628,7 @@
   }
 
   function findStageForMemoryRow(row) {
-    const stageKey = String(row.stage || row.stage_id || '');
+    const stageKey = String(row.stage_id || row.stage || row.year || '');
     return state.data.stages.find(stage =>
       stage.id === stageKey || stage.period === stageKey || stage.title === stageKey
     );
@@ -1077,15 +1678,16 @@
     return {
       id: `supabase-${String(row.id)}`,
       dbId: row.id,
+      type: row.type === 'story' ? 'story' : 'photo',
       isDynamic: true,
       sortOrder: row.sort_order == null ? Number.MAX_SAFE_INTEGER : Number(row.sort_order) || 0,
       title: String(row.title || 'Kỷ niệm mới'),
-      time: String(row.time || row.created_at || ''),
+      time: String(row.date_label || row.time || row.created_at || ''),
       month: row.month == null || row.month === '' ? null : Number(row.month),
-      description: String(row.description || ''),
+      description: String(row.story || row.caption || row.description || ''),
       image: images,
       mediaType: isVideoUrl(images[0]) ? 'video' : 'image',
-      tag: 'Kỷ niệm',
+      tag: row.type === 'story' ? 'Tâm sự' : 'Kỷ niệm',
       isHighlight: false
     };
   }
@@ -1166,9 +1768,7 @@
       const indexTag = section.querySelector('.stage-index-tag');
       const archiveLabel = section.querySelector('.btn-open-archive > span:last-child');
       const count = stage.memories.length;
-      if (indexTag) {
-        indexTag.textContent = `${presentation.eyebrow} • ${count} MẢNH KÝ ỨC`;
-      }
+      if (indexTag) indexTag.textContent = presentation.eyebrow;
       if (archiveLabel) {
         archiveLabel.textContent = `Khai Ấn Ngọc Giản: Ký Ức ${stage.period} (${count} mảnh tàn hồn)`;
       }
@@ -1184,7 +1784,7 @@
     renderFilmstripGrid(stage, state.currentModalMonth);
   }
 
-  async function loadDynamicMemories() {
+  async function loadDynamicMemories({ throwOnError = false } = {}) {
     if (!supabaseClient || !state.data) return;
 
     try {
@@ -1200,6 +1800,7 @@
         const staticMemories = (state.originalMemoriesByStage.get(stage.id) || [])
           .filter(memory => !state.hiddenMemories.has(String(memory.id)));
         const dynamicMemories = data
+          .filter(row => row.is_deleted !== true)
           .filter(row => findStageForMemoryRow(row) === stage)
           .map(mapDynamicMemory)
           .filter(Boolean)
@@ -1220,6 +1821,7 @@
       }
     } catch (error) {
       console.warn('Không thể tải kỷ niệm động; tiếp tục dùng dữ liệu gốc:', error);
+      if (throwOnError) throw error;
     }
   }
 
@@ -1254,7 +1856,7 @@
     modal.classList.remove('active');
     modal.setAttribute('aria-hidden', 'true');
     modal.hidden = true;
-    document.body.style.overflow = '';
+    syncFeatureModalScrollLock();
   }
 
   function setAuthMode(mode) {
@@ -1362,6 +1964,7 @@
     authenticatedUser = user || null;
     renderAuthState(authenticatedUser);
     refreshVisibleMemoryLikes();
+    initMilestoneComments();
     if (authenticatedUser) {
       void syncCultivationForUser(authenticatedUser);
       void loadLeaderboard();
@@ -1404,9 +2007,11 @@
 
   function setAdminStatus(message, isError = false) {
     const status = document.getElementById('auth-status');
-    if (!status) return;
-    status.textContent = message;
-    status.classList.toggle('is-error', isError);
+    if (status) {
+      status.textContent = message;
+      status.classList.toggle('is-error', isError);
+    }
+    if (isAdminUser()) showAdminToast(message, isError);
   }
 
   function authErrorMessage(error, mode) {
@@ -1485,9 +2090,32 @@
 
   function setAdminToolStatus(id, message, isError = false) {
     const status = document.getElementById(id);
-    if (!status) return;
-    status.textContent = message;
-    status.classList.toggle('is-error', isError);
+    if (status) {
+      status.textContent = message;
+      status.classList.toggle('is-error', isError);
+    }
+    if (isAdminUser()) showAdminToast(message, isError);
+  }
+
+  function showAdminToast(message, isError = false) {
+    const text = String(message || '').trim();
+    if (!text || /^đang /i.test(text)) return;
+    let toast = document.getElementById('admin-action-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'admin-action-toast';
+      toast.className = 'admin-action-toast';
+      toast.setAttribute('role', 'status');
+      toast.setAttribute('aria-live', 'polite');
+      document.body.appendChild(toast);
+    }
+    toast.textContent = isError
+      ? `❌ Lỗi: ${text.replace(/^không thể[^:]*:\s*/i, '')}`
+      : `✅ ${text}`;
+    toast.classList.toggle('is-error', isError);
+    toast.classList.add('is-visible');
+    if (adminToastTimer) window.clearTimeout(adminToastTimer);
+    adminToastTimer = window.setTimeout(() => toast.classList.remove('is-visible'), 4200);
   }
 
   function populateAdminCultivationForm(stageId) {
@@ -1547,7 +2175,7 @@
     }).join('');
   }
 
-  function activateAdminPanel(panelId) {
+  function activateAdminPanel(panelId, memoryPanelId = 'admin-panel-add-memory') {
     const tabs = Array.from(document.querySelectorAll('[data-admin-panel-target]'));
     const panels = Array.from(document.querySelectorAll('.admin-dashboard-panel'));
     if (!tabs.some(tab => tab.dataset.adminPanelTarget === panelId)) return;
@@ -1560,6 +2188,23 @@
     panels.forEach(panel => {
       panel.hidden = panel.id !== panelId;
     });
+    const showMemory = panelId === 'admin-panel-memory';
+    const addMemoryPanel = document.getElementById('admin-panel-add-memory');
+    const manageMemoryPanel = document.getElementById('admin-panel-manage-memories');
+    if (addMemoryPanel) addMemoryPanel.hidden = !showMemory || memoryPanelId !== 'admin-panel-add-memory';
+    if (manageMemoryPanel) manageMemoryPanel.hidden = !showMemory || memoryPanelId !== 'admin-panel-manage-memories';
+    document.querySelectorAll('.admin-memory-subtab').forEach(button => {
+      const selected = button.dataset.memoryPanelTarget === memoryPanelId;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-selected', String(selected));
+    });
+    if (showMemory && memoryPanelId === 'admin-panel-manage-memories') {
+      syncAdminVisitorCounterForm();
+      void loadDeletedMemories();
+    }
+    if (panelId === 'admin-panel-attributes' && isAdminUser()) {
+      void loadAdminCultivationProfiles();
+    }
   }
 
   function syncAdminSettingsForm() {
@@ -1567,37 +2212,93 @@
     if (visitorToggle) visitorToggle.checked = state.visitor.visible;
     const stageSelect = document.getElementById('admin-cultivation-stage');
     if (stageSelect) populateAdminCultivationForm(stageSelect.value);
+    syncAdminGlobalSettingsForms();
+    syncAdminVisitorCounterForm();
+  }
+
+  function syncAdminVisitorCounterForm() {
+    const input = document.getElementById('admin-visitor-count');
+    if (!input) return;
+    const savedCount = getVisitorCount(state.siteConfig.visitor_count);
+    input.value = String(savedCount ?? state.visitor.count ?? 0);
   }
 
   function initAdminSettingsControls() {
     const dashboardTabs = Array.from(document.querySelectorAll('[data-admin-panel-target]'));
-    dashboardTabs.forEach(tab => {
-      tab.addEventListener('click', () => activateAdminPanel(tab.dataset.adminPanelTarget));
-    });
     const initialDashboardTab = dashboardTabs.find(tab => tab.getAttribute('aria-selected') === 'true') || dashboardTabs[0];
     if (initialDashboardTab) activateAdminPanel(initialDashboardTab.dataset.adminPanelTarget);
-
-    document.querySelectorAll('[data-admin-memory-filter]').forEach(button => {
-      button.addEventListener('click', () => {
-        const filter = button.dataset.adminMemoryFilter;
+    document.addEventListener('click', event => {
+      const clicked = event.target instanceof Element ? event.target.closest('button') : null;
+      if (!clicked || !clicked.closest('#admin-dashboard')) return;
+      const dashboardTab = clicked.closest('.admin-dashboard-tab[data-admin-panel-target]');
+      if (dashboardTab) {
+        activateAdminPanel(dashboardTab.dataset.adminPanelTarget);
+        return;
+      }
+      const memoryTab = clicked.closest('.admin-memory-subtab[data-memory-panel-target]');
+      if (memoryTab) {
+        activateAdminPanel('admin-panel-memory', memoryTab.dataset.memoryPanelTarget);
+        return;
+      }
+      const filterButton = clicked.closest('[data-admin-memory-filter]');
+      if (filterButton) {
+        const filter = filterButton.dataset.adminMemoryFilter;
         const hasStage = filter === 'all' || state.data.stages.some(stage => stage.id === filter);
         if (!hasStage) return;
         state.adminMemoryFilter = filter;
         renderAdminMemoryList();
-      });
+        return;
+      }
+      const memoryButton = clicked.closest('#admin-memory-list [data-memory-action]');
+      const restoreButton = clicked.closest('#admin-deleted-memory-list [data-memory-action="restore"]');
+      if (restoreButton) {
+        const deletedMemory = state.deletedMemories.find(item =>
+          String(item.id) === restoreButton.dataset.memoryId
+        );
+        if (deletedMemory) void restoreDeletedMemory(deletedMemory, restoreButton);
+        return;
+      }
+      if (memoryButton) {
+        const stage = state.data.stages.find(item => item.id === memoryButton.dataset.stageId);
+        const memory = stage && stage.memories.find(item =>
+          String(item.id) === memoryButton.dataset.memoryId
+        );
+        if (!stage || !memory) return;
+        switch (memoryButton.dataset.memoryAction) {
+          case 'edit':
+            editDynamicMemory(stage, memory);
+            break;
+          case 'up':
+            void moveDynamicMemory(stage, memory, -1);
+            break;
+          case 'down':
+            void moveDynamicMemory(stage, memory, 1);
+            break;
+          case 'hide-original':
+            void hideOriginalMemory(stage, memory, memoryButton);
+            break;
+          case 'delete':
+            void deleteDynamicMemory(stage, memory, memoryButton);
+            break;
+          default:
+            break;
+        }
+      }
     });
 
     const visitorToggle = document.getElementById('admin-visitor-visible');
     if (visitorToggle) {
-      visitorToggle.addEventListener('change', async () => {
+      document.addEventListener('change', async event => {
+        if (event.target.id !== 'admin-visitor-visible') return;
+        const currentToggle = event.target;
         if (!isAdminUser()) {
-          visitorToggle.checked = state.visitor.visible;
+          currentToggle.checked = state.visitor.visible;
           setAdminToolStatus('admin-visitor-status', 'Chỉ Admin mới được đổi cài đặt này.', true);
           return;
         }
         const previousConfig = state.siteSettings.visitor_config || {};
-        const nextConfig = { ...previousConfig, visible: visitorToggle.checked };
-        visitorToggle.disabled = true;
+        const nextConfig = { ...previousConfig, visible: currentToggle.checked };
+        currentToggle.disabled = true;
         try {
           await saveSiteSetting('visitor_config', nextConfig);
           state.visitor.visible = nextConfig.visible;
@@ -1606,23 +2307,28 @@
             ? 'Đã bật huy hiệu Đạo Hữu Lỡ Bước Nhập Môn.'
             : 'Đã ẩn huy hiệu Đạo Hữu Lỡ Bước Nhập Môn.');
         } catch (error) {
-          visitorToggle.checked = state.visitor.visible;
+          currentToggle.checked = state.visitor.visible;
           setAdminToolStatus('admin-visitor-status', `Không thể lưu cài đặt: ${error.message || 'Lỗi kết nối.'}`, true);
         } finally {
-          visitorToggle.disabled = false;
+          currentToggle.disabled = false;
         }
       });
     }
 
     const stageSelect = document.getElementById('admin-cultivation-stage');
     if (stageSelect) {
-      stageSelect.addEventListener('change', () => populateAdminCultivationForm(stageSelect.value));
+      document.addEventListener('change', event => {
+        if (event.target.id === 'admin-cultivation-stage') {
+          populateAdminCultivationForm(event.target.value);
+        }
+      });
     }
 
-    const cultivationForm = document.getElementById('admin-cultivation-form');
-    if (cultivationForm) {
-      cultivationForm.addEventListener('submit', async event => {
+    if (document.getElementById('admin-cultivation-form')) {
+      document.addEventListener('submit', async event => {
+        if (event.target.id !== 'admin-cultivation-form') return;
         event.preventDefault();
+        const cultivationForm = event.target;
         if (!isAdminUser()) {
           setAdminToolStatus('admin-cultivation-status', 'Chỉ Admin mới được sửa thuộc tính tu tiên.', true);
           return;
@@ -1696,6 +2402,375 @@
           if (submitButton) submitButton.disabled = false;
         }
       });
+    }
+
+    initAdminGlobalControls();
+    initAdminDecreeControls();
+    initAdminUserCultivationControl();
+    initAdminVisitorCounterControl();
+  }
+
+  function initAdminVisitorCounterControl() {
+    const form = document.getElementById('admin-visitor-count-form');
+    if (!form) return;
+    document.addEventListener('submit', async event => {
+      if (event.target.id !== 'admin-visitor-count-form') return;
+      event.preventDefault();
+      if (!isAdminUser()) {
+        setAdminToolStatus('admin-visitor-status', 'Chỉ Tông Chủ mới được cập nhật bộ đếm đạo hữu.', true);
+        return;
+      }
+      const input = document.getElementById('admin-visitor-count');
+      const count = Number(input.value);
+      if (!Number.isSafeInteger(count) || count < 0) {
+        setAdminToolStatus('admin-visitor-status', 'Số đếm phải là số nguyên không âm.', true);
+        input.focus();
+        return;
+      }
+      const button = form.querySelector('button[type="submit"]');
+      if (button) button.disabled = true;
+      setAdminToolStatus('admin-visitor-status', 'Đang cập nhật bộ đếm đạo hữu…');
+      try {
+        await saveSiteConfig('visitor_count', count);
+        state.visitor.count = count;
+        updateVisitorBadge();
+        setAdminToolStatus('admin-visitor-status', 'Đã cập nhật bộ đếm đạo hữu!');
+      } catch (error) {
+        setAdminToolStatus('admin-visitor-status', `Không thể cập nhật bộ đếm: ${error.message || 'Lỗi kết nối.'}`, true);
+      } finally {
+        if (button) button.disabled = false;
+      }
+    });
+  }
+
+  function initAdminGlobalControls() {
+    document.addEventListener('change', async event => {
+      const input = event.target instanceof Element
+        ? event.target.closest('[data-feature-toggle]')
+        : null;
+      if (!input || !input.closest('#admin-dashboard')) return;
+        const key = input.dataset.featureToggle;
+        if (!Object.prototype.hasOwnProperty.call(DEFAULT_FEATURE_TOGGLES, key) || !isAdminUser()) {
+          input.checked = state.featureToggles[key] !== false;
+          setAdminToolStatus('admin-feature-status', 'Chỉ Tông Chủ mới được đổi công tắc toàn trang.', true);
+          return;
+        }
+
+        const previous = state.featureToggles;
+        const next = { ...previous, [key]: input.checked };
+        const inputs = Array.from(document.querySelectorAll('[data-feature-toggle]'));
+        inputs.forEach(item => {
+          item.disabled = true;
+        });
+        state.featureToggles = next;
+        applyFeatureToggles();
+        renderCultivationCard();
+        void loadCultivationLeaderboard();
+        try {
+          await saveSiteConfig('feature_toggles', next);
+          renderFeaturedDecree();
+          setAdminToolStatus('admin-feature-status', 'Đã lưu trạng thái hiển thị!');
+        } catch (error) {
+          state.featureToggles = previous;
+          applyFeatureToggles();
+          renderCultivationCard();
+          void loadCultivationLeaderboard();
+          setAdminToolStatus('admin-feature-status', `Không thể lưu công tắc: ${error.message || 'Lỗi kết nối.'}`, true);
+        } finally {
+          inputs.forEach(item => {
+            item.disabled = false;
+          });
+        }
+    });
+
+    if (document.getElementById('admin-theme-form')) {
+      document.addEventListener('submit', async event => {
+        if (event.target.id !== 'admin-theme-form') return;
+        event.preventDefault();
+        const themeForm = event.target;
+        if (!isAdminUser()) {
+          setAdminToolStatus('admin-theme-status', 'Chỉ Tông Chủ mới được đổi Cảnh Giới & Nền Trời.', true);
+          return;
+        }
+        const next = normalizeThemeSettings({
+          theme: document.getElementById('admin-global-theme').value,
+          sky: document.getElementById('admin-global-sky').value
+        });
+        const button = themeForm.querySelector('button[type="submit"]');
+        if (button) button.disabled = true;
+        setAdminToolStatus('admin-theme-status', 'Đang truyền Cảnh Giới lên toàn tông môn…');
+        try {
+          await saveSiteConfig('theme_settings', next);
+          applyGlobalThemeSettings(next);
+          setAdminToolStatus('admin-theme-status', 'Đã lưu; nền mới sẽ hiển thị với mọi người khi mở trang.');
+        } catch (error) {
+          syncAdminGlobalSettingsForms();
+          setAdminToolStatus('admin-theme-status', `Không thể lưu Cảnh Giới: ${error.message || 'Lỗi kết nối.'}`, true);
+        } finally {
+          if (button) button.disabled = false;
+        }
+      });
+    }
+  }
+
+  function initAdminDecreeControls() {
+    const form = document.getElementById('admin-decree-form');
+    const cancelEditButton = document.getElementById('admin-decree-cancel-edit');
+    if (cancelEditButton && form) {
+      document.addEventListener('click', event => {
+        const cancel = event.target instanceof Element
+          ? event.target.closest('#admin-decree-cancel-edit')
+          : null;
+        if (!cancel) return;
+        state.adminEditingDecreeId = null;
+        form.reset();
+        cancelEditButton.hidden = true;
+        const submitButton = document.getElementById('admin-decree-submit');
+        if (submitButton) submitButton.textContent = '⚡ Ban Bố Chiếu Thư';
+        setAdminToolStatus('admin-decree-status', '');
+      });
+    }
+    if (form) {
+      document.addEventListener('submit', async event => {
+        if (event.target.id !== 'admin-decree-form') return;
+        event.preventDefault();
+        if (!isAdminUser()) {
+          setAdminToolStatus('admin-decree-status', 'Chỉ Tông Chủ mới được ban bố chiếu thư.', true);
+          return;
+        }
+        const submitButton = document.getElementById('admin-decree-submit');
+        const decree = {
+          decree_type: document.getElementById('admin-decree-type').value,
+          title: document.getElementById('admin-decree-title').value.trim(),
+          content: document.getElementById('admin-decree-content').value.trim(),
+          author_title: String(authenticatedUser.user_metadata && authenticatedUser.user_metadata.author_title || 'Hải Thành Lão Tổ'),
+          is_pinned: document.getElementById('admin-decree-pinned').checked
+        };
+        if (!decree.title || !decree.content || !DECREE_TYPES[decree.decree_type]) return;
+        if (submitButton) submitButton.disabled = true;
+        setAdminToolStatus('admin-decree-status', state.adminEditingDecreeId
+          ? 'Đang tu chỉnh chiếu thư…'
+          : 'Đang truyền chiếu thư lên Tông Môn…');
+        try {
+          await saveTongChuDecree(decree, state.adminEditingDecreeId);
+          const wasEditing = Boolean(state.adminEditingDecreeId);
+          state.adminEditingDecreeId = null;
+          form.reset();
+          if (cancelEditButton) cancelEditButton.hidden = true;
+          if (submitButton) submitButton.textContent = '⚡ Ban Bố Chiếu Thư';
+          await loadTongChuDecrees({ throwOnError: true });
+          setAdminToolStatus('admin-decree-status', wasEditing
+            ? 'Chiếu thư đã được lưu thành công.'
+            : 'Đã ban bố chiếu thư thành công!');
+        } catch (error) {
+          setAdminToolStatus('admin-decree-status', `Không thể ban bố chiếu thư: ${error.message || 'Lỗi kết nối.'}`, true);
+        } finally {
+          if (submitButton) submitButton.disabled = false;
+        }
+      });
+    }
+
+    document.addEventListener('click', async event => {
+        const target = event.target instanceof Element
+          ? event.target.closest('#admin-dashboard [data-decree-action]')
+          : null;
+        if (!target || !isAdminUser()) return;
+        const decree = state.decrees.find(item => String(item.id) === target.dataset.decreeId);
+        if (!decree) return;
+        const action = target.dataset.decreeAction;
+        if (action === 'edit') {
+          state.adminEditingDecreeId = decree.id;
+          document.getElementById('admin-decree-type').value = decree.decree_type || 'phap-chi';
+          document.getElementById('admin-decree-title').value = String(decree.title || '');
+          document.getElementById('admin-decree-content').value = String(decree.content || '');
+          document.getElementById('admin-decree-pinned').checked = Boolean(decree.is_pinned);
+          if (cancelEditButton) cancelEditButton.hidden = false;
+          const submitButton = document.getElementById('admin-decree-submit');
+          if (submitButton) submitButton.textContent = '💾 Lưu Chiếu Thư';
+          activateAdminPanel('admin-panel-decrees');
+          form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        target.disabled = true;
+        try {
+          const query = supabaseClient.from('tong_chu_decrees');
+          const result = action === 'delete'
+            ? await query.delete().eq('id', decree.id).select('id').maybeSingle()
+            : await query.update({ is_pinned: !decree.is_pinned }).eq('id', decree.id).select('id').maybeSingle();
+          if (result.error) throw result.error;
+          if (!result.data) throw new Error('Không có chiếu thư nào được cập nhật; hãy kiểm tra quyền truy cập.');
+          if (action === 'delete') {
+            state.decrees = state.decrees.filter(item => String(item.id) !== String(decree.id));
+            renderFeaturedDecree();
+            renderAdminDecreeList();
+          } else {
+            decree.is_pinned = !decree.is_pinned;
+          }
+          await loadTongChuDecrees({ throwOnError: true });
+          setAdminToolStatus('admin-decree-status', action === 'delete'
+            ? 'Đã xóa chiếu thư.'
+            : 'Đã cập nhật trạng thái ghim.');
+        } catch (error) {
+          setAdminToolStatus('admin-decree-status', `Không thể cập nhật chiếu thư: ${error.message || 'Lỗi kết nối.'}`, true);
+        } finally {
+          target.disabled = false;
+        }
+      });
+  }
+
+  async function saveTongChuDecree(decree, decreeId) {
+    const table = supabaseClient.from('tong_chu_decrees');
+    const write = payload => decreeId
+      ? table.update(payload).eq('id', decreeId).select('id').maybeSingle()
+      : table.insert(payload).select('id').maybeSingle();
+    const { data, error } = await write(decree);
+    if (!error) {
+      if (!data) throw new Error('Không có chiếu thư nào được lưu; hãy kiểm tra quyền truy cập Supabase.');
+      return;
+    }
+    const missingSupplementalColumn = ['title', 'author_title', 'decree_type']
+      .some(column => isMissingDatabaseColumn(error, column));
+    if (!missingSupplementalColumn) throw error;
+    const fallbackResult = await write({
+      content: decree.content,
+      is_pinned: decree.is_pinned
+    });
+    if (fallbackResult.error) throw fallbackResult.error;
+    if (!fallbackResult.data) throw new Error('Không có chiếu thư nào được lưu; hãy kiểm tra quyền truy cập Supabase.');
+  }
+
+  function initAdminUserCultivationControl() {
+    const form = document.getElementById('admin-user-cultivation-form');
+    if (!form) return;
+    const refreshButton = document.getElementById('admin-cultivation-users-refresh');
+    if (refreshButton) {
+      document.addEventListener('click', event => {
+        const button = event.target instanceof Element
+          ? event.target.closest('#admin-cultivation-users-refresh')
+          : null;
+        if (button) void loadAdminCultivationProfiles();
+      });
+    }
+    document.addEventListener('click', event => {
+      const button = event.target instanceof Element
+        ? event.target.closest('#admin-cultivation-users-list [data-user-email]')
+        : null;
+      if (!button) return;
+      const emailInput = document.getElementById('admin-user-cultivation-id');
+      const pointsInput = document.getElementById('admin-user-cultivation-points');
+      if (!emailInput || !pointsInput) return;
+      emailInput.value = button.dataset.userEmail;
+      pointsInput.value = button.dataset.tuVi || '0';
+      emailInput.focus();
+    });
+    document.addEventListener('submit', async event => {
+      if (event.target.id !== 'admin-user-cultivation-form') return;
+      event.preventDefault();
+      if (!isAdminUser()) {
+        setAdminToolStatus('admin-user-cultivation-status', 'Chỉ Tông Chủ mới được điều chỉnh Tu Vi.', true);
+        return;
+      }
+      const email = document.getElementById('admin-user-cultivation-id').value.trim().toLowerCase();
+      const emailPattern = email.replace(/[\\%_]/g, '\\$&');
+      const points = Number(document.getElementById('admin-user-cultivation-points').value);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || !Number.isSafeInteger(points) || points < 0) {
+        setAdminToolStatus('admin-user-cultivation-status', 'Hãy nhập Gmail hợp lệ và số Tu Vi nguyên không âm.', true);
+        return;
+      }
+      const userForm = event.target;
+      const submitButton = userForm.querySelector('button[type="submit"]');
+      if (submitButton) submitButton.disabled = true;
+      setAdminToolStatus('admin-user-cultivation-status', 'Đang khắc ghi Tu Vi…');
+      try {
+        const { data: existing, error: fetchError } = await supabaseClient.from('user_cultivation')
+          .select('*')
+          .ilike('email', emailPattern)
+          .maybeSingle();
+        if (fetchError) throw fetchError;
+        if (!existing || !existing.user_id) {
+          throw new Error(`Không tìm thấy hồ sơ Tu Vi với Gmail ${email}.`);
+        }
+        const targetUser = {
+          id: existing.user_id,
+          email: existing.email || email,
+          user_metadata: { display_name: existing.display_name || '' }
+        };
+        const nextProfile = buildCultivationPayload(targetUser, existing, {
+          tu_vi: String(existing.user_id) === String(authenticatedUser.id) ? 9999 : points
+        });
+        await upsertCultivationProfile(nextProfile);
+        if (String(existing.user_id) === String(authenticatedUser.id)) applyCultivationProfile(nextProfile);
+        await loadCultivationLeaderboard();
+        await loadAdminCultivationProfiles();
+        setAdminToolStatus('admin-user-cultivation-status', 'Đã cập nhật Tu Vi và làm mới Bảng Vàng.');
+      } catch (error) {
+        setAdminToolStatus('admin-user-cultivation-status', `Không thể lưu Tu Vi: ${error.message || 'Lỗi kết nối.'}`, true);
+      } finally {
+        if (submitButton) submitButton.disabled = false;
+      }
+    });
+  }
+
+  async function loadAdminCultivationProfiles() {
+    const list = document.getElementById('admin-cultivation-users-list');
+    const refreshButton = document.getElementById('admin-cultivation-users-refresh');
+    if (!list) return;
+    if (!isAdminUser() || !supabaseClient) {
+      setAdminToolStatus('admin-user-cultivation-status', 'Không thể tải hồ sơ: tài khoản Admin hoặc kết nối Supabase chưa sẵn sàng.', true);
+      return;
+    }
+    if (refreshButton) refreshButton.disabled = true;
+    list.textContent = 'Đang triệu hồi hồ sơ Tu Vi…';
+    try {
+      const { data, error } = await supabaseClient.from('user_cultivation')
+        .select('*')
+        .limit(100);
+      if (error) throw error;
+      const profiles = (data || []).sort((left, right) =>
+        getCultivationPoints(right) - getCultivationPoints(left)
+      );
+      list.replaceChildren();
+      if (!profiles.length) {
+        list.textContent = 'Chưa có hồ sơ Tu Vi nào.';
+        return;
+      }
+      profiles.forEach(profile => {
+        const row = document.createElement('div');
+        row.className = 'admin-cultivation-user-row';
+        const identity = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = String(profile.display_name || 'Đạo Hữu');
+        const email = document.createElement('span');
+        email.className = 'admin-cultivation-user-email';
+        email.textContent = String(profile.email || 'Chưa có Gmail đồng bộ');
+        const streak = document.createElement('span');
+        streak.className = 'admin-cultivation-user-streak';
+        streak.textContent = `🔥 Chuỗi ${Math.max(0, Number(profile.streak_days) || 0)} ngày`;
+        identity.append(name, email, streak);
+        const points = document.createElement('span');
+        points.className = 'admin-cultivation-user-points';
+        const profileTuVi = getCultivationPoints(profile);
+        points.textContent = `${profileTuVi} Tu Vi`;
+        const editButton = document.createElement('button');
+        editButton.type = 'button';
+        editButton.className = 'admin-secondary-button';
+        editButton.textContent = 'Chọn';
+        if (profile.email) {
+          editButton.dataset.userEmail = String(profile.email);
+          editButton.dataset.tuVi = String(profileTuVi);
+        } else {
+          editButton.disabled = true;
+          editButton.title = 'Đạo hữu cần đăng nhập lại để đồng bộ Gmail.';
+        }
+        row.append(identity, points, editButton);
+        list.appendChild(row);
+      });
+    } catch (error) {
+      console.error('Không thể tải danh sách Tu Vi cho Admin:', error);
+      list.textContent = `Không thể tải danh sách Tu Vi: ${error.message || 'Lỗi truy vấn user_cultivation.'}`;
+      setAdminToolStatus('admin-user-cultivation-status', `Không thể tải hồ sơ: ${error.message || 'Lỗi truy vấn user_cultivation.'}`, true);
+    } finally {
+      if (refreshButton) refreshButton.disabled = false;
     }
   }
 
@@ -1859,8 +2934,10 @@
         });
     }
 
-    memoryForm.addEventListener('submit', async event => {
+    document.addEventListener('submit', async event => {
+      if (event.target.id !== 'admin-memory-form') return;
       event.preventDefault();
+      const currentForm = event.target;
       if (!isAdminUser()) {
         setAdminStatus('Chỉ chủ bảo tàng mới được đăng kỷ niệm.', true);
         return;
@@ -1874,35 +2951,60 @@
       const title = document.getElementById('admin-memory-title').value.trim();
       const time = document.getElementById('admin-memory-time').value.trim();
       const description = document.getElementById('admin-memory-description').value.trim();
+      const type = document.getElementById('admin-memory-type').value === 'story' ? 'story' : 'photo';
+      const imageUrlInput = document.getElementById('admin-memory-image-url');
+      const enteredImageUrl = imageUrlInput.value.trim();
       const fileInput = document.getElementById('admin-memory-image');
       const file = fileInput.files && fileInput.files[0];
       const editing = state.adminEditingMemory;
-      const submitButton = memoryForm.querySelector('button[type="submit"]');
+      const submitButton = currentForm.querySelector('button[type="submit"]');
       const videoExtension = file && (file.type.startsWith('video/') || isVideoUrl(file.name))
         ? getVideoExtension(file)
         : '';
       const videoFile = Boolean(videoExtension);
-      if ((!editing && !file) || (file && !file.type.startsWith('image/') && !videoFile)) {
+      if (file && !file.type.startsWith('image/') && !videoFile) {
         setAdminStatus('Hãy chọn ảnh hoặc video MP4, WebM, MOV, OGV hợp lệ.', true);
+        return;
+      }
+      if (enteredImageUrl) {
+        try {
+          const parsedUrl = new URL(enteredImageUrl);
+          if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error('URL không an toàn.');
+        } catch (error) {
+          setAdminStatus('Link ảnh phải là URL HTTP hoặc HTTPS hợp lệ.', true);
+          imageUrlInput.focus();
+          return;
+        }
+      }
+      if (type === 'photo' && !file && !enteredImageUrl &&
+        !(editing && editing.memory.image && editing.memory.image[0])) {
+        setAdminStatus('Ảnh Kỷ Niệm cần chọn file ảnh hoặc dán link URL.', true);
+        return;
+      }
+      if (type === 'story' && !description) {
+        setAdminStatus('Tâm Ma Bí Lục cần có nội dung mô tả.', true);
         return;
       }
 
       if (submitButton) submitButton.disabled = true;
       setAdminStatus(editing
         ? 'Đang cập nhật kỷ niệm…'
-        : videoFile ? 'Đang tải video và khai ấn kỷ niệm…' : 'Đang nén ảnh và khai ấn kỷ niệm…');
+        : file ? videoFile ? 'Đang tải video và khai ấn kỷ niệm…' : 'Đang nén ảnh và khai ấn kỷ niệm…'
+          : 'Đang lưu kỷ niệm…');
       let uploadedPath = '';
+      let uploadedBucket = 'memories';
       let recordInserted = false;
       try {
         let publicUrl = editing && editing.memory.image && editing.memory.image[0]
           ? editing.memory.image[0]
-          : '';
+          : enteredImageUrl;
+        if (enteredImageUrl) publicUrl = enteredImageUrl;
         if (file) {
           const uploadedFile = videoFile ? file : await compressImage(file);
           const extension = videoFile ? videoExtension : 'jpg';
           const filePath = `${stageId}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${extension}`;
           const { data: uploaded, error: uploadError } = await supabaseClient.storage
-            .from('museum-images')
+            .from(uploadedBucket)
             .upload(filePath, uploadedFile, {
               contentType: videoFile ? getVideoContentType(file, extension) : 'image/jpeg',
               upsert: false
@@ -1910,7 +3012,7 @@
           if (uploadError) throw uploadError;
           uploadedPath = uploaded.path;
 
-          const { data: publicData } = supabaseClient.storage.from('museum-images').getPublicUrl(uploadedPath);
+          const { data: publicData } = supabaseClient.storage.from(uploadedBucket).getPublicUrl(uploadedPath);
           if (!publicData || !publicData.publicUrl) throw new Error('Không lấy được đường dẫn ảnh công khai.');
           publicUrl = publicData.publicUrl;
         }
@@ -1919,10 +3021,14 @@
         if (!targetStage) throw new Error('Không tìm thấy giai đoạn đã chọn.');
         const existingCount = targetStage.memories.filter(item => item.isDynamic && item !== (editing && editing.memory)).length;
         const recordFields = {
-          stage: stageId,
+          stage_id: stageId,
+          year: stageId,
+          type,
           title,
-          time,
-          description,
+          caption: description,
+          story: type === 'story' ? description : '',
+          date_label: time,
+          is_deleted: false,
           sort_order: existingCount * 10
         };
         const row = editing
@@ -1935,10 +3041,10 @@
           const previousStage = editing.stage;
           previousStage.memories = previousStage.memories.filter(item => item !== editing.memory);
           targetStage.memories.push(memory);
-          if (file) {
-            const oldImagePath = getMuseumImagePath(editing.memory.image && editing.memory.image[0]);
-            if (oldImagePath) {
-              const { error: oldImageError } = await supabaseClient.storage.from('museum-images').remove([oldImagePath]);
+          if (file && editing.memory.image && editing.memory.image[0]) {
+            const oldImage = getMemoryStorageReference(editing.memory.image[0]);
+            if (oldImage) {
+              const { error: oldImageError } = await supabaseClient.storage.from(oldImage.bucket).remove([oldImage.path]);
               if (oldImageError) console.warn('Đã sửa kỷ niệm nhưng chưa dọn được ảnh cũ:', oldImageError);
             }
           }
@@ -1951,16 +3057,26 @@
           (left.isDynamic && right.isDynamic ? left.sortOrder - right.sortOrder : 0)
         );
         updateStageMemoryCounts();
+        let refreshError = null;
+        try {
+          await loadDynamicMemories({ throwOnError: true });
+        } catch (error) {
+          refreshError = error;
+          console.warn('Đã lưu kỷ niệm nhưng không tải lại được danh sách:', error);
+        }
         renderAdminMemoryList();
         refreshOpenArchive(targetStage);
         resetAdminMemoryForm();
-        setAdminStatus(editing ? 'Đã cập nhật kỷ niệm.' : 'Đã đăng kỷ niệm mới thành công.');
+        setAdminStatus(refreshError
+          ? `Đã lưu kỷ niệm nhưng không tải lại được danh sách: ${refreshError.message || 'Lỗi truy vấn.'}`
+          : editing ? 'Đã cập nhật kỷ niệm thành công.' : 'Đã thêm kỷ niệm mới!',
+        Boolean(refreshError));
       } catch (error) {
         let cleanupMessage = '';
         if (uploadedPath && !recordInserted) {
           try {
             const { error: cleanupError } = await supabaseClient.storage
-              .from('museum-images')
+              .from(uploadedBucket)
               .remove([uploadedPath]);
             if (cleanupError) cleanupMessage = ' Không thể xóa ảnh đã tải lên dở dang.';
           } catch (cleanupError) {
@@ -1975,7 +3091,11 @@
 
     const cancelEditButton = document.getElementById('admin-memory-cancel-edit');
     if (cancelEditButton) {
-      cancelEditButton.addEventListener('click', () => {
+      document.addEventListener('click', event => {
+        const cancel = event.target instanceof Element
+          ? event.target.closest('#admin-memory-cancel-edit')
+          : null;
+        if (!cancel) return;
         resetAdminMemoryForm();
         setAdminStatus('Đã hủy chỉnh sửa.');
       });
@@ -1987,90 +3107,129 @@
   }
 
   function initCultivationOracle() {
-    const button = document.getElementById('btn-draw-oracle');
-    const quoteElement = document.getElementById('cultivation-oracle-quote');
-    const status = document.getElementById('cultivation-oracle-status');
-    if (!button || !quoteElement || !status) return;
-
-    const maxims = [
-      'Tu tiên không sợ căn cơ mỏng, chỉ sợ mở IDE rồi quên mình định sửa bug gì.',
-      'Một lần bấm lưu bằng mười lần cầu nguyện; nhớ commit thì thiên đạo càng thương.',
-      'Kiếm khí có thể chém yêu, nhưng chỉ có backup mới chém được nỗi sợ mất file.',
-      'Độ kiếp là chuyện của trời; qua deadline hay không là chuyện của lịch nhắc việc.',
-      'Linh lực cạn thì nghỉ ngơi, đừng cố gõ code bằng ý chí đang ở mức 1 HP.',
-      'Người có đạo tâm biết tắt máy đúng giờ; người có bug thì nhớ ghi lại để mai xử.',
-      'Đừng hỏi vì sao build đỏ, hãy hỏi mình đã đọc dòng lỗi đầu tiên chưa.',
-      'Muốn thành đại năng phải biết tra cứu; không ai phi thăng nhờ đoán mò API.'
-    ];
-
-    button.addEventListener('click', async () => {
-      if (!authenticatedUser) {
-        requireAuth(() => button.click());
-        return;
-      }
-
-      const user = authenticatedUser;
-      const today = localDateKey();
-      const storageKey = `tmtc-daily-oracle-${user.id}`;
-      let previousClaim = null;
-      try {
-        const savedClaim = localStorage.getItem(storageKey);
-        if (savedClaim) {
-          try {
-            previousClaim = JSON.parse(savedClaim);
-          } catch (error) {
-            console.warn('Không thể đọc quẻ đã lưu:', error);
-            localStorage.removeItem(storageKey);
-          }
-        }
-      } catch (error) {
-        console.error('Không thể kiểm tra lượt rút quẻ hôm nay:', error);
-        status.textContent = 'Trình duyệt chưa cho phép lưu lượt rút quẻ; chưa thể nhận Tu Vi.';
-        status.classList.add('is-error');
-        return;
-      }
-
-      if (previousClaim && previousClaim.date === today && previousClaim.quote) {
-        quoteElement.textContent = `“${previousClaim.quote}”`;
-        quoteElement.hidden = false;
-        status.textContent = 'Hôm nay đạo hữu đã rút quẻ rồi — mai quay lại xin thêm thiên cơ nhé.';
-        status.classList.remove('is-error');
-        return;
-      }
-
-      const quote = maxims[Math.floor(Math.random() * maxims.length)];
-      quoteElement.textContent = `“${quote}”`;
-      quoteElement.hidden = false;
-      status.textContent = 'Đang ghi nhận quẻ vào sổ thiên cơ…';
-      status.classList.remove('is-error');
-      button.disabled = true;
-      try {
-        localStorage.setItem(storageKey, JSON.stringify({ date: today, quote }));
-        const isAdmin = isAdminUser(user);
-        const awarded = isAdmin || await awardCultivation(5, 'Rút Quẻ Lời Răn Của Lão Tổ');
-        if (!awarded) {
-          localStorage.removeItem(storageKey);
-          status.textContent = 'Chưa thể ghi nhận phần thưởng Tu Vi. Đạo hữu thử rút lại sau nhé.';
-          status.classList.add('is-error');
-          return;
-        }
-        status.textContent = isAdmin
-          ? 'Quẻ đã lưu; Tông Chủ Chí Tôn đã đạt mức Tu Vi tối đa.'
-          : 'Đã nhận quẻ hôm nay và được cộng +5 Tu Vi.';
-        status.classList.remove('is-error');
-      } catch (error) {
-        try {
-          localStorage.removeItem(storageKey);
-        } catch (storageError) {
-          console.error('Không thể hoàn tác lượt rút quẻ:', storageError);
-        }
-        console.error('Không thể lưu lượt rút quẻ:', error);
-        status.textContent = `Chưa thể lưu lượt rút quẻ: ${error.message || 'Lỗi lưu trữ trình duyệt.'}`;
-        status.classList.add('is-error');
-      } finally {
-        button.disabled = false;
-      }
+    const control = {
+      button: document.getElementById('btn-draw-oracle-home'),
+      quote: document.getElementById('home-oracle-quote'),
+      status: document.getElementById('home-oracle-status'),
+      card: document.getElementById('home-oracle-flip-card'),
+      tube: document.getElementById('home-oracle-tube'),
+      repeatNote: document.getElementById('home-oracle-repeat-note')
+    };
+    if (!control.button || !control.quote || !control.status) return;
+    control.button.addEventListener('click', () => {
+      void drawCultivationOracle(control);
     });
+  }
+
+  async function drawCultivationOracle(control) {
+    const { button, quote: quoteElement, status, card, tube } = control;
+    const user = authenticatedUser;
+    const maxims = document.querySelector('.thien-co-maxims');
+    if (maxims) maxims.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (!user) {
+      openOracleAuthSeal();
+      return;
+    }
+    const today = vietnamDateKey();
+    const storageKey = `tmtc-daily-oracle-${user.id}`;
+    let previousClaim = null;
+    let storageAvailable = true;
+
+    try {
+      const savedClaim = window.localStorage.getItem(storageKey);
+      if (savedClaim) {
+        try {
+          previousClaim = JSON.parse(savedClaim);
+        } catch (error) {
+          console.warn('Không thể đọc quẻ đã lưu:', error);
+          window.localStorage.removeItem(storageKey);
+        }
+      }
+    } catch (error) {
+      storageAvailable = false;
+      console.error('Không thể kiểm tra lượt rút quẻ hôm nay:', error);
+    }
+
+    const alreadyClaimed = storageAvailable && previousClaim &&
+      previousClaim.date === today && previousClaim.quote;
+    const quote = alreadyClaimed
+      ? previousClaim.quote
+      : CULTIVATION_MAXIMS[Math.floor(Math.random() * CULTIVATION_MAXIMS.length)];
+    if (!alreadyClaimed && storageAvailable) {
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify({ date: today, quote }));
+      } catch (error) {
+        storageAvailable = false;
+        console.error('Không thể lưu lượt rút quẻ hôm nay:', error);
+      }
+    }
+    if (control.repeatNote) {
+      control.repeatNote.hidden = true;
+      control.repeatNote.textContent = '';
+    }
+    button.disabled = true;
+    button.classList.add('is-drawing');
+    if (tube) tube.classList.add('is-shaking');
+    if (card) {
+      card.classList.remove('is-revealed');
+      void card.offsetWidth;
+    }
+    status.classList.remove('is-error');
+    status.textContent = 'Ống xăm đang rung, thiên cơ sắp hiện…';
+
+    const delay = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      ? 0
+      : 520;
+    await new Promise(resolve => window.setTimeout(resolve, delay));
+
+    quoteElement.textContent = `“${quote}”`;
+    quoteElement.hidden = false;
+    if (card) card.classList.add('is-revealed');
+    if (tube) window.setTimeout(() => tube.classList.remove('is-shaking'), 180);
+
+    try {
+      if (alreadyClaimed) {
+        status.textContent = 'Hôm nay đạo hữu đã rút quẻ rồi — mai quay lại xin thêm thiên cơ nhé.';
+        if (control.repeatNote) {
+          control.repeatNote.textContent = ORACLE_REPEAT_NOTES[
+            Math.floor(Math.random() * ORACLE_REPEAT_NOTES.length)
+          ];
+          control.repeatNote.hidden = false;
+        }
+        return;
+      }
+      if (!storageAvailable) {
+        status.textContent = 'Đã hiện lời răn, nhưng trình duyệt không lưu được lượt nhận thưởng hôm nay.';
+        status.classList.add('is-error');
+        return;
+      }
+
+      const isAdmin = isAdminUser(user);
+      const awarded = isAdmin || await awardCultivation(5, 'Rút Quẻ Lời Răn Của Lão Tổ', {
+        sourceElement: button
+      });
+      if (!awarded) {
+        window.localStorage.removeItem(storageKey);
+        status.textContent = 'Chưa thể ghi nhận phần thưởng Tu Vi. Đạo hữu thử rút lại sau nhé.';
+        status.classList.add('is-error');
+        return;
+      }
+      status.textContent = isAdmin
+        ? 'Quẻ đã lưu; Tông Chủ Chí Tôn đã đạt mức Tu Vi tối đa.'
+        : 'Đã nhận quẻ hôm nay và được cộng +5 Tu Vi.';
+    } catch (error) {
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch (storageError) {
+        console.error('Không thể hoàn tác lượt rút quẻ:', storageError);
+      }
+      console.error('Không thể lưu lượt rút quẻ:', error);
+      status.textContent = `Chưa thể lưu lượt rút quẻ: ${error.message || 'Lỗi lưu trữ trình duyệt.'}`;
+      status.classList.add('is-error');
+    } finally {
+      button.disabled = false;
+      button.classList.remove('is-drawing');
+    }
   }
 
   function renderAdminMemoryList() {
@@ -2116,35 +3275,173 @@
         const editButton = document.createElement('button');
         editButton.type = 'button';
         editButton.className = 'admin-secondary-button';
+        editButton.dataset.memoryAction = 'edit';
+        editButton.dataset.stageId = stage.id;
+        editButton.dataset.memoryId = String(memory.id);
         editButton.textContent = 'Sửa';
-        editButton.addEventListener('click', () => editDynamicMemory(stage, memory));
         const moveUpButton = document.createElement('button');
         moveUpButton.type = 'button';
         moveUpButton.className = 'admin-secondary-button';
+        moveUpButton.dataset.memoryAction = 'up';
+        moveUpButton.dataset.stageId = stage.id;
+        moveUpButton.dataset.memoryId = String(memory.id);
         moveUpButton.textContent = '↑';
         moveUpButton.setAttribute('aria-label', `Di chuyển ${memory.title} lên`);
         moveUpButton.disabled = index === 0;
-        moveUpButton.addEventListener('click', () => moveDynamicMemory(stage, memory, -1));
         const moveDownButton = document.createElement('button');
         moveDownButton.type = 'button';
         moveDownButton.className = 'admin-secondary-button';
+        moveDownButton.dataset.memoryAction = 'down';
+        moveDownButton.dataset.stageId = stage.id;
+        moveDownButton.dataset.memoryId = String(memory.id);
         moveDownButton.textContent = '↓';
         moveDownButton.setAttribute('aria-label', `Di chuyển ${memory.title} xuống`);
         moveDownButton.disabled = index === stageMemories.length - 1;
-        moveDownButton.addEventListener('click', () => moveDynamicMemory(stage, memory, 1));
         actions.append(editButton, moveUpButton, moveDownButton);
       }
       const removeButton = document.createElement('button');
       removeButton.type = 'button';
       removeButton.className = 'admin-delete-button';
-      removeButton.textContent = '🗑️ Xóa Ảnh / Kỷ Niệm';
-      removeButton.addEventListener('click', () => isOriginal
-        ? hideOriginalMemory(stage, memory, removeButton)
-        : deleteDynamicMemory(stage, memory, removeButton));
+      removeButton.dataset.memoryAction = isOriginal ? 'hide-original' : 'delete';
+      removeButton.dataset.stageId = stage.id;
+      removeButton.dataset.memoryId = String(memory.id);
+      removeButton.textContent = isOriginal ? '🗑️ Ẩn Ảnh / Kỷ Niệm Gốc' : '🗑️ Xóa Ảnh / Kỷ Niệm';
       actions.appendChild(removeButton);
       item.append(label, actions);
       list.appendChild(item);
     });
+  }
+
+  async function loadDeletedMemories() {
+    const list = document.getElementById('admin-deleted-memory-list');
+    if (!list) return false;
+    if (!supabaseClient || !isAdminUser()) {
+      state.deletedMemories = [];
+      list.textContent = 'Không thể tải ảnh đã xóa: cần kết nối Supabase và đăng nhập Admin.';
+      return false;
+    }
+
+    list.textContent = 'Đang tải ảnh/kỷ niệm đã xóa…';
+    try {
+      const { data, error } = await supabaseClient.from('memories')
+        .select('*')
+        .eq('is_deleted', true)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      state.deletedMemories = (data || []).filter(memory => memory.is_deleted === true);
+      renderDeletedMemoryList();
+      return true;
+    } catch (error) {
+      console.error('Không thể tải danh sách kỷ niệm đã xóa:', error);
+      state.deletedMemories = [];
+      list.textContent = `Không thể tải ảnh/kỷ niệm đã xóa: ${error.message || 'Lỗi truy vấn bảng memories.'}`;
+      return false;
+    }
+  }
+
+  function renderDeletedMemoryList() {
+    const list = document.getElementById('admin-deleted-memory-list');
+    if (!list) return;
+    list.replaceChildren();
+    if (!state.deletedMemories.length) {
+      const empty = document.createElement('p');
+      empty.className = 'admin-memory-empty';
+      empty.textContent = 'Hiện không có ảnh nào đã xóa';
+      list.appendChild(empty);
+      return;
+    }
+
+    state.deletedMemories.forEach(row => {
+      const item = document.createElement('article');
+      item.className = 'admin-deleted-memory-item';
+      const memory = mapDynamicMemory(row);
+      const imageUrl = memory && memory.image[0];
+      if (imageUrl && memory.mediaType !== 'video') {
+        const thumbnail = document.createElement('img');
+        thumbnail.src = imageUrl;
+        thumbnail.alt = `Ảnh thu nhỏ: ${memory.title}`;
+        thumbnail.loading = 'lazy';
+        item.appendChild(thumbnail);
+      } else {
+        const placeholder = document.createElement('span');
+        placeholder.className = 'admin-deleted-memory-thumbnail-placeholder';
+        placeholder.textContent = memory && memory.mediaType === 'video' ? 'Video' : 'Ký ức';
+        item.appendChild(placeholder);
+      }
+
+      const details = document.createElement('div');
+      details.className = 'admin-deleted-memory-details';
+      const title = document.createElement('strong');
+      title.textContent = String(row.title || 'Kỷ niệm đã xóa');
+      const stage = findStageForMemoryRow(row);
+      const period = stage ? stage.period : String(row.stage_id || row.year || 'Chưa rõ giai đoạn');
+      const year = document.createElement('span');
+      year.textContent = `${period} · ${String(row.date_label || row.time || '')}`.trim();
+      details.append(title, year);
+
+      const restoreButton = document.createElement('button');
+      restoreButton.type = 'button';
+      restoreButton.className = 'admin-secondary-button';
+      restoreButton.dataset.memoryAction = 'restore';
+      restoreButton.dataset.memoryId = String(row.id);
+      restoreButton.textContent = '♻️ Khôi Phục';
+      item.append(details, restoreButton);
+      list.appendChild(item);
+    });
+  }
+
+  async function restoreDeletedMemory(row, button) {
+    if (!isAdminUser() || !supabaseClient) {
+      setAdminStatus('Chỉ Admin mới được khôi phục kỷ niệm.', true);
+      return;
+    }
+    const stage = findStageForMemoryRow(row);
+    if (!stage) {
+      setAdminStatus('Không thể khôi phục: không tìm thấy giai đoạn của kỷ niệm.', true);
+      return;
+    }
+    button.disabled = true;
+    setAdminStatus('Đang khôi phục ảnh/kỷ niệm…');
+    try {
+      const { data: restoredRow, error } = await supabaseClient.from('memories')
+        .update({ is_deleted: false })
+        .eq('id', row.id)
+        .select('id')
+        .maybeSingle();
+      if (error) throw error;
+      if (!restoredRow) throw new Error('Không tìm thấy bản ghi hoặc không có quyền khôi phục.');
+
+      const restoredMemory = mapDynamicMemory({ ...row, is_deleted: false });
+      if (restoredMemory && !stage.memories.some(memory => String(memory.dbId) === String(row.id))) {
+        stage.memories.push(restoredMemory);
+        stage.memories.sort((left, right) =>
+          Number(Boolean(left.isDynamic)) - Number(Boolean(right.isDynamic)) ||
+          (left.isDynamic && right.isDynamic ? left.sortOrder - right.sortOrder : 0)
+        );
+      }
+      state.deletedMemories = state.deletedMemories.filter(item => String(item.id) !== String(row.id));
+      updateStageMemoryCounts();
+      renderAdminMemoryList();
+      renderDeletedMemoryList();
+      refreshOpenArchive(stage);
+
+      let refreshError = null;
+      try {
+        await loadDynamicMemories({ throwOnError: true });
+        if (!await loadDeletedMemories()) {
+          throw new Error('Không tải lại được danh sách ảnh đã xóa.');
+        }
+      } catch (error) {
+        refreshError = error;
+        console.warn('Đã khôi phục kỷ niệm nhưng không tải lại được danh sách:', error);
+      }
+      setAdminStatus(refreshError
+        ? `Đã khôi phục ảnh thành công nhưng không tải lại được danh sách: ${refreshError.message || 'Lỗi truy vấn.'}`
+        : 'Đã khôi phục ảnh thành công!', Boolean(refreshError));
+    } catch (error) {
+      setAdminStatus(`Không thể khôi phục ảnh/kỷ niệm: ${error.message || 'Lỗi cập nhật dữ liệu.'}`, true);
+      button.disabled = false;
+    }
   }
 
   async function hideOriginalMemory(stage, memory, button) {
@@ -2182,12 +3479,14 @@
     const submitButton = document.getElementById('admin-memory-submit');
     const cancelButton = document.getElementById('admin-memory-cancel-edit');
     if (!form || !stageInput || !imageInput) return;
-    activateAdminPanel('admin-panel-add-memory');
+    activateAdminPanel('admin-panel-memory', 'admin-panel-add-memory');
     state.adminEditingMemory = { stage, memory };
     stageInput.value = stage.id;
     document.getElementById('admin-memory-title').value = memory.title;
     document.getElementById('admin-memory-time').value = memory.time;
     document.getElementById('admin-memory-description').value = memory.description;
+    document.getElementById('admin-memory-type').value = memory.type || (memory.tag === 'Tâm sự' ? 'story' : 'photo');
+    document.getElementById('admin-memory-image-url').value = memory.image && memory.image[0] || '';
     imageInput.value = '';
     imageInput.required = false;
     if (title) title.textContent = 'Sửa Kỷ Niệm';
@@ -2203,9 +3502,9 @@
     const submitButton = document.getElementById('admin-memory-submit');
     const cancelButton = document.getElementById('admin-memory-cancel-edit');
     if (form) form.reset();
-    if (imageInput) imageInput.required = true;
+    if (imageInput) imageInput.required = false;
     if (title) title.textContent = 'Thêm Kỷ Niệm Mới';
-    if (submitButton) submitButton.textContent = 'Tải ảnh/video & khai ấn kỷ niệm';
+    if (submitButton) submitButton.textContent = '💾 Lưu Kỷ Niệm';
     if (cancelButton) cancelButton.hidden = true;
     state.adminEditingMemory = null;
   }
@@ -2249,90 +3548,73 @@
       setAdminStatus('Chỉ chủ bảo tàng mới được xóa kỷ niệm.', true);
       return;
     }
-    if (!window.confirm(`Xóa kỷ niệm “${memory.title}”?`)) return;
+    if (!window.confirm(`Chuyển kỷ niệm “${memory.title}” vào danh sách đã xóa?`)) return;
     button.disabled = true;
-    setAdminStatus('Đang xóa kỷ niệm…');
+    setAdminStatus('Đang chuyển kỷ niệm vào danh sách đã xóa…');
 
     try {
-      const { error } = await supabaseClient.from('memories').delete().eq('id', memory.dbId);
+      const { data: deletedRow, error } = await supabaseClient.from('memories')
+        .update({ is_deleted: true })
+        .eq('id', memory.dbId)
+        .select('id')
+        .maybeSingle();
       if (error) throw error;
+      if (!deletedRow) throw new Error('Không tìm thấy bản ghi hoặc không có quyền xóa mềm.');
       stage.memories = stage.memories.filter(item => item !== memory);
       updateStageMemoryCounts();
       renderAdminMemoryList();
       refreshOpenArchive(stage);
-
-      const imagePath = getMuseumImagePath(memory.image[0]);
-      if (imagePath) {
-        try {
-          const { error: storageError } = await supabaseClient.storage.from('museum-images').remove([imagePath]);
-          if (storageError) {
-            setAdminStatus(`Đã xóa bản ghi nhưng chưa dọn được ảnh: ${storageError.message}`, true);
-            return;
-          }
-        } catch (storageError) {
-          setAdminStatus(`Đã xóa bản ghi nhưng chưa dọn được ảnh: ${storageError.message || 'Lỗi kết nối.'}`, true);
-          return;
-        }
+      if (!await loadDeletedMemories()) {
+        setAdminStatus('Đã xóa mềm kỷ niệm nhưng không tải được danh sách khôi phục.', true);
+        return;
       }
-      setAdminStatus('Đã xóa kỷ niệm.');
+      setAdminStatus('Đã chuyển kỷ niệm vào danh sách đã xóa.');
     } catch (error) {
       button.disabled = false;
       setAdminStatus(`Không thể xóa kỷ niệm: ${error.message || 'Lỗi kết nối.'}`, true);
     }
   }
 
-  function getMuseumImagePath(imageUrl) {
-    if (typeof imageUrl !== 'string') return '';
+  function getMemoryStorageReference(imageUrl) {
+    if (typeof imageUrl !== 'string') return null;
     try {
       const pathname = new URL(imageUrl).pathname;
-      const marker = '/storage/v1/object/public/museum-images/';
-      const index = pathname.indexOf(marker);
-      return index < 0 ? '' : decodeURIComponent(pathname.slice(index + marker.length));
+      for (const bucket of ['memories', 'museum-images']) {
+        const marker = `/storage/v1/object/public/${bucket}/`;
+        const index = pathname.indexOf(marker);
+        if (index >= 0) {
+          return {
+            bucket,
+            path: decodeURIComponent(pathname.slice(index + marker.length))
+          };
+        }
+      }
+      return null;
     } catch (error) {
-      return '';
+      return null;
     }
   }
 
   async function insertDynamicMemory(fields, publicUrl) {
-    const baseRecord = { ...fields };
-    let result = await supabaseClient
-      .from('memories')
-      .insert({ ...baseRecord, image_url: publicUrl })
-      .select()
-      .single();
-
-    if (result.error && isMissingDatabaseColumn(result.error, 'image_url')) {
-      result = await supabaseClient
-        .from('memories')
-        .insert({ ...baseRecord, image: publicUrl })
-        .select()
-        .single();
-    }
-    if (result.error && isMissingDatabaseColumn(result.error, 'sort_order')) {
-      const withoutSortOrder = { ...baseRecord };
-      delete withoutSortOrder.sort_order;
-      result = await supabaseClient
-        .from('memories')
-        .insert({ ...withoutSortOrder, image_url: publicUrl })
-        .select()
-        .single();
-      if (result.error && isMissingDatabaseColumn(result.error, 'image_url')) {
-        result = await supabaseClient
-          .from('memories')
-          .insert({ ...withoutSortOrder, image: publicUrl })
-          .select()
-          .single();
+    let includeSortOrder = true;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const payload = { ...fields, image_url: publicUrl };
+      if (!includeSortOrder) delete payload.sort_order;
+      const result = await supabaseClient.from('memories').insert(payload).select().single();
+      if (!result.error) return result.data;
+      if (includeSortOrder && isMissingDatabaseColumn(result.error, 'sort_order')) {
+        includeSortOrder = false;
+        continue;
       }
+      throw result.error;
     }
-    if (result.error) throw result.error;
-    return result.data;
+    throw new Error('Không thể tạo bản ghi kỷ niệm sau khi tương thích cấu trúc dữ liệu.');
   }
 
   async function updateDynamicMemoryRecord(memory, fields, publicUrl) {
-    let imageField = 'image_url';
     let includeSortOrder = true;
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      const payload = { ...fields, [imageField]: publicUrl };
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const payload = { ...fields, image_url: publicUrl };
       if (!includeSortOrder) delete payload.sort_order;
       const result = await supabaseClient.from('memories')
         .update(payload)
@@ -2340,10 +3622,6 @@
         .select()
         .single();
       if (!result.error) return result.data;
-      if (imageField === 'image_url' && isMissingDatabaseColumn(result.error, 'image_url')) {
-        imageField = 'image';
-        continue;
-      }
       if (includeSortOrder && isMissingDatabaseColumn(result.error, 'sort_order')) {
         includeSortOrder = false;
         continue;
@@ -2643,7 +3921,8 @@
       '#filmstrip-modal.active',
       '#game-modal.active',
       '#cinema-modal.active',
-      '#archive-lock-modal.active'
+      '#authSealModal.active',
+      '.feature-modal.active'
     ];
 
     function syncModalNavbar() {
@@ -2653,9 +3932,7 @@
       if (pauseCanvasAnimation) pauseCanvasAnimation(hasOpenModal);
 
       const nav = document.getElementById('sticky-header');
-      const themeDropdown = document.getElementById('theme-selector-dropdown');
       if (nav) nav.style.display = hasOpenModal ? 'none' : '';
-      if (themeDropdown) themeDropdown.style.display = hasOpenModal ? 'none' : '';
     }
 
     syncModalNavbar();
@@ -2824,6 +4101,7 @@
   function renderStages() {
     const container = document.getElementById('stages-container');
     if (!container) return;
+    renderHomeCultivationAttributes();
     try {
       container.innerHTML = '';
 
@@ -2839,34 +4117,55 @@
       section.id = `stage-${stage.id}`;
 
       const presentation = getStagePresentation(stage, index, state.data.stages.length);
+      const cultivationEyebrow = presentation.eyebrow
+        .replace('KIẾP NẠN THỨ ', 'KIẾP NẠN ')
+        .replace(/(\d+) \/ (\d+)/, '$1/$2')
+        .replace(' • THUỞ KHAI LINH', '');
+      section.setAttribute('aria-label', `${presentation.eyebrow} • ${presentation.title}`);
+      const cultivationExpanded = state.cultivationCardExpansion.get(stage.id) === true;
+      const cultivationDetailsId = `rpg-details-${stage.id}`;
 
-      // Top Header Block
       let html = `
         <div class="container">
-          <div class="stage-header-block">
-            <span class="stage-index-tag stage-eyebrow">${escapeHtml(presentation.eyebrow)}</span>
-            <h2 class="stage-main-title stage-title">${escapeHtml(presentation.title)}</h2>
-          </div>
-
-          <!-- Stage RPG & Music Top Row -->
           <div class="stage-top-grid">
-            
-            <!-- RPG Character Profile Card -->
-            <div class="rpg-card">
-              <div class="rpg-header">
-                <div class="rpg-avatar" data-stage-id="${escapeHtml(stage.id)}">
-                  <img src="${escapeHtml(stage.coverImage)}" alt="${escapeHtml(stage.title)}" loading="lazy" decoding="async">
-                  <span class="rpg-avatar-lv">${escapeHtml(getCultivationLevel(stage))}</span>
-                </div>
-                <div class="rpg-title-group">
-                  <span class="rpg-badge-tag">☯ BẢNG THUỘC TÍNH TU TIÊN • CẢNH GIỚI</span>
-                  <h3 class="rpg-level-name">${escapeHtml(getCultivationLevelName(stage))}</h3>
-                  <div class="rpg-fate-badge">🔮 Mệnh Cách: ${escapeHtml(getCultivationFate(stage.id))}</div>
-                </div>
-              </div>
+            <div class="rpg-card rpg-card-collapsible${cultivationExpanded ? ' is-expanded' : ''}" data-cultivation-stage-id="${escapeHtml(stage.id)}">
+              <button type="button" class="rpg-collapsed-summary" aria-expanded="${cultivationExpanded}" aria-hidden="${cultivationExpanded}" aria-controls="${escapeHtml(cultivationDetailsId)}" ${cultivationExpanded ? 'inert' : ''}>
+                <span class="rpg-collapsed-header">
+                  <span class="stage-index-tag">✦ ${escapeHtml(cultivationEyebrow)}</span>
+                  <span class="rpg-toggle-label" aria-hidden="true">✧ Khai Mở ▾</span>
+                </span>
+                <span class="rpg-collapsed-content">
+                  <span class="rpg-avatar rpg-summary-avatar" data-stage-id="${escapeHtml(stage.id)}">
+                    <img src="${escapeHtml(stage.coverImage)}" alt="${escapeHtml(stage.title)}" loading="lazy" decoding="async">
+                    <span class="rpg-avatar-lv">${escapeHtml(getCultivationLevel(stage))}</span>
+                  </span>
+                  <span class="rpg-summary-copy">
+                    <span class="rpg-summary-title">${escapeHtml(presentation.title)}</span>
+                    <span class="rpg-level-name">☯ ${escapeHtml(getCultivationLevelName(stage))}</span>
+                    <span class="rpg-summary-hint">✧ Chạm để khai mở Mệnh Cách &amp; chỉ số căn cốt</span>
+                  </span>
+                </span>
+              </button>
 
-              <div class="rpg-stats-container">
-                <!-- Primary Stats (Progress Bars) -->
+              <div class="rpg-expanded-panel" id="${escapeHtml(cultivationDetailsId)}" aria-hidden="${!cultivationExpanded}" ${cultivationExpanded ? '' : 'inert'}>
+                <button type="button" class="rpg-expanded-summary" aria-expanded="${cultivationExpanded}" aria-hidden="${!cultivationExpanded}" aria-controls="${escapeHtml(cultivationDetailsId)}">
+                  <span class="rpg-expanded-topline">
+                    <span class="rpg-expanded-eyebrow">✦ ${escapeHtml(cultivationEyebrow)}</span>
+                    <span class="rpg-toggle-label" aria-hidden="true">✧ Thu Gọn ▴</span>
+                  </span>
+                  <span class="rpg-avatar rpg-expanded-avatar" data-stage-id="${escapeHtml(stage.id)}">
+                    <img src="${escapeHtml(stage.coverImage)}" alt="${escapeHtml(stage.title)}" loading="lazy" decoding="async">
+                    <span class="rpg-avatar-lv">${escapeHtml(getCultivationLevel(stage))}</span>
+                  </span>
+                  <span class="rpg-expanded-title">
+                    <span class="stage-main-title">${escapeHtml(presentation.title)}</span>
+                    <span class="rpg-level-name">☯ ${escapeHtml(getCultivationLevelName(stage))}</span>
+                  </span>
+                </button>
+
+                <div class="rpg-expanded-body">
+                  <div class="rpg-fate-badge">🔮 Mệnh Cách: ${escapeHtml(getCultivationFate(stage.id))}</div>
+                  <div class="rpg-stats-container">
                 <div class="rpg-stat-col">
                   <div class="rpg-stat-col-title">
                     <span>❖ LINH CĂN &amp; CĂN CỐT CHÍNH</span>
@@ -2892,6 +4191,11 @@
 
       html += `
                   </div>
+                </div>
+                </div>
+                    <button type="button" class="rpg-toggle-label rpg-collapse-trigger" aria-expanded="${cultivationExpanded}" aria-controls="${escapeHtml(cultivationDetailsId)}">
+                      ✧ Thu Gọn Bảng Thuộc Tính ▴
+                    </button>
                 </div>
               </div>
             </div>
@@ -2985,6 +4289,10 @@
             </button>
           </div>
 
+          <button type="button" class="milestone-comments-open btn btn-glass" data-stage-id="${escapeHtml(stage.id)}" aria-haspopup="dialog" aria-controls="milestoneCommentsModal">
+            🗣️ Tường Truyền Âm • Mốc ${escapeHtml(stage.period || stage.title)} (${Math.max(0, Number(state.milestoneCommentCounts.get(stage.id)) || 0)} lời nhắn)
+          </button>
+
         </div>
       `;
 
@@ -2999,10 +4307,378 @@
     attachMemoryCardEvents();
     attachArchiveButtons();
 
+    initStageCultivationCardControls();
     document.querySelectorAll('.stage-quotes-toggle').forEach(bindStageQuoteToggle);
     refreshVisibleMemoryLikes();
+    initGlassInteractions();
+    initMilestoneComments();
+    applyFeatureToggles();
     } catch (e) {
       console.error('Lỗi render 7 giai đoạn:', e);
+    }
+  }
+
+  function formatMilestoneCommentTime(value) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return 'vừa xong';
+    const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+    const formatter = new Intl.RelativeTimeFormat('vi', { numeric: 'auto' });
+    if (seconds < 60) return formatter.format(-seconds, 'second');
+    if (seconds < 3600) return formatter.format(-Math.floor(seconds / 60), 'minute');
+    if (seconds < 86400) return formatter.format(-Math.floor(seconds / 3600), 'hour');
+    return formatter.format(-Math.floor(seconds / 86400), 'day');
+  }
+
+  function renderMilestoneComment(comment, profileByUser) {
+    const item = document.createElement('li');
+    item.className = 'milestone-comment-item';
+
+    const header = document.createElement('div');
+    header.className = 'milestone-comment-meta';
+    const author = document.createElement('strong');
+    author.className = 'milestone-comment-author';
+    author.textContent = String(comment.display_name || 'Đạo Hữu');
+    header.appendChild(author);
+
+    const profile = profileByUser.get(String(comment.user_id || ''));
+    if (profile) {
+      const badge = document.createElement('span');
+      badge.className = 'milestone-comment-rank';
+      badge.textContent = getCultivationRank(getCultivationPoints(profile)).name;
+      header.appendChild(badge);
+    }
+
+    const time = document.createElement('time');
+    time.className = 'milestone-comment-time';
+    time.dateTime = String(comment.created_at || '');
+    time.textContent = formatMilestoneCommentTime(comment.created_at);
+    header.appendChild(time);
+
+    const content = document.createElement('p');
+    content.className = 'milestone-comment-content';
+    content.textContent = String(comment.content || '');
+    item.append(header, content);
+
+    const mayDelete = authenticatedUser &&
+      (String(comment.user_id) === String(authenticatedUser.id) || isAdminUser());
+    if (mayDelete && comment.id != null) {
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'milestone-comment-delete';
+      deleteButton.dataset.commentId = String(comment.id);
+      deleteButton.setAttribute('aria-label', `Xóa lời nhắn của ${author.textContent}`);
+      deleteButton.textContent = '✕';
+      item.appendChild(deleteButton);
+    }
+    return item;
+  }
+
+  async function loadMilestoneComments(section) {
+    const stageId = section.dataset.stageId;
+    const list = section.querySelector('.milestone-comment-list');
+    const status = section.querySelector('.milestone-comments-status');
+    if (!stageId || !list || !status) return;
+    if (!supabaseClient) {
+      list.replaceChildren();
+      status.textContent = 'Linh phù truyền âm hiện chưa kết nối được Supabase.';
+      return;
+    }
+
+    status.textContent = 'Đang nhận lời nhắn từ linh phù…';
+    try {
+      const { data, error, count } = await supabaseClient.from('milestone_comments')
+        .select('*', { count: 'exact' })
+        .eq('stage_id', stageId)
+        .order('created_at', { ascending: false })
+        .limit(40);
+      if (error) throw error;
+
+      const comments = data || [];
+      const userIds = [...new Set(comments.map(comment => String(comment.user_id || '')).filter(Boolean))];
+      const profileByUser = new Map();
+      if (userIds.length) {
+        const { data: profiles, error: profileError } = await supabaseClient.from('user_cultivation')
+          .select('user_id,tu_vi')
+          .in('user_id', userIds);
+        if (profileError) {
+          console.warn('Không thể tải Cảnh Giới của người truyền âm:', profileError);
+        } else {
+          (profiles || []).forEach(profile => profileByUser.set(String(profile.user_id), profile));
+        }
+      }
+
+      list.replaceChildren();
+      if (!comments.length) {
+        const empty = document.createElement('li');
+        empty.className = 'milestone-comments-empty';
+        empty.textContent = 'Chưa có đạo hữu truyền âm ở mốc này. Hãy khai lời đầu tiên!';
+        list.appendChild(empty);
+      } else {
+        comments.forEach(comment => list.appendChild(renderMilestoneComment(comment, profileByUser)));
+      }
+      const totalCount = Math.max(comments.length, Number(count) || 0);
+      state.milestoneCommentCounts.set(stageId, totalCount);
+      updateMilestoneCommentButtons(stageId, totalCount);
+      status.textContent = totalCount > comments.length
+        ? `Đang hiển thị ${comments.length} lời nhắn gần nhất trong tổng số ${totalCount}.`
+        : '';
+    } catch (error) {
+      console.error(`Không thể tải lời truyền âm ${stageId}:`, error);
+      list.replaceChildren();
+      status.textContent = 'Linh phù truyền âm tạm thời mất kết nối. Vui lòng thử lại sau.';
+      status.classList.add('is-error');
+      return;
+    }
+    status.classList.remove('is-error');
+  }
+
+  function vietnamDayUtcBounds(dateKey) {
+    const start = new Date(`${dateKey}T00:00:00+07:00`);
+    const end = new Date(`${shiftDateKey(dateKey, 1)}T00:00:00+07:00`);
+    return { start: start.toISOString(), end: end.toISOString() };
+  }
+
+  async function hasCommentRewardToday(userId) {
+    const { start, end } = vietnamDayUtcBounds(vietnamDateKey());
+    const { data, error } = await supabaseClient.from('milestone_comments')
+      .select('id')
+      .eq('user_id', userId)
+      .gte('created_at', start)
+      .lt('created_at', end)
+      .limit(1);
+    if (error) throw error;
+    return Boolean(data && data.length);
+  }
+
+  function updateMilestoneCommentButtons(stageId, count) {
+    const stage = state.data && state.data.stages.find(item => item.id === stageId);
+    const label = stage ? stage.period || stage.title : stageId;
+    document.querySelectorAll('.milestone-comments-open').forEach(button => {
+      if (button.dataset.stageId !== stageId) return;
+      button.textContent = `🗣️ Tường Truyền Âm • Mốc ${label} (${count} lời nhắn)`;
+    });
+  }
+
+  function syncFeatureModalScrollLock() {
+    const activeModal = document.querySelector('.feature-modal.active, .admin-modal.active, .archive-lock-modal.active, .modal.active, .lightbox-modal.active');
+    document.body.style.overflow = activeModal ? 'hidden' : '';
+  }
+
+  function setFeatureModalOpen(modal, isOpen) {
+    if (!modal) return;
+    modal.hidden = !isOpen;
+    modal.classList.toggle('active', isOpen);
+    modal.setAttribute('aria-hidden', String(!isOpen));
+    syncFeatureModalScrollLock();
+  }
+
+  function openMilestoneCommentsModal(stageId) {
+    const stage = state.data && state.data.stages.find(item => item.id === stageId);
+    const modal = document.getElementById('milestoneCommentsModal');
+    const section = document.getElementById('milestone-comments-modal-content');
+    const title = document.getElementById('milestone-comments-modal-title');
+    const stageLabel = document.getElementById('milestone-comments-modal-stage');
+    if (!stage || !modal || !section) return;
+
+    state.currentMilestoneStage = stageId;
+    section.dataset.stageId = stageId;
+    if (title) title.textContent = `🗣️ Tường Truyền Âm • ${stage.period || stage.title}`;
+    if (stageLabel) stageLabel.textContent = 'Linh phù đã mở — hãy để lại lời nhắn văn minh, tối đa 220 ký tự.';
+    const list = section.querySelector('.milestone-comment-list');
+    const status = section.querySelector('.milestone-comments-status');
+    const form = section.querySelector('.milestone-comment-form');
+    if (list) {
+      list.replaceChildren();
+      const loading = document.createElement('li');
+      loading.className = 'milestone-comments-empty';
+      loading.textContent = 'Đang nhận lời nhắn từ linh phù…';
+      list.appendChild(loading);
+    }
+    if (status) {
+      status.textContent = '';
+      status.classList.remove('is-error');
+    }
+    if (form) {
+      form.reset();
+      const count = form.querySelector('.milestone-comment-count');
+      if (count) count.textContent = '0/220';
+    }
+    setFeatureModalOpen(modal, true);
+    void loadMilestoneComments(section);
+    modal.querySelector('.feature-modal-dialog')?.focus({ preventScroll: true });
+  }
+
+  function initMilestoneComments() {
+    void loadMilestoneCommentCounts();
+    document.querySelectorAll('.milestone-comments-open').forEach(button => {
+      if (button.dataset.bound === 'true') return;
+      button.dataset.bound = 'true';
+      button.addEventListener('click', () => openMilestoneCommentsModal(button.dataset.stageId));
+    });
+
+    const modal = document.getElementById('milestoneCommentsModal');
+    const section = document.getElementById('milestone-comments-modal-content');
+    const form = document.getElementById('milestone-comment-modal-form');
+    if (!modal || !section || !form || form.dataset.bound === 'true') return;
+    form.dataset.bound = 'true';
+    const textarea = form.querySelector('textarea[name="content"]');
+    const count = form.querySelector('.milestone-comment-count');
+    if (!textarea || !count) return;
+    textarea.addEventListener('input', () => {
+      count.textContent = `${textarea.value.length}/220`;
+    });
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      void submitMilestoneComment(section, form, textarea.value.trim());
+    });
+    section.querySelector('.milestone-comment-list')?.addEventListener('click', event => {
+      const target = event.target instanceof Element ? event.target : null;
+      const deleteButton = target && target.closest('.milestone-comment-delete');
+      if (!deleteButton) return;
+      void deleteMilestoneComment(section, deleteButton.dataset.commentId);
+    });
+  }
+
+  function loadMilestoneCommentCounts() {
+    if (!supabaseClient || !state.data || state.milestoneCountsPromise) return;
+    state.milestoneCountsPromise = Promise.all(state.data.stages.map(async stage => {
+      try {
+        const { count, error } = await supabaseClient.from('milestone_comments')
+          .select('id', { count: 'exact', head: true })
+          .eq('stage_id', stage.id);
+        if (error) throw error;
+        const total = Math.max(0, Number(count) || 0);
+        state.milestoneCommentCounts.set(stage.id, total);
+        updateMilestoneCommentButtons(stage.id, total);
+      } catch (error) {
+        console.warn(`Không thể tải số lời nhắn của mốc ${stage.id}:`, error);
+      }
+    }));
+  }
+
+  function initFeatureModals() {
+    const thienCoButton = document.getElementById('nav-thien-co-btn');
+    const thienCoModal = document.getElementById('thienCoModal');
+    if (thienCoButton && thienCoModal) {
+      thienCoButton.addEventListener('click', () => {
+        if (!authenticatedUser) {
+          openOracleAuthSeal();
+          return;
+        }
+        setFeatureModalOpen(thienCoModal, true);
+        thienCoModal.querySelector('.feature-modal-dialog')?.focus({ preventScroll: true });
+      });
+    }
+
+    const historyButton = document.getElementById('open-decree-history');
+    const historyModal = document.getElementById('decreeHistoryModal');
+    if (historyButton && historyModal) {
+      historyButton.addEventListener('click', () => {
+        renderDecreeHistory();
+        setFeatureModalOpen(historyModal, true);
+        historyModal.querySelector('.feature-modal-dialog')?.focus({ preventScroll: true });
+      });
+    }
+
+    document.querySelectorAll('[data-modal-close]').forEach(button => {
+      if (button.dataset.modalBound === 'true') return;
+      button.dataset.modalBound = 'true';
+      button.addEventListener('click', () => {
+        const modal = document.getElementById(button.dataset.modalClose);
+        if (modal) setFeatureModalOpen(modal, false);
+      });
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      document.querySelectorAll('.feature-modal.active').forEach(modal => setFeatureModalOpen(modal, false));
+    });
+  }
+
+  async function submitMilestoneComment(section, form, content) {
+    const stageId = section.dataset.stageId;
+    const textarea = form.querySelector('textarea[name="content"]');
+    const submitButton = form.querySelector('button[type="submit"]');
+    const status = section.querySelector('.milestone-comments-status');
+    if (!stageId || !textarea || !submitButton || !status || !content) return;
+    if (content.length > 220) {
+      status.textContent = 'Lời truyền âm tối đa 220 ký tự.';
+      status.classList.add('is-error');
+      return;
+    }
+    if (!authenticatedUser) {
+      openArchiveLockModal(stageId);
+      const authButton = document.getElementById('archive-lock-auth');
+      status.textContent = 'Hãy ghi danh để truyền âm lời nhắn của đạo hữu.';
+      if (authButton) {
+        authButton.dataset.action = 'comment';
+        authButton.dataset.commentText = content;
+        authButton.dataset.commentFormId = form.id || '';
+      }
+      return;
+    }
+
+    const user = authenticatedUser;
+    submitButton.disabled = true;
+    status.classList.remove('is-error');
+    status.textContent = 'Đang gửi linh phù…';
+    let rewardAvailable = false;
+    try {
+      rewardAvailable = !(isAdminUser(user)) && !(await hasCommentRewardToday(user.id));
+      const { error } = await supabaseClient.from('milestone_comments').insert({
+        stage_id: stageId,
+        user_id: user.id,
+        display_name: getUserDisplayName(user),
+        content
+      });
+      if (error) throw error;
+
+      form.reset();
+      const count = form.querySelector('.milestone-comment-count');
+      if (count) count.textContent = '0/220';
+      await loadMilestoneComments(section);
+      status.classList.remove('is-error');
+
+      if (rewardAvailable) {
+        const awarded = await awardCultivation(5, 'Gửi Truyền Âm', { sourceElement: submitButton });
+        if (awarded) {
+          status.textContent = 'Linh phù đã truyền đi, nhận +5 Tu Vi đầu tiên hôm nay!';
+        } else {
+          status.textContent = 'Linh phù đã truyền đi; phần thưởng Tu Vi chưa đồng bộ được.';
+          status.classList.add('is-error');
+        }
+      } else {
+        status.classList.remove('is-error');
+        status.textContent = 'Linh phù đã truyền đi thành công!';
+      }
+    } catch (error) {
+      console.error('Không thể gửi linh phù truyền âm:', error);
+      status.textContent = 'Không thể gửi lời nhắn lúc này. Vui lòng thử lại.';
+      status.classList.add('is-error');
+    } finally {
+      submitButton.disabled = false;
+    }
+  }
+
+  async function deleteMilestoneComment(section, commentId) {
+    if (!authenticatedUser || !commentId || !supabaseClient) return;
+    const status = section.querySelector('.milestone-comments-status');
+    try {
+      const { error } = await supabaseClient.from('milestone_comments')
+        .delete()
+        .eq('id', commentId);
+      if (error) throw error;
+      if (status) {
+        status.classList.remove('is-error');
+        status.textContent = 'Đã xóa lời truyền âm.';
+      }
+      await loadMilestoneComments(section);
+    } catch (error) {
+      console.error('Không thể xóa lời truyền âm:', error);
+      if (status) {
+        status.textContent = 'Không thể xóa lời truyền âm. Vui lòng thử lại.';
+        status.classList.add('is-error');
+      }
     }
   }
 
@@ -3273,10 +4949,25 @@
   }
 
   function openArchiveLockModal(stageId) {
-    const modal = document.getElementById('archive-lock-modal');
+    const modal = document.getElementById('authSealModal');
     const authButton = document.getElementById('archive-lock-auth');
     if (!modal || !authButton) return;
     authButton.dataset.stageId = stageId;
+    authButton.dataset.action = 'archive';
+    delete authButton.dataset.commentText;
+    delete authButton.dataset.commentFormId;
+    modal.hidden = false;
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function openOracleAuthSeal() {
+    const modal = document.getElementById('authSealModal');
+    const authButton = document.getElementById('archive-lock-auth');
+    if (!modal || !authButton) return;
+    delete authButton.dataset.stageId;
+    authButton.dataset.action = 'oracle';
     modal.hidden = false;
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
@@ -3284,29 +4975,237 @@
   }
 
   function closeArchiveLockModal() {
-    const modal = document.getElementById('archive-lock-modal');
+    const modal = document.getElementById('authSealModal');
     if (!modal) return;
     modal.classList.remove('active');
     modal.setAttribute('aria-hidden', 'true');
     modal.hidden = true;
-    if (!document.querySelector('.admin-modal.active') &&
-        !document.querySelector('.modal.active') &&
-        !document.querySelector('.lightbox-modal.active')) {
-      document.body.style.overflow = '';
+    syncFeatureModalScrollLock();
+  }
+
+  function initSpiritParticlesCanvas() {
+    const canvas = document.getElementById('spiritParticlesCanvas');
+    const context = canvas && canvas.getContext ? canvas.getContext('2d') : null;
+    if (!canvas || !context) {
+      console.warn('Không thể khởi tạo canvas hạt linh khí.');
+      return;
+    }
+
+    const reducedMotionQuery = window.matchMedia
+      ? window.matchMedia('(prefers-reduced-motion: reduce)')
+      : { matches: false, addEventListener: null };
+    const particles = Array.from({ length: 40 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      radius: 0.7 + Math.random() * 1.8,
+      speedX: (Math.random() - 0.5) * 0.012,
+      speedY: (Math.random() - 0.5) * 0.012,
+      phase: Math.random() * Math.PI * 2,
+      gold: Math.random() > 0.56
+    }));
+    let width = 0;
+    let height = 0;
+    let frameId = 0;
+    let lastFrameTime = 0;
+    let nextSwordAt = 6 + Math.random() * 6;
+    let swordTrail = null;
+
+    const resize = () => {
+      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      width = window.innerWidth;
+      height = window.innerHeight;
+      canvas.width = Math.max(1, Math.round(width * ratio));
+      canvas.height = Math.max(1, Math.round(height * ratio));
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+      context.setTransform(ratio, 0, 0, ratio, 0, 0);
+      drawParticles(0, 0);
+    };
+
+    const drawParticles = (time, delta) => {
+      context.clearRect(0, 0, width, height);
+      particles.forEach(particle => {
+        if (!reducedMotionQuery.matches && delta > 0) {
+          particle.x = (particle.x + particle.speedX * delta + 1) % 1;
+          particle.y = (particle.y + particle.speedY * delta + 1) % 1;
+        }
+        const x = particle.x * width;
+        const y = particle.y * height;
+        const pulse = 0.4 + (Math.sin(time * 0.0012 + particle.phase) + 1) * 0.24;
+        context.beginPath();
+        context.fillStyle = particle.gold
+          ? `rgba(255, 222, 130, ${pulse})`
+          : `rgba(112, 255, 220, ${pulse})`;
+        context.shadowBlur = 9;
+        context.shadowColor = particle.gold ? 'rgba(255, 195, 75, 0.75)' : 'rgba(45, 212, 191, 0.8)';
+        context.arc(x, y, particle.radius, 0, Math.PI * 2);
+        context.fill();
+      });
+
+      if (!reducedMotionQuery.matches) {
+        const seconds = time / 1000;
+        if (!swordTrail && seconds >= nextSwordAt) {
+          swordTrail = {
+            x: Math.random() * width * 0.8,
+            y: Math.random() * height * 0.58,
+            age: 0
+          };
+          nextSwordAt = seconds + 7 + Math.random() * 9;
+        }
+        if (swordTrail) {
+          swordTrail.age += delta;
+          const progress = swordTrail.age / 0.72;
+          if (progress >= 1) {
+            swordTrail = null;
+          } else {
+            const x = swordTrail.x + progress * 150;
+            const y = swordTrail.y + progress * 74;
+            const gradient = context.createLinearGradient(x - 64, y - 32, x, y);
+            gradient.addColorStop(0, 'rgba(112, 255, 220, 0)');
+            gradient.addColorStop(0.65, 'rgba(112, 255, 220, 0.75)');
+            gradient.addColorStop(1, 'rgba(255, 227, 151, 0)');
+            context.save();
+            context.globalAlpha = Math.sin(progress * Math.PI);
+            context.strokeStyle = gradient;
+            context.lineWidth = 1.2;
+            context.shadowBlur = 12;
+            context.shadowColor = 'rgba(45, 212, 191, 0.82)';
+            context.beginPath();
+            context.moveTo(x - 64, y - 32);
+            context.lineTo(x, y);
+            context.stroke();
+            context.restore();
+          }
+        }
+      }
+    };
+
+    const animate = now => {
+      const delta = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.05) : 0;
+      lastFrameTime = now;
+      drawParticles(now, delta);
+      frameId = window.requestAnimationFrame(animate);
+    };
+    const start = () => {
+      if (reducedMotionQuery.matches || document.hidden || frameId) return;
+      lastFrameTime = 0;
+      frameId = window.requestAnimationFrame(animate);
+    };
+    const stop = () => {
+      if (!frameId) return;
+      window.cancelAnimationFrame(frameId);
+      frameId = 0;
+    };
+    const syncMotion = () => {
+      if (reducedMotionQuery.matches || document.hidden) {
+        stop();
+        drawParticles(0, 0);
+      } else {
+        start();
+      }
+    };
+
+    resize();
+    start();
+    window.addEventListener('resize', resize, { passive: true });
+    document.addEventListener('visibilitychange', syncMotion);
+    if (reducedMotionQuery.addEventListener) {
+      reducedMotionQuery.addEventListener('change', syncMotion);
     }
   }
 
+  function initGlassInteractions() {
+    const targets = document.querySelectorAll(
+      '.genesis-card-wrapper, .rpg-card, .public-leaderboard-card, .btn-open-archive, ' +
+      '.btn-toggle-stage-quotes, .milestone-comments-open, .nav-actions > .nav-btn, .btn-invite, .utility-launch-btn'
+    );
+
+    targets.forEach(target => {
+      if (target.dataset.glassInteractionBound === 'true') return;
+      target.dataset.glassInteractionBound = 'true';
+      target.classList.add('glass-tilt-target');
+
+      if (!target.matches('.genesis-card-wrapper')) {
+        const glint = document.createElement('span');
+        glint.className = 'glass-pointer-glint';
+        glint.setAttribute('aria-hidden', 'true');
+        target.appendChild(glint);
+      }
+
+      const baseTransform = target.style.transform;
+      const reset = () => {
+        target.classList.remove('is-glass-pointed');
+        target.style.transform = baseTransform;
+      };
+      target.addEventListener('pointermove', event => {
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const bounds = target.getBoundingClientRect();
+        if (!bounds.width || !bounds.height) return;
+        const x = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
+        const y = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
+        const rotateY = (x - 0.5) * 7;
+        const rotateX = (0.5 - y) * 7;
+        target.style.setProperty('--glass-pointer-x', `${x * 100}%`);
+        target.style.setProperty('--glass-pointer-y', `${y * 100}%`);
+        target.style.transform = `perspective(900px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+        target.classList.add('is-glass-pointed');
+      }, { passive: true });
+      target.addEventListener('pointerleave', reset, { passive: true });
+      target.addEventListener('pointercancel', reset, { passive: true });
+      target.addEventListener('pointerup', event => {
+        if (event.pointerType === 'touch') reset();
+      }, { passive: true });
+    });
+  }
+
   function initArchiveLockModal() {
-    const modal = document.getElementById('archive-lock-modal');
+    const modal = document.getElementById('authSealModal');
     const closeButton = document.getElementById('archive-lock-close');
-    const backdrop = document.getElementById('archive-lock-backdrop');
+    const dismissButton = document.getElementById('archive-lock-dismiss');
     const authButton = document.getElementById('archive-lock-auth');
-    if (!modal || !closeButton || !backdrop || !authButton) return;
+    if (!modal || !closeButton || !dismissButton || !authButton) return;
     closeButton.addEventListener('click', closeArchiveLockModal);
-    backdrop.addEventListener('click', closeArchiveLockModal);
+    dismissButton.addEventListener('click', closeArchiveLockModal);
+    modal.addEventListener('click', event => {
+      if (event.target === modal) closeArchiveLockModal();
+    });
     authButton.addEventListener('click', () => {
       const stageId = authButton.dataset.stageId;
+      const action = authButton.dataset.action || 'archive';
+      const commentText = authButton.dataset.commentText || '';
+      const commentFormId = authButton.dataset.commentFormId || '';
       closeArchiveLockModal();
+      authButton.dataset.action = 'archive';
+      delete authButton.dataset.commentText;
+      delete authButton.dataset.commentFormId;
+      if (action === 'oracle') {
+        const openOracle = () => {
+          const oracleModal = document.getElementById('thienCoModal');
+          setFeatureModalOpen(oracleModal, true);
+          oracleModal?.querySelector('.feature-modal-dialog')?.focus({ preventScroll: true });
+        };
+        if (!requireAuth(openOracle)) return;
+        openOracle();
+        return;
+      }
+      if (action === 'comment') {
+        setFeatureModalOpen(document.getElementById('milestoneCommentsModal'), false);
+        const continueComment = () => {
+          openMilestoneCommentsModal(stageId);
+          const form = document.getElementById(commentFormId);
+          const section = form && form.closest('.milestone-comments');
+          const textarea = form && form.querySelector('textarea[name="content"]');
+          if (form && section && textarea) {
+            textarea.value = commentText;
+            const count = form.querySelector('.milestone-comment-count');
+            if (count) count.textContent = `${textarea.value.length}/220`;
+            void submitMilestoneComment(section, form, commentText);
+          }
+        };
+        if (!requireAuth(continueComment)) return;
+        continueComment();
+        return;
+      }
       if (!requireAuth(() => openFilmstripModal(stageId))) {
         return;
       }
@@ -3904,7 +5803,9 @@
       state.game.score += 1;
       state.game.streak += 1;
       state.game.bestStreak = Math.max(state.game.bestStreak, state.game.streak);
-      void awardCultivation(5, 'Trả lời đúng Đoán Năm');
+      void awardCultivation(5, 'Trả lời đúng Đoán Năm', {
+        sourceElement: document.getElementById('game-year-submit')
+      });
       revealCard.classList.add('is-correct');
       revealHeader.className = 'reveal-header is-correct';
       statusIcon.textContent = '🎉';
@@ -3980,7 +5881,7 @@
     list.replaceChildren();
     if (!rows.length) {
       const emptyRow = document.createElement('li');
-      emptyRow.textContent = 'Bảng Tu Vi còn trống! Đạo Hữu đăng nhập điểm danh nhận +20, kẻo Linh Thạch mọc rêu nhé.';
+      emptyRow.textContent = 'Bảng Tu Vi còn trống! Đạo Hữu đăng nhập điểm danh nhận thưởng theo chuỗi, kẻo Linh Thạch mọc rêu nhé.';
       list.appendChild(emptyRow);
       return;
     }
@@ -4012,12 +5913,15 @@
       rank.className = 'cultivation-rank-badge';
       rank.textContent = currentAdmin
         ? 'Độ Kiếp Chí Tôn'
-        : getCultivationRank(row.tu_vi).name;
-      identity.append(name, rank);
+        : getCultivationRank(getCultivationPoints(row)).name;
+      const streak = document.createElement('span');
+      streak.className = 'cultivation-streak-badge leaderboard-streak-badge';
+      streak.textContent = `🔥 Chuỗi ${Math.max(0, Number(row.streak_days) || 0)} ngày`;
+      identity.append(name, streak, rank);
 
       const points = document.createElement('span');
       points.className = 'leaderboard-score';
-      points.textContent = `${Number(row.tu_vi) || 0} Tu Vi`;
+      points.textContent = `${getCultivationPoints(row)} Tu Vi`;
       item.append(place, identity, points);
       list.appendChild(item);
     });
@@ -4057,9 +5961,15 @@
     try {
       const { data, error } = await supabaseClient.from('user_cultivation')
         .select('*')
-        .order('tu_vi', { ascending: false });
       if (error) throw error;
-      const rows = data || [];
+      const rows = (data || []).filter(row => {
+        if (!state.featureToggles.hideAdminFromLeaderboard) return true;
+        const rowEmail = String(row.email || '').trim().toLowerCase();
+        const isCurrentAdmin = isAdminUser() &&
+          String(row.user_id) === String(authenticatedUser.id);
+        return rowEmail !== ADMIN_EMAIL && !isCurrentAdmin;
+      });
+      rows.sort((left, right) => getCultivationPoints(right) - getCultivationPoints(left));
       if (isAdminUser()) {
         rows.sort((left, right) =>
           String(right.user_id) === String(authenticatedUser.id) ? 1 :
@@ -4940,7 +6850,10 @@
       btnPrint.addEventListener('click', () => {
         if (!requireAuth(() => btnPrint.click())) return;
         updateTicket(true);
-        void awardCultivation(15, 'In Vé Lưu Niệm', { claimField: 'ticket_claimed' });
+        void awardCultivation(15, 'In Vé Lưu Niệm', {
+          claimField: 'ticket_claimed',
+          sourceElement: btnPrint
+        });
       });
     }
 
@@ -5294,103 +7207,6 @@
   }
 
   // ========================================================
-  // THEME SWITCHER
-  // ========================================================
-  function initThemeSwitcher() {
-    const dropdown = document.getElementById('theme-selector-dropdown');
-    const toggleBtn = document.getElementById('theme-toggle-btn');
-    const optionBtns = document.querySelectorAll('.theme-option-btn');
-    const btnIcon = document.getElementById('theme-btn-icon');
-    const btnText = document.getElementById('theme-btn-text');
-
-    if (!dropdown || !toggleBtn) return;
-
-    const themeIcons = {
-      xianxia: '☯',
-      obsidian: '🌑',
-      sepia: '📜',
-      midnight: '🌌',
-      daylight: '☁️'
-    };
-
-    const themeNames = {
-      xianxia: 'Tiên Giới Cổ Phong',
-      obsidian: 'Đêm Obsidian',
-      sepia: 'Giấy Cũ',
-      midnight: 'Xanh Đêm',
-      daylight: 'Sáng Tối Giản'
-    };
-
-    function applyTheme(theme, save = true) {
-      if (!themeIcons[theme]) theme = 'xianxia';
-      document.documentElement.setAttribute('data-theme', theme);
-
-      optionBtns.forEach(btn => {
-        const isMatch = btn.dataset.theme === theme;
-        btn.classList.toggle('active', isMatch);
-        btn.setAttribute('aria-selected', isMatch ? 'true' : 'false');
-      });
-
-      if (btnIcon) btnIcon.textContent = themeIcons[theme];
-      if (btnText) btnText.textContent = themeNames[theme];
-
-      if (save) {
-        try {
-          localStorage.setItem('museum_theme_v22', theme);
-        } catch (e) {
-          console.warn('LocalStorage không khả dụng:', e);
-        }
-      }
-    }
-
-    // Load saved theme or default to Xianxia.
-    let initialTheme = 'xianxia';
-    try {
-      const saved = localStorage.getItem('museum_theme_v22');
-      if (saved && themeIcons[saved]) {
-        initialTheme = saved;
-      }
-    } catch (e) {
-      console.warn('LocalStorage error:', e);
-    }
-    applyTheme(initialTheme, false);
-
-    // Toggle dropdown
-    toggleBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isOpen = dropdown.classList.toggle('open');
-      toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
-    });
-
-    // Option click
-    optionBtns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const theme = btn.dataset.theme;
-        applyTheme(theme, true);
-        dropdown.classList.remove('open');
-        toggleBtn.setAttribute('aria-expanded', 'false');
-      });
-    });
-
-    // Close on outside click
-    document.addEventListener('click', (e) => {
-      if (!dropdown.contains(e.target)) {
-        dropdown.classList.remove('open');
-        toggleBtn.setAttribute('aria-expanded', 'false');
-      }
-    });
-
-    // Close on Escape
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && dropdown.classList.contains('open')) {
-        dropdown.classList.remove('open');
-        toggleBtn.setAttribute('aria-expanded', 'false');
-      }
-    });
-  }
-
-  // ========================================================
   // MỤC 1: RPG ACHIEVEMENTS
   // ========================================================
   function initAchievements() {
@@ -5616,7 +7432,7 @@
               .in('user_id', userIds);
             if (profileError) throw profileError;
             (profiles || []).forEach(profile => {
-              cultivationByUser.set(String(profile.user_id), getCultivationRank(Number(profile.tu_vi) || 0).name);
+              cultivationByUser.set(String(profile.user_id), getCultivationRank(getCultivationPoints(profile)).name);
             });
           } catch (error) {
             console.warn('Không thể tải Cảnh Giới của Sổ Lưu Bút:', error);
@@ -5823,7 +7639,10 @@
         }
 
         if (savedOnline) {
-          await awardCultivation(20, 'Gửi lời nhắn Sổ Lưu Bút', { claimField: 'guestbook_claimed' });
+          await awardCultivation(20, 'Gửi lời nhắn Sổ Lưu Bút', {
+            claimField: 'guestbook_claimed',
+            sourceElement: sealBtn
+          });
         }
 
         const newCapsule = {
