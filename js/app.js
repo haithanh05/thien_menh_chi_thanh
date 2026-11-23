@@ -84,6 +84,8 @@
   let pendingAuthAction = null;
   let activeAuthMode = 'login';
   let pauseCanvasAnimation = null;
+  let pauseXianxiaAnimation = null;
+  let html2CanvasPromise = null;
   let adminToastTimer = null;
   let cultivationCardControlsBound = false;
 
@@ -136,15 +138,20 @@
       currentIndex: 0,
       audio: new Audio(),
       startTimeApplied: false,
-      isPlaying: true,
-      isUserMuted: false
+      isPlaying: false,
+      isUserMuted: true
     },
     lightbox: {
       images: [],
       items: [],
       currentIndex: 0,
       memory: null,
-      isZoomed: false
+      isZoomed: false,
+      panX: 0,
+      panY: 0,
+      scale: 1,
+      transformFrameId: 0,
+      dragOrigin: null
     },
     game: {
       pool: [],
@@ -169,6 +176,7 @@
       currentTrackSrc: null
     }
   };
+  state.bgMusic.audio.preload = 'none';
 
   // Helper: Format Seconds to MM:SS
   function formatTime(seconds) {
@@ -530,8 +538,7 @@
 
     if (target && targetRect && targetRect.width) {
       target.classList.remove('tuvi-burst-arrival');
-      void target.offsetWidth;
-      target.classList.add('tuvi-burst-arrival');
+      window.requestAnimationFrame(() => target.classList.add('tuvi-burst-arrival'));
       window.setTimeout(() => target.classList.remove('tuvi-burst-arrival'), 620);
     }
   }
@@ -1881,8 +1888,7 @@
     }
     const visibleForm = activeAuthMode === 'login' ? loginForm : signupForm;
     visibleForm.classList.remove('auth-form-enter');
-    void visibleForm.offsetWidth;
-    visibleForm.classList.add('auth-form-enter');
+    window.requestAnimationFrame(() => visibleForm.classList.add('auth-form-enter'));
   }
 
   function renderAuthState(user) {
@@ -3172,7 +3178,6 @@
     if (tube) tube.classList.add('is-shaking');
     if (card) {
       card.classList.remove('is-revealed');
-      void card.offsetWidth;
     }
     status.classList.remove('is-error');
     status.textContent = 'Ống xăm đang rung, thiên cơ sắp hiện…';
@@ -3698,14 +3703,15 @@
     if (!context) return;
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const stars = Array.from({ length: 190 }, () => ({
+    const mobile = () => window.innerWidth < 768;
+    const stars = Array.from({ length: mobile() ? 90 : 190 }, () => ({
       x: Math.random(),
       y: Math.random(),
       radius: Math.random() * 1.35 + 0.25,
       phase: Math.random() * Math.PI * 2,
       color: Math.random() > 0.78 ? '#f5d98b' : Math.random() > 0.55 ? '#8de8d4' : '#e8f5f2'
     }));
-    const motes = Array.from({ length: 38 }, () => ({
+    const motes = Array.from({ length: mobile() ? 18 : 38 }, () => ({
       x: Math.random(),
       y: Math.random(),
       speed: Math.random() * 0.018 + 0.006,
@@ -3714,7 +3720,7 @@
       radius: Math.random() * 1.8 + 0.7,
       jade: Math.random() > 0.5
     }));
-    const leaves = Array.from({ length: 13 }, () => ({
+    const leaves = Array.from({ length: mobile() ? 8 : 13 }, () => ({
       x: Math.random(),
       y: Math.random(),
       speed: Math.random() * 0.035 + 0.012,
@@ -3729,11 +3735,15 @@
     let width = 0;
     let height = 0;
     let frameId = 0;
+    let lastFrameTime = 0;
+    let resizeTimer = 0;
+    let animationPaused = false;
     let meteor = null;
     let nextMeteorAt = 6;
     const startedAt = performance.now();
 
     const resize = () => {
+      if (mobile() && motes.length > 25) motes.length = 25;
       const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
       width = window.innerWidth;
       height = window.innerHeight;
@@ -3884,11 +3894,16 @@
     }
 
     const animate = now => {
+      if (mobile() && now - lastFrameTime < 1000 / 30) {
+        frameId = window.requestAnimationFrame(animate);
+        return;
+      }
+      lastFrameTime = now;
       draw((now - startedAt) / 1000);
       frameId = window.requestAnimationFrame(animate);
     };
     const start = () => {
-      if (reducedMotion || document.hidden || canvasPaused || frameId) return;
+      if (reducedMotion || document.hidden || animationPaused || frameId) return;
       frameId = window.requestAnimationFrame(animate);
     };
     const stop = () => {
@@ -3896,16 +3911,19 @@
       window.cancelAnimationFrame(frameId);
       frameId = 0;
     };
-    let canvasPaused = false;
-    pauseCanvasAnimation = paused => {
-      canvasPaused = paused;
+    pauseXianxiaAnimation = paused => {
+      animationPaused = paused;
       if (paused) stop();
       else start();
+    };
+    const scheduleResize = () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(resize, 150);
     };
 
     resize();
     start();
-    window.addEventListener('resize', resize, { passive: true });
+    window.addEventListener('resize', scheduleResize, { passive: true });
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) stop();
       else start();
@@ -3930,6 +3948,7 @@
         Boolean(document.querySelector('.admin-modal.active'));
       document.body.classList.toggle('modal-open', hasOpenModal);
       if (pauseCanvasAnimation) pauseCanvasAnimation(hasOpenModal);
+      if (pauseXianxiaAnimation) pauseXianxiaAnimation(hasOpenModal);
 
       const nav = document.getElementById('sticky-header');
       if (nav) nav.style.display = hasOpenModal ? 'none' : '';
@@ -4066,25 +4085,20 @@
     const scrollLine = document.getElementById('scroll-progress');
     const navChips = navBar.querySelectorAll('.nav-chip');
 
-    window.addEventListener('scroll', () => {
+    const updateScrollProgress = () => {
       if (window.innerWidth <= 768) return;
       const scrollTop = window.scrollY;
       const docHeight = document.documentElement.scrollHeight - window.innerHeight;
       const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
       if (scrollLine) scrollLine.style.width = `${progress}%`;
+    };
 
-      // Determine active section
-      const stageSections = document.querySelectorAll('.stage-section');
-      let currentSectionId = '';
-
-      stageSections.forEach(sec => {
-        const top = sec.offsetTop - 120;
-        const height = sec.offsetHeight;
-        if (scrollTop >= top && scrollTop < top + height) {
-          currentSectionId = sec.id.replace('stage-', '');
-        }
-      });
-
+    const activeSections = new Map();
+    const updateActiveChapter = () => {
+      if (window.innerWidth <= 768) return;
+      const current = [...activeSections.entries()]
+        .sort((left, right) => Math.abs(left[1]) - Math.abs(right[1]))[0];
+      const currentSectionId = current ? current[0] : '';
       navChips.forEach(chip => {
         if (chip.dataset.stageId === currentSectionId) {
           chip.classList.add('active');
@@ -4092,7 +4106,22 @@
           chip.classList.remove('active');
         }
       });
-    }, { passive: true });
+    };
+
+    if ('IntersectionObserver' in window) {
+      const stageObserver = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+          const stageId = entry.target.id.replace('stage-', '');
+          if (entry.isIntersecting) activeSections.set(stageId, entry.boundingClientRect.top - 120);
+          else activeSections.delete(stageId);
+        });
+        updateActiveChapter();
+      }, { rootMargin: '-120px 0px -70% 0px', threshold: 0 });
+      document.querySelectorAll('.stage-section').forEach(section => stageObserver.observe(section));
+    }
+
+    window.addEventListener('scroll', updateScrollProgress, { passive: true });
+    window.addEventListener('resize', updateScrollProgress, { passive: true });
   }
 
   // ========================================================
@@ -4541,19 +4570,24 @@
 
   function loadMilestoneCommentCounts() {
     if (!supabaseClient || !state.data || state.milestoneCountsPromise) return;
-    state.milestoneCountsPromise = Promise.all(state.data.stages.map(async stage => {
+    state.milestoneCountsPromise = (async () => {
       try {
-        const { count, error } = await supabaseClient.from('milestone_comments')
-          .select('id', { count: 'exact', head: true })
-          .eq('stage_id', stage.id);
+        const { data, error } = await supabaseClient.from('milestone_comments').select('stage_id');
         if (error) throw error;
-        const total = Math.max(0, Number(count) || 0);
-        state.milestoneCommentCounts.set(stage.id, total);
-        updateMilestoneCommentButtons(stage.id, total);
+        const counts = new Map();
+        (data || []).forEach(comment => {
+          const stageId = String(comment.stage_id || '');
+          if (stageId) counts.set(stageId, (counts.get(stageId) || 0) + 1);
+        });
+        state.data.stages.forEach(stage => {
+          const total = counts.get(stage.id) || 0;
+          state.milestoneCommentCounts.set(stage.id, total);
+          updateMilestoneCommentButtons(stage.id, total);
+        });
       } catch (error) {
-        console.warn(`Không thể tải số lời nhắn của mốc ${stage.id}:`, error);
+        console.warn('Không thể tải số lời nhắn của các mốc:', error);
       }
-    }));
+    })();
   }
 
   function initFeatureModals() {
@@ -4956,6 +4990,29 @@
     authButton.dataset.action = 'archive';
     delete authButton.dataset.commentText;
     delete authButton.dataset.commentFormId;
+    const message = modal.querySelector('.archive-lock-dialog p');
+    if (message) {
+      message.textContent = 'Đạo hữu chưa ghi danh nhập môn nên thiên cơ bất khả lộ — mau đăng nhập để phá giải phong ấn, chiêm ngưỡng toàn bộ ký ức bí truyền của Hải Thành Lão Tổ!';
+    }
+    modal.hidden = false;
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function openFeatureAuthSeal(action) {
+    const modal = document.getElementById('authSealModal');
+    const authButton = document.getElementById('archive-lock-auth');
+    if (!modal || !authButton) return;
+    const featureName = action === 'game' ? 'Đố Vui Độ Kiếp' : 'nhận Thẻ Đệ Tử';
+    const message = modal.querySelector('.archive-lock-dialog p');
+    if (message) {
+      message.textContent = `Kết giới tông môn đang phong ấn! Đạo hữu cần ghi danh nhập môn (đăng nhập) mới có thể tham gia ${featureName}.`;
+    }
+    delete authButton.dataset.stageId;
+    delete authButton.dataset.commentText;
+    delete authButton.dataset.commentFormId;
+    authButton.dataset.action = action;
     modal.hidden = false;
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
@@ -4968,6 +5025,10 @@
     if (!modal || !authButton) return;
     delete authButton.dataset.stageId;
     authButton.dataset.action = 'oracle';
+    const message = modal.querySelector('.archive-lock-dialog p');
+    if (message) {
+      message.textContent = 'Đạo hữu chưa ghi danh nhập môn nên thiên cơ bất khả lộ — mau đăng nhập để phá giải phong ấn, xin quẻ chỉ dẫn từ Thiên Cơ Lão Tổ!';
+    }
     modal.hidden = false;
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
@@ -4994,7 +5055,7 @@
     const reducedMotionQuery = window.matchMedia
       ? window.matchMedia('(prefers-reduced-motion: reduce)')
       : { matches: false, addEventListener: null };
-    const particles = Array.from({ length: 40 }, () => ({
+    const particles = Array.from({ length: 25 }, () => ({
       x: Math.random(),
       y: Math.random(),
       radius: 0.7 + Math.random() * 1.8,
@@ -5007,6 +5068,8 @@
     let height = 0;
     let frameId = 0;
     let lastFrameTime = 0;
+    let resizeTimer = 0;
+    let canvasPaused = false;
     let nextSwordAt = 6 + Math.random() * 6;
     let swordTrail = null;
 
@@ -5081,13 +5144,17 @@
     };
 
     const animate = now => {
+      if (window.innerWidth < 768 && lastFrameTime && now - lastFrameTime < 1000 / 30) {
+        frameId = window.requestAnimationFrame(animate);
+        return;
+      }
       const delta = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.05) : 0;
       lastFrameTime = now;
       drawParticles(now, delta);
       frameId = window.requestAnimationFrame(animate);
     };
     const start = () => {
-      if (reducedMotionQuery.matches || document.hidden || frameId) return;
+      if (reducedMotionQuery.matches || document.hidden || canvasPaused || frameId) return;
       lastFrameTime = 0;
       frameId = window.requestAnimationFrame(animate);
     };
@@ -5104,10 +5171,19 @@
         start();
       }
     };
+    pauseCanvasAnimation = paused => {
+      canvasPaused = paused;
+      if (paused) stop();
+      else start();
+    };
+    const scheduleResize = () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(resize, 150);
+    };
 
     resize();
     start();
-    window.addEventListener('resize', resize, { passive: true });
+    window.addEventListener('resize', scheduleResize, { passive: true });
     document.addEventListener('visibilitychange', syncMotion);
     if (reducedMotionQuery.addEventListener) {
       reducedMotionQuery.addEventListener('change', syncMotion);
@@ -5133,16 +5209,21 @@
       }
 
       const baseTransform = target.style.transform;
+      let pointerBounds = null;
       const reset = () => {
         target.classList.remove('is-glass-pointed');
         target.style.transform = baseTransform;
+        pointerBounds = null;
       };
+      target.addEventListener('pointerenter', () => {
+        pointerBounds = target.getBoundingClientRect();
+      }, { passive: true });
       target.addEventListener('pointermove', event => {
         if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-        const bounds = target.getBoundingClientRect();
-        if (!bounds.width || !bounds.height) return;
-        const x = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
-        const y = Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
+        if (!pointerBounds) pointerBounds = target.getBoundingClientRect();
+        if (!pointerBounds.width || !pointerBounds.height) return;
+        const x = Math.max(0, Math.min(1, (event.clientX - pointerBounds.left) / pointerBounds.width));
+        const y = Math.max(0, Math.min(1, (event.clientY - pointerBounds.top) / pointerBounds.height));
         const rotateY = (x - 0.5) * 7;
         const rotateX = (0.5 - y) * 7;
         target.style.setProperty('--glass-pointer-x', `${x * 100}%`);
@@ -5186,6 +5267,13 @@
         };
         if (!requireAuth(openOracle)) return;
         openOracle();
+        return;
+      }
+      if (action === 'game' || action === 'ticket') {
+        const button = document.getElementById(action === 'game' ? 'btn-nav-game' : 'nav-ticket-btn');
+        const resumeFeature = () => button?.click();
+        if (!requireAuth(resumeFeature)) return;
+        resumeFeature();
         return;
       }
       if (action === 'comment') {
@@ -5249,6 +5337,7 @@
     if (modal) {
       modal.classList.add('active');
       modal.setAttribute('aria-hidden', 'false');
+      modal.inert = false;
     }
     document.body.style.overflow = 'hidden';
   }
@@ -5257,12 +5346,21 @@
     const modal = document.getElementById('filmstrip-modal');
     if (modal) {
       modal.setAttribute('aria-hidden', 'true');
+      modal.inert = true;
       if (!modal.classList.contains('is-closing')) {
         modal.classList.add('is-closing');
         state.archive.closeTimer = window.setTimeout(() => {
           window.requestAnimationFrame(() => {
             const grid = document.getElementById('modal-filmstrip-grid');
-            if (grid) grid.replaceChildren();
+            if (grid) {
+              grid.querySelectorAll('img').forEach(image => image.removeAttribute('src'));
+              grid.querySelectorAll('video').forEach(video => {
+                video.pause();
+                video.removeAttribute('src');
+                video.load();
+              });
+              grid.replaceChildren();
+            }
             state.archive.memories = [];
             state.archive.renderedCount = 0;
             modal.classList.remove('active', 'is-closing');
@@ -5421,6 +5519,58 @@
   // ========================================================
   // 10. LIGHTBOX VIEWER
   // ========================================================
+  function setLightboxTransform(scale, panX, panY) {
+    const lightbox = state.lightbox;
+    lightbox.scale = Math.max(1, Math.min(2.5, scale));
+    lightbox.panX = panX;
+    lightbox.panY = panY;
+    lightbox.isZoomed = lightbox.scale > 1;
+    if (lightbox.transformFrameId) {
+      window.cancelAnimationFrame(lightbox.transformFrameId);
+    }
+    lightbox.transformFrameId = window.requestAnimationFrame(() => {
+      lightbox.transformFrameId = 0;
+      const image = document.getElementById('lightbox-img');
+      if (!image) return;
+      image.style.setProperty('--lightbox-scale', String(lightbox.scale));
+      image.style.setProperty('--lightbox-pan-x', `${lightbox.panX}px`);
+      image.style.setProperty('--lightbox-pan-y', `${lightbox.panY}px`);
+    });
+  }
+
+  function bindLightboxPan(wrapper) {
+    if (!wrapper || wrapper.dataset.panBound === 'true') return;
+    wrapper.dataset.panBound = 'true';
+    wrapper.addEventListener('pointerdown', event => {
+      if (!state.lightbox.isZoomed || (event.pointerType === 'mouse' && event.button !== 0)) return;
+      state.lightbox.dragOrigin = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        panX: state.lightbox.panX,
+        panY: state.lightbox.panY
+      };
+      wrapper.setPointerCapture(event.pointerId);
+    }, { passive: true });
+    wrapper.addEventListener('pointermove', event => {
+      const origin = state.lightbox.dragOrigin;
+      if (!origin || origin.pointerId !== event.pointerId) return;
+      setLightboxTransform(
+        state.lightbox.scale,
+        origin.panX + event.clientX - origin.x,
+        origin.panY + event.clientY - origin.y
+      );
+    }, { passive: true });
+    const finishPan = event => {
+      if (state.lightbox.dragOrigin?.pointerId === event.pointerId) {
+        state.lightbox.dragOrigin = null;
+      }
+    };
+    wrapper.addEventListener('pointerup', finishPan, { passive: true });
+    wrapper.addEventListener('pointercancel', finishPan, { passive: true });
+    wrapper.addEventListener('lostpointercapture', finishPan, { passive: true });
+  }
+
   function openLightbox(memory, startIndex, stageForCollection = null) {
     if (!memory || !memory.image || memory.image.length === 0) return;
     const stage = stageForCollection || state.data.stages.find(s => s.memories.some(m => m.id === memory.id)) || null;
@@ -5441,7 +5591,7 @@
     }
 
     state.lightbox.memory = state.lightbox.items[state.lightbox.currentIndex]?.memory || memory;
-    state.lightbox.isZoomed = false;
+    setLightboxTransform(1, 0, 0);
 
     updateLightboxView();
 
@@ -5449,6 +5599,7 @@
     if (modal) {
       modal.classList.add('active');
       modal.setAttribute('aria-hidden', 'false');
+      modal.inert = false;
     }
     document.body.style.overflow = 'hidden';
   }
@@ -5476,7 +5627,7 @@
 
     // Reset zoom
     wrapper.classList.remove('zoomed');
-    state.lightbox.isZoomed = false;
+    setLightboxTransform(1, 0, 0);
 
     // Image/video & counter
     const isVideo = isVideoUrl(currentImgUrl);
@@ -5496,6 +5647,8 @@
     if (!isVideo) {
       imgEl.src = currentImgUrl;
       imgEl.alt = memory.title;
+    } else {
+      imgEl.removeAttribute('src');
     }
     counterEl.textContent = `${currentIndex + 1} / ${images.length}`;
 
@@ -5539,6 +5692,23 @@
     if (modal) {
       modal.classList.remove('active');
       modal.setAttribute('aria-hidden', 'true');
+      modal.inert = true;
+    }
+    const wrapper = document.getElementById('lightbox-img-wrapper');
+    if (wrapper) wrapper.classList.remove('zoomed');
+    setLightboxTransform(1, 0, 0);
+    const img = document.getElementById('lightbox-img');
+    if (img) img.removeAttribute('src');
+    const thumbs = document.getElementById('lightbox-thumbs');
+    if (thumbs) {
+      thumbs.querySelectorAll('img, video').forEach(media => {
+        if (media instanceof HTMLVideoElement) {
+          media.pause();
+          media.load();
+        }
+        media.removeAttribute('src');
+      });
+      thumbs.replaceChildren();
     }
     // Only reset body overflow if filmstrip modal isn't also open
     const filmModal = document.getElementById('filmstrip-modal');
@@ -5552,6 +5722,10 @@
       video.load();
       video.hidden = true;
     }
+    state.lightbox.images = [];
+    state.lightbox.items = [];
+    state.lightbox.memory = null;
+    state.lightbox.dragOrigin = null;
   }
 
   function prevLightboxImage() {
@@ -5636,6 +5810,7 @@
     if (modal) {
       modal.classList.add('active');
       modal.setAttribute('aria-hidden', 'false');
+      modal.inert = false;
     }
     document.body.style.overflow = 'hidden';
 
@@ -5648,6 +5823,7 @@
     if (modal) {
       modal.classList.remove('active');
       modal.setAttribute('aria-hidden', 'true');
+      modal.inert = true;
     }
     const filmModal = document.getElementById('filmstrip-modal');
     const lightboxModal = document.getElementById('lightbox-modal');
@@ -5732,8 +5908,7 @@
       if (!Number.isFinite(guessedYear) || yearInput.value.length === 0) {
         yearInput.focus();
         yearInput.classList.remove('game-input-shake');
-        void yearInput.offsetWidth;
-        yearInput.classList.add('game-input-shake');
+          window.requestAnimationFrame(() => yearInput.classList.add('game-input-shake'));
         return;
       }
       handleGameYearAnswer(currentQ, guessedYear);
@@ -6259,6 +6434,7 @@
     if (modal) {
       modal.classList.add('active');
       modal.setAttribute('aria-hidden', 'false');
+      modal.inert = false;
     }
     document.body.style.overflow = 'hidden';
 
@@ -6416,6 +6592,7 @@
     if (modal) {
       modal.classList.remove('active');
       modal.setAttribute('aria-hidden', 'true');
+      modal.inert = true;
     }
 
     const filmModal = document.getElementById('filmstrip-modal');
@@ -6462,6 +6639,11 @@
         });
         section.hidden = false;
         section.classList.add('open');
+        if (targetId === 'ticket-station' && authenticatedUser) {
+          void ensureHtml2Canvas().catch(() => {
+            showToast('Chưa thể tải pháp bảo xuất ảnh vé; đạo hữu có thể thử lại khi tải vé.', '⚠️');
+          });
+        }
         const button = document.querySelector(`[data-utility-target="${targetId}"]`);
         if (button) button.setAttribute('aria-expanded', 'true');
         section.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -6475,6 +6657,10 @@
       if (!section) return;
       const shouldOpen = section.hidden;
       if (shouldOpen && (targetId === 'time-capsule' || targetId === 'ticket-station')) {
+        if (targetId === 'ticket-station' && !authenticatedUser) {
+          openFeatureAuthSeal('ticket');
+          return;
+        }
         if (!requireAuth(() => toggleUtility(targetId, true))) return;
       }
       toggleUtility(targetId, shouldOpen);
@@ -6499,6 +6685,10 @@
     const navTicketBtn = document.getElementById('nav-ticket-btn');
     if (navTicketBtn) {
       navTicketBtn.addEventListener('click', () => {
+        if (!authenticatedUser) {
+          openFeatureAuthSeal('ticket');
+          return;
+        }
         if (!requireAuth(() => toggleUtility('ticket-station', true))) return;
         toggleUtility('ticket-station', true);
       });
@@ -6508,6 +6698,10 @@
     if (heroTicketBtn) {
       heroTicketBtn.addEventListener('click', e => {
         e.preventDefault();
+        if (!authenticatedUser) {
+          openFeatureAuthSeal('ticket');
+          return;
+        }
         if (!requireAuth(() => toggleUtility('ticket-station', true))) return;
         toggleUtility('ticket-station', true);
       });
@@ -6544,7 +6738,9 @@
       const wrapper = document.getElementById('lightbox-img-wrapper');
       state.lightbox.isZoomed = !state.lightbox.isZoomed;
       wrapper.classList.toggle('zoomed', state.lightbox.isZoomed);
+      setLightboxTransform(state.lightbox.isZoomed ? 2.5 : 1, 0, 0);
     });
+    bindLightboxPan(document.getElementById('lightbox-img-wrapper'));
 
     // Global Audio Toggle Button (Sticky Nav)
     const globalAudioToggle = document.getElementById('global-audio-toggle');
@@ -6570,6 +6766,10 @@
 
     // Game Trigger & Control Events
     const startAuthenticatedGame = () => {
+      if (!authenticatedUser) {
+        openFeatureAuthSeal('game');
+        return;
+      }
       if (!requireAuth(startNewGame)) return;
       startNewGame();
     };
@@ -6684,6 +6884,7 @@
     }
 
     function handleSwipe() {
+      if (state.lightbox.isZoomed) return;
       const diff = touchEndX - touchStartX;
       if (Math.abs(diff) > 50) {
         if (diff > 0) {
@@ -6716,6 +6917,40 @@
   // ========================================================
   // 14. BƯỚC 4: QUẦY IN VÉ THAM QUAN LƯU NIỆM (SOUVENIR TICKET)
   // ========================================================
+  function loadHtml2CanvasScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.onload = () => {
+        if (typeof window.html2canvas === 'function') resolve(window.html2canvas);
+        else reject(new Error('Tập lệnh html2canvas đã tải nhưng không cung cấp thư viện.'));
+      };
+      script.onerror = () => reject(new Error(`Không thể tải html2canvas từ ${src}.`));
+      document.head.appendChild(script);
+    });
+  }
+
+  function ensureHtml2Canvas() {
+    if (typeof window.html2canvas === 'function') return Promise.resolve(window.html2canvas);
+    if (!html2CanvasPromise) {
+      html2CanvasPromise = loadHtml2CanvasScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js')
+        .catch(async cdnError => {
+          try {
+            return await loadHtml2CanvasScript('js/html2canvas.min.js');
+          } catch (localError) {
+            console.error('Không thể tải thư viện html2canvas:', cdnError, localError);
+            throw localError;
+          }
+        })
+        .catch(error => {
+          html2CanvasPromise = null;
+          throw error;
+        });
+    }
+    return html2CanvasPromise;
+  }
+
   function initTicketStation() {
     const stageSelect = document.getElementById('ticket-stage-select');
     const visitorInput = document.getElementById('ticket-visitor-name');
@@ -6837,8 +7072,7 @@
 
       if (isInteractive) {
         ticketEl.classList.remove('print-pulse');
-        void ticketEl.offsetWidth; // Force reflow
-        ticketEl.classList.add('print-pulse');
+        window.requestAnimationFrame(() => ticketEl.classList.add('print-pulse'));
       }
     }
 
@@ -6859,10 +7093,13 @@
 
     // 5. Download Ticket as PNG Event (html2canvas)
     if (btnDownload) {
-      btnDownload.addEventListener('click', () => {
+      btnDownload.addEventListener('click', async () => {
         if (!requireAuth(() => btnDownload.click())) return;
-        if (typeof html2canvas === 'undefined') {
-          alert('Thư viện chụp ảnh html2canvas đang được tải hoặc bị chặn kết nối. Vui lòng tải lại trang hoặc kiểm tra kết nối mạng!');
+        let renderHtml2Canvas;
+        try {
+          renderHtml2Canvas = await ensureHtml2Canvas();
+        } catch (error) {
+          alert('Không thể tải thư viện tạo ảnh vé. Vui lòng kiểm tra kết nối mạng và thử lại.');
           return;
         }
 
@@ -6876,7 +7113,7 @@
         const serialNum = dispSerial ? dispSerial.textContent.replace(/[^a-zA-Z0-9-]/g, '') : 'MEM-2026';
 
         // Options for sharp, high-DPI output with zero canvas taint
-        html2canvas(ticketEl, {
+        renderHtml2Canvas(ticketEl, {
           scale: 2, // 2x high resolution Retina canvas
           useCORS: true,
           logging: false,
@@ -6955,7 +7192,7 @@
   }
 
   // ========================================================
-  // 16. NHẠC NỀN TỰ ĐỘNG PHÁT & TRÁO NGẪU NHIÊN (NÂNG CẤP 2)
+  // 16. NHẠC NỀN PHÁT THEO YÊU CẦU & TRÁO NGẪU NHIÊN (NÂNG CẤP 2)
   // ========================================================
   function initBackgroundMusic() {
     // ── Danh sách nhạc nền thực tế trong audio/nhạc nền/ ──
@@ -7001,8 +7238,9 @@
     state.bgMusic.playlist = shuffled;
     state.bgMusic.currentIndex = 0;
     state.bgMusic.audio.volume = 0.5;
-    state.bgMusic.isUserMuted = false;  // Mặc định BẬT mỗi lần tải trang
-    state.bgMusic.isPlaying = true;
+    state.bgMusic.audio.preload = 'none';
+    state.bgMusic.isUserMuted = true;
+    state.bgMusic.isPlaying = false;
 
     // Hết bài → chuyển ngẫu nhiên bài khác (tránh lặp bài vừa phát)
     state.bgMusic.audio.addEventListener('ended', () => {
@@ -7022,44 +7260,6 @@
       }
     });
 
-    // Nạp bài đầu tiên (đã shuffle → luôn ngẫu nhiên)
-    loadBgMusicTrack(0);
-    state.bgMusic.audio.autoplay = true;
-
-    // Tự động phát ngay khi trang load
-    function startDefaultBgMusic() {
-      if (state.bgMusic.isUserMuted) return;
-      if (state.currentAudio && !state.currentAudio.paused) return;
-      if (state.cinema && state.cinema.isPlaying) return;
-
-      const playPromise = state.bgMusic.audio.play();
-      if (playPromise !== undefined) {
-        playPromise.then(() => {
-          state.bgMusic.isPlaying = true;
-          updateBgMusicUI();
-        }).catch(() => {
-          // Trình duyệt (Safari/Chrome mobile) chặn autoplay trước tương tác đầu tiên
-          // → đăng ký 1 lần duy nhất, cất nhạc ngay ở cú chạm/click đầu tiên
-          updateBgMusicUI();
-          const unlockAutoplay = () => {
-            if (!state.bgMusic.isUserMuted && !state.currentAudio && (!state.cinema || !state.cinema.isPlaying)) {
-              state.bgMusic.audio.play().then(() => {
-                state.bgMusic.isPlaying = true;
-                updateBgMusicUI();
-              }).catch(() => {});
-            }
-            ['pointerdown', 'click', 'touchstart', 'keydown'].forEach(ev => {
-              window.removeEventListener(ev, unlockAutoplay, true);
-            });
-          };
-          ['pointerdown', 'click', 'touchstart', 'keydown'].forEach(ev => {
-            window.addEventListener(ev, unlockAutoplay, { once: true, passive: true, capture: true });
-          });
-        });
-      }
-    }
-
-    startDefaultBgMusic();
     updateBgMusicUI();
 
     // Nút Bật/Tắt nhạc nền nổi
@@ -7170,7 +7370,8 @@
       } while (nextIdx === state.bgMusic.currentIndex);
     }
     loadBgMusicTrack(nextIdx);
-    if (!state.bgMusic.isUserMuted && !state.currentAudio && (!state.cinema || !state.cinema.isPlaying)) {
+    if (state.bgMusic.isUserMuted) state.bgMusic.isUserMuted = false;
+    if (!state.currentAudio && (!state.cinema || !state.cinema.isPlaying)) {
       playBgMusic();
     }
   }
@@ -7254,8 +7455,7 @@
 
       // Trigger 2-second border highlight pulse
       targetElement.classList.remove('achievement-highlight-pulse');
-      void targetElement.offsetWidth; // Force reflow
-      targetElement.classList.add('achievement-highlight-pulse');
+      window.requestAnimationFrame(() => targetElement.classList.add('achievement-highlight-pulse'));
 
       setTimeout(() => {
         targetElement.classList.remove('achievement-highlight-pulse');
@@ -7412,39 +7612,17 @@
     async function loadGuestbook() {
       if (!supabaseClient) return;
       try {
-        let { data, error } = await supabaseClient
+        const { data, error } = await supabaseClient
           .from('guestbook')
-          .select('sender_name, message, unlock_date, user_id');
-        if (error) {
-          ({ data, error } = await supabaseClient
-            .from('guestbook')
-            .select('sender_name, message, unlock_date'));
-        }
+          .select('sender_name, message, unlock_date');
         if (error) throw error;
         if (!Array.isArray(data)) return;
-
-        const userIds = [...new Set(data.map(row => String(row.user_id || '')).filter(Boolean))];
-        const cultivationByUser = new Map();
-        if (userIds.length) {
-          try {
-            const { data: profiles, error: profileError } = await supabaseClient.from('user_cultivation')
-              .select('user_id,tu_vi')
-              .in('user_id', userIds);
-            if (profileError) throw profileError;
-            (profiles || []).forEach(profile => {
-              cultivationByUser.set(String(profile.user_id), getCultivationRank(getCultivationPoints(profile)).name);
-            });
-          } catch (error) {
-            console.warn('Không thể tải Cảnh Giới của Sổ Lưu Bút:', error);
-          }
-        }
 
         const remoteEntries = data.map((row, index) => ({
           id: `guestbook-${index}`,
           isGuestbook: true,
           isDefault: false,
           sender: String(row.sender_name || 'Người bạn ẩn danh'),
-          cultivationRank: cultivationByUser.get(String(row.user_id || '')) || '',
           tag: 'wish',
           tagLabel: '💌 Lời nhắn nhủ',
           date: formatCapsuleDate(row.unlock_date),

@@ -8,11 +8,11 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=69">
-  <link rel="stylesheet" href="css/style.css?v=69">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=70">
+  <link rel="stylesheet" href="css/style.css?v=70">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Playfair+Display:ital,wght@0,500;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;600&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 </head>
 <body class="museum-body">
 
@@ -341,7 +341,7 @@
   <!-- ======================================================== -->
   <!-- FILMSTRIP GRID MODAL (Cuộn phim lưu trữ toàn bộ)         -->
   <!-- ======================================================== -->
-  <div id="filmstrip-modal" class="modal filmstrip-modal" aria-hidden="true" role="dialog" aria-labelledby="modal-stage-title">
+  <div id="filmstrip-modal" class="modal filmstrip-modal" aria-hidden="true" inert role="dialog" aria-labelledby="modal-stage-title">
     <div class="modal-backdrop" id="modal-filmstrip-backdrop"></div>
     <div class="modal-dialog filmstrip-dialog">
       
@@ -388,7 +388,7 @@
   <!-- ======================================================== -->
   <!-- FULLSCREEN LIGHTBOX MODAL                                -->
   <!-- ======================================================== -->
-  <div id="lightbox-modal" class="lightbox-modal" aria-hidden="true" role="dialog">
+  <div id="lightbox-modal" class="lightbox-modal" aria-hidden="true" inert role="dialog">
     <div class="lightbox-backdrop" id="lightbox-backdrop"></div>
     
     <div class="lightbox-container">
@@ -406,7 +406,7 @@
         <button class="lightbox-nav lightbox-prev" id="lightbox-btn-prev" aria-label="Ảnh trước">‹</button>
         
         <div class="lightbox-img-wrapper" id="lightbox-img-wrapper">
-          <img id="lightbox-img" src="" alt="Kỷ niệm phóng to" loading="lazy" decoding="async">
+          <img id="lightbox-img" src="" alt="Kỷ niệm phóng to" width="1600" height="1200" loading="lazy" decoding="async">
           <video id="lightbox-video" controls playsinline preload="metadata" hidden></video>
         </div>
 
@@ -436,7 +436,7 @@
   <!-- ======================================================== -->
   <!-- MINI-GAME MODAL: THỬ THÁCH ĐOÁN NĂM                      -->
   <!-- ======================================================== -->
-  <div id="game-modal" class="modal game-modal year-guess-modal" aria-hidden="true" role="dialog" aria-labelledby="game-modal-title">
+  <div id="game-modal" class="modal game-modal year-guess-modal" aria-hidden="true" inert role="dialog" aria-labelledby="game-modal-title">
     <div class="modal-backdrop" id="modal-game-backdrop"></div>
     <div class="modal-dialog game-dialog year-guess-dialog">
       
@@ -525,7 +525,7 @@
   <!-- ======================================================== -->
   <!-- CINEMA MEMORY REEL MODAL (Chiếu Phim Tự Động)            -->
   <!-- ======================================================== -->
-  <div id="cinema-modal" class="cinema-modal" aria-hidden="true" role="dialog" aria-labelledby="cinema-sub-title">
+  <div id="cinema-modal" class="cinema-modal" aria-hidden="true" inert role="dialog" aria-labelledby="cinema-sub-title">
     <div class="cinema-backdrop"></div>
 
     <!-- Story Segmented Progress Bar (Top) -->
@@ -1012,7 +1012,7 @@
           <div class="home-cultivation-identity-copy">
             <h2 id="home-cultivation-title">Hải Thành Lão Tổ</h2>
             <span class="home-cultivation-rank">👑 Chí Tôn • LV.9999</span>
-            <span class="home-cultivation-qi-track" aria-label="Linh lực tối đa"><span></span></span>
+            <span class="home-cultivation-qi-track" role="progressbar" aria-label="Linh lực tối đa" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span></span></span>
           </div>
         </div>
         <button type="button" class="home-cultivation-toggle" id="home-cultivation-toggle" aria-expanded="false" aria-controls="home-cultivation-details">
@@ -1491,15 +1491,8 @@
   </footer>
 
   <!-- SCRIPTS -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script>
-    // Fallback to local copy if CDN is unavailable offline
-    if (typeof html2canvas === 'undefined') {
-      document.write('<script src="js/html2canvas.min.js"><\/script>');
-    }
-  </script>
-   <script src="js/memories.js?v=69"></script>
+   <script src="js/memories.js?v=70"></script>
    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-   <script src="js/app.js?v=69"></script>
+   <script src="js/app.js?v=70"></script>
 </body>
 </html>
