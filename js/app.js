@@ -17,6 +17,7 @@
   const DISCIPLE_AVATAR_CACHE_PREFIX = 'tm_avatar_';
   const DISCIPLE_PROFILE_CACHE_PREFIX = 'thien-menh-chi-thanh:disciple-profile:';
   const DEVICE_ID_KEY = 'tm_device_id';
+  const FEATURE_TOGGLES_STORAGE_KEY = 'thien-menh-chi-thanh:feature-toggles';
   const DEFAULT_DISCIPLE_AVATAR = 'images/avt/avt3.webp';
   const GENESIS_PREFACE = '"Nơi lưu giữ toàn bộ quá trình độ kiếp từ một phàm nhân hay ngủ nướng thành Kiến Trúc Sư Gõ Phím tuổi 21. Đạo hữu ghé thăm xin nhẹ tay tặng chút Linh Thạch, chớ dại trêu chọc Thành Chủ kẻo bị tế lên Thiên Kiêu Bảng!"';
   const HERO_INTRO = '"Chào mừng đạo hữu hạ phàm ghé thăm thánh địa của Thành Chủ Hải Thành! Nơi đây phong ấn toàn bộ huyết lệ từ thuở luyện khí còn sợ bug đến khi độ kiếp thành chiến thần gõ phím Lv.21. Đã lỡ chân bước vào thì đừng vội quay xe — hãy dâng chút Linh Thạch lấy hên rồi cùng khám phá thiên cơ!"';
@@ -35,6 +36,7 @@
     leaderboard: true,
     hideAdminFromLeaderboard: false,
     comments: true,
+    discussion: true,
     footerUtilities: true
   });
   const THEME_KEYS = ['xianxia', 'obsidian', 'sepia', 'midnight', 'daylight'];
@@ -877,6 +879,37 @@
     ]));
   }
 
+  function readFeatureTogglesCache() {
+    try {
+      const cached = window.localStorage.getItem(FEATURE_TOGGLES_STORAGE_KEY);
+      return cached ? normalizeFeatureToggles(JSON.parse(cached)) : null;
+    } catch (error) {
+      console.warn('Không thể đọc bộ nhớ công tắc toàn trang:', error);
+      return null;
+    }
+  }
+
+  function cacheFeatureToggles(value) {
+    try {
+      window.localStorage.setItem(FEATURE_TOGGLES_STORAGE_KEY, JSON.stringify(normalizeFeatureToggles(value)));
+    } catch (error) {
+      console.warn('Không thể lưu bộ nhớ công tắc toàn trang:', error);
+    }
+  }
+
+  function initFeatureToggleStorageSync() {
+    state.featureToggles = readFeatureTogglesCache() || state.featureToggles;
+    window.addEventListener('storage', event => {
+      if (event.key !== FEATURE_TOGGLES_STORAGE_KEY || !event.newValue) return;
+      try {
+        state.featureToggles = normalizeFeatureToggles(JSON.parse(event.newValue));
+        applyFeatureToggles();
+      } catch (error) {
+        console.warn('Không thể đồng bộ công tắc toàn trang từ tab khác:', error);
+      }
+    });
+  }
+
   function normalizeThemeSettings(value) {
     const saved = parseSettingValue(value);
     return {
@@ -913,6 +946,7 @@
     setVisibility('#home-cultivation-section', toggles.attributes);
     setVisibility('#public-leaderboard', toggles.leaderboard);
     setVisibility('.milestone-comments-open', toggles.comments);
+    setVisibility('#sect-discussion', toggles.discussion);
     setVisibility('#utility-launcher', toggles.footerUtilities);
 
     document.querySelectorAll('[data-feature-toggle]').forEach(input => {
@@ -961,6 +995,7 @@
   }
 
   async function loadGlobalSiteConfig() {
+    state.featureToggles = readFeatureTogglesCache() || state.featureToggles;
     if (!supabaseClient) {
       applyFeatureToggles();
       applyGlobalThemeSettings(state.themeSettings);
@@ -976,6 +1011,7 @@
         state.siteConfig[row.config_key] = parseSettingValue(row.config_value);
       });
       state.featureToggles = normalizeFeatureToggles(state.siteConfig.feature_toggles);
+      cacheFeatureToggles(state.featureToggles);
       const savedVisitorCount = getVisitorCount(state.siteConfig.visitor_count);
       if (savedVisitorCount != null) state.visitor.count = savedVisitorCount;
       applyGlobalThemeSettings(state.siteConfig.theme_settings);
@@ -1153,6 +1189,7 @@
           } else if (row.config_key === 'feature_toggles') {
             state.siteConfig.feature_toggles = value;
             state.featureToggles = normalizeFeatureToggles(value);
+            cacheFeatureToggles(state.featureToggles);
             applyFeatureToggles();
             renderCultivationCard();
             void loadCultivationLeaderboard();
@@ -1822,6 +1859,7 @@
 
       initHeroSection();
       if (homePage || galleryPage) initStickyNav();
+      initFeatureToggleStorageSync();
       applyGlobalThemeSettings(state.themeSettings);
       applyFeatureToggles();
       if (homePage || galleryPage) renderStages();
@@ -5770,19 +5808,30 @@
     const status = document.getElementById('admin-disciples-status');
     if (!list || !status || !isAdminUser() || !supabaseClient) return;
     status.textContent = 'Đang tải sổ môn đồ…';
-    const disciples = [];
-    let offset = 0;
+    let disciples = [];
     try {
-      while (true) {
-        const { data, error } = await supabaseClient.from('disciples')
-          .select('user_id,email,full_name,avatar_url,sect_title,is_banned,tu_vi,cultivation_points,visit_count,last_seen,quiz_best_score,quiz_max_combo')
-          .order('last_seen', { ascending: false })
-          .range(offset, offset + 999);
-        if (error) throw error;
-        const batch = data || [];
-        disciples.push(...batch);
-        if (batch.length < 1000) break;
-        offset += batch.length;
+      let data;
+      let rpcError;
+      try {
+        ({ data, error: rpcError } = await supabaseClient.rpc('admin_list_disciples'));
+      } catch (error) {
+        rpcError = error;
+      }
+      if (rpcError) {
+        const { data: fallbackData, error: fallbackError } = await supabaseClient
+          .from('disciples').select('*');
+        if (fallbackError) {
+          throw new Error(`RPC quản trị: ${rpcError.message || 'lỗi truy vấn'} · Truy vấn dự phòng: ${fallbackError.message || 'lỗi truy vấn'}`);
+        }
+        disciples = fallbackData || [];
+      } else if (Array.isArray(data)) {
+        disciples = data;
+      } else if (data && Array.isArray(data.disciples)) {
+        disciples = data.disciples;
+      } else if (data && Array.isArray(data.rows)) {
+        disciples = data.rows;
+      } else if (data != null) {
+        throw new Error('RPC admin_list_disciples không trả về danh sách hợp lệ.');
       }
     } catch (error) {
       state.adminDisciples = [];
@@ -5791,6 +5840,9 @@
       renderAdminOnlinePresence();
       return;
     }
+    disciples.sort((first, second) =>
+      String(second.last_seen || '').localeCompare(String(first.last_seen || ''))
+    );
     state.adminDisciples = disciples;
     renderAdminDisciples();
     renderAdminOnlinePresence();
@@ -5822,7 +5874,7 @@
       .trim().toLocaleLowerCase('vi');
     const counts = getMemberGuestbookCounts();
     const rows = (state.adminDisciples || []).filter(member =>
-      `${member.full_name || ''} ${member.email || ''} ${member.sect_title || ''}`
+      `${member.full_name || ''} ${member.username || ''} ${member.email || ''} ${member.sect_title || ''}`
         .toLocaleLowerCase('vi').includes(query));
     list.replaceChildren();
     if (!rows.length) {
@@ -5848,28 +5900,30 @@
       const identity = document.createElement('div');
       identity.className = 'admin-disciple-identity';
       const name = document.createElement('strong');
-      name.textContent = String(member.full_name || 'Đạo Hữu');
+      name.textContent = `Đạo hiệu: ${String(member.full_name || member.username || 'Đạo Hữu')}`;
       const email = document.createElement('span');
       email.textContent = String(member.email || '');
       const userId = document.createElement('span');
       userId.textContent = `ID: ${String(member.user_id || '—')}`;
       const statusBadge = document.createElement('span');
       statusBadge.className = `admin-disciple-status-badge${member.is_banned ? ' is-banned' : ''}`;
-      statusBadge.textContent = member.is_banned ? '⛔ Đã Phong Ấn' : '✅ Hoạt động';
+      statusBadge.textContent = member.is_banned ? '⛔ Đã Phong Ấn' : 'Hoạt động';
       identity.append(name, email, userId, statusBadge);
 
       const details = document.createElement('div');
       details.className = 'admin-disciple-details';
-      const cultivation = Math.max(10, Number(member.cultivation_points ?? member.tu_vi) || 10);
+      const cultivation = Math.max(10, Number(member.tu_vi ?? member.cultivation_points) || 10);
       const rank = document.createElement('span');
-      rank.textContent = `Cảnh giới: ${getCultivationRank(cultivation).name} · ${cultivation} Tu Vi`;
+      rank.textContent = `Cảnh giới: ${getCultivationRank(cultivation).name}`;
+      const tuVi = document.createElement('span');
+      tuVi.textContent = `Tu Vi: ${cultivation}`;
       const visits = document.createElement('span');
       visits.textContent = `Lượt ghé: ${Math.max(0, Number(member.visit_count) || 0)}`;
       const lastSeen = document.createElement('span');
       lastSeen.textContent = `Lần cuối: ${member.last_seen ? new Date(member.last_seen).toLocaleString('vi-VN') : '—'}`;
       const messages = document.createElement('span');
       messages.textContent = `Lời nhắn: ${counts.get(String(member.user_id)) || 0}`;
-      details.append(rank, visits, lastSeen, messages);
+      details.append(rank, tuVi, visits, lastSeen, messages);
 
       const controls = document.createElement('div');
       controls.className = 'admin-disciple-controls';
@@ -5889,7 +5943,8 @@
       ban.dataset.id = String(member.user_id);
       ban.dataset.banned = String(Boolean(member.is_banned));
       ban.textContent = member.is_banned ? '🔓 Giải Ấn' : '🔨 Phong Ấn';
-      controls.append(title, ban);
+      controls.append(title);
+      if (String(member.email || '').trim().toLowerCase() !== ADMIN_EMAIL) controls.append(ban);
       row.append(avatar, identity, details, controls);
       list.appendChild(row);
     });
@@ -6379,6 +6434,7 @@
           item.disabled = true;
         });
         state.featureToggles = next;
+        cacheFeatureToggles(next);
         applyFeatureToggles();
         if (key === 'autoPlayMusic' && input.checked) {
           void startConfiguredBackgroundMusic(true);
@@ -6394,6 +6450,7 @@
           setAdminToolStatus('admin-feature-status', 'Đã lưu trạng thái hiển thị!');
         } catch (error) {
           state.featureToggles = previous;
+          cacheFeatureToggles(previous);
           applyFeatureToggles();
           if (key === 'autoPlayMusic' && previous.autoPlayMusic === false) {
             state.bgMusic.autoplayAwaitingGesture = false;
