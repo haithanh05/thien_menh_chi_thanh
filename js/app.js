@@ -111,7 +111,15 @@
     reloadPending: false
   };
   let chatFallbackAvatarUrl = '';
-  let sectCommentState = { offset: 0, hasMore: true, replyTo: null, rows: [] };
+  let sectCommentState = {
+    offset: 0,
+    hasMore: true,
+    replyTo: null,
+    rows: [],
+    expandedRoots: new Set(),
+    loading: false,
+    reloadPending: false
+  };
   const DISCIPLE_FRAMES = [
     { id: 'jade', name: 'Ngọc Bích Mặc Định', cost: 0 },
     { id: 'dragon', name: 'Thanh Long Vân Văn', cost: 30 },
@@ -1998,13 +2006,28 @@
   }
 
   function discipleBanMessage(status) {
+    const message = 'Linh tịch của đạo hữu đã bị Tông Chủ phong ấn';
     if (status) {
-      status.textContent = '⚠️ Tài khoản của đạo hữu đã bị Tông Môn Phong Ấn!';
+      status.textContent = `⚠️ ${message}`;
       status.classList.add('is-error');
     } else {
-      showToast('⚠️ Tài khoản của đạo hữu đã bị Tông Môn Phong Ấn!', '🔒');
+      showToast(`⚠️ ${message}`, '🔒');
     }
     return false;
+  }
+
+  async function verifyDiscipleCanInteract(status) {
+    if (!authenticatedUser) return false;
+    if (!supabaseClient) throw new Error('Dịch vụ Tông Môn chưa kết nối.');
+    const { data, error } = await supabaseClient.from('disciples')
+      .select('is_banned')
+      .eq('user_id', authenticatedUser.id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) throw new Error('Không tìm thấy linh tịch môn đồ để xác minh quyền gửi.');
+    state.disciple = { ...(state.disciple || {}), is_banned: Boolean(data.is_banned) };
+    state.discipleStatusReady = true;
+    return !isDiscipleBanned() || discipleBanMessage(status);
   }
 
   function hasDiscipleFeatureAccess(status) {
@@ -2114,6 +2137,7 @@
       initDiscipleRealtime(user);
       requestLeaderboardLoad();
       if (isAdminUser()) void loadAdminDisciples();
+      if (state.disciple.is_banned) discipleBanMessage();
     } catch (error) {
       if (String(authenticatedUser && authenticatedUser.id || '') === String(user.id)) {
         discipleSyncUserId = '';
@@ -2465,15 +2489,18 @@
       void loadSectMessages();
     });
     const list = document.getElementById('sect-chat-conversations');
-    list.addEventListener('click', event => {
-      const button = event.target.closest('[data-chat-user]');
-      if (!button) return;
-      sectChatState.selectedUserId = button.dataset.chatUser;
-      document.getElementById('sect-chat-admin-layout').classList.add('is-chatting');
-      document.getElementById('sect-chat-room-title').textContent =
-        button.querySelector('strong')?.textContent || 'Hội thoại';
-      void loadSectMessages();
-    });
+    [list, document.getElementById('admin-sect-chat-conversations')].filter(Boolean)
+      .forEach(conversationList => conversationList.addEventListener('click', event => {
+        const button = event.target.closest('[data-chat-user]');
+        if (!button) return;
+        sectChatState.selectedUserId = button.dataset.chatUser;
+        document.getElementById('sect-chat-admin-layout').classList.add('is-chatting');
+        const title = button.querySelector('strong')?.textContent || 'Hội thoại';
+        document.getElementById('sect-chat-room-title').textContent = title;
+        const adminTitle = document.getElementById('admin-sect-chat-room-title');
+        if (adminTitle) adminTitle.textContent = title;
+        void loadSectMessages();
+      }));
     document.getElementById('sect-chat-back-list').addEventListener('click', () => {
       document.getElementById('sect-chat-admin-layout').classList.remove('is-chatting');
     });
@@ -2483,6 +2510,7 @@
     });
     const memberForm = document.getElementById('sect-chat-member-form');
     const adminForm = document.getElementById('sect-chat-form');
+    const dashboardAdminForm = document.getElementById('admin-sect-chat-form');
     memberForm.addEventListener('submit', event => {
       event.preventDefault();
       void sendSectMessage(document.getElementById('sect-chat-member-input').value, memberForm);
@@ -2490,6 +2518,10 @@
     adminForm.addEventListener('submit', event => {
       event.preventDefault();
       void sendSectMessage(document.getElementById('sect-chat-input').value, adminForm);
+    });
+    dashboardAdminForm?.addEventListener('submit', event => {
+      event.preventDefault();
+      void sendSectMessage(dashboardAdminForm.querySelector('textarea').value, dashboardAdminForm);
     });
     refreshSectMessaging();
   }
@@ -2530,10 +2562,12 @@
   }
 
   function setSectChatStatus(message, isError = false) {
-    const status = document.getElementById('sect-chat-status');
-    if (!status) return;
-    status.textContent = message;
-    status.classList.toggle('is-error', isError);
+    ['sect-chat-status', 'admin-sect-chat-status'].forEach(id => {
+      const status = document.getElementById(id);
+      if (!status) return;
+      status.textContent = message;
+      status.classList.toggle('is-error', isError);
+    });
   }
 
   async function refreshSectUnread() {
@@ -2563,47 +2597,81 @@
     setSectChatStatus('Đang mở linh phù truyền âm…');
     try {
       if (isAdminUser()) {
-        const { data, error } = await supabaseClient.from('sect_messages').select('*')
-          .order('created_at', { ascending: false }).limit(500);
-        if (error) throw error;
+        const data = await fetchAllSectMessageRows(() => supabaseClient.from('sect_messages')
+          .select('*').order('created_at', { ascending: true }));
         const grouped = new Map();
+        const conversationsByAlias = new Map();
         const membersById = new Map((state.adminDisciples || [])
           .map(member => [String(member.user_id), member]));
         (data || []).forEach(message => {
-          const key = String(message.user_id || message.user_email || '');
-          if (!key) return;
+          const userId = String(message.user_id || '');
+          const userEmail = String(message.user_email || '');
+          if (!userId && !userEmail) return;
+          let conversation = conversationsByAlias.get(userId) ||
+            conversationsByAlias.get(userEmail);
+          if (!conversation) {
+            const key = userEmail || userId;
+            const member = membersById.get(userId) ||
+              (state.adminDisciples || []).find(item =>
+                String(item.email || '').toLowerCase() === userEmail.toLowerCase());
+            conversation = {
+              key,
+              user_id: userId,
+              user_email: userEmail,
+              full_name: String(member && (member.username || member.full_name) ||
+                message.full_name || message.user_name || userEmail || 'Đạo Hữu'),
+              avatar_url: String(member && member.avatar_url || message.user_avatar || ''),
+              unread: 0,
+              latest: message.created_at
+            };
+            grouped.set(key, conversation);
+          }
+          if (!conversation.user_id && userId) conversation.user_id = userId;
+          if (!conversation.user_email && userEmail) conversation.user_email = userEmail;
+          if (userId) conversationsByAlias.set(userId, conversation);
+          if (userEmail) conversationsByAlias.set(userEmail, conversation);
           const member = membersById.get(String(message.user_id || ''));
-          const conversation = grouped.get(key) || {
-            user_id: String(message.user_id || ''),
-            user_email: String(message.user_email || ''),
-            full_name: String(member && (member.username || member.full_name) ||
-              message.full_name || message.user_email || 'Đạo Hữu'),
-            avatar_url: String(member && member.avatar_url || ''),
-            unread: 0,
-            latest: message.created_at
-          };
+          if (!conversation.avatar_url) conversation.avatar_url = String(member && member.avatar_url || '');
           if (message.sender_role === 'disciple' && message.is_read !== true) conversation.unread += 1;
-          grouped.set(key, conversation);
+          conversation.latest = message.created_at || conversation.latest;
         });
-        sectChatState.conversations = Array.from(grouped.values());
-        const selected = sectChatState.conversations.find(item => item.user_id === sectChatState.selectedUserId) ||
+        sectChatState.conversations = Array.from(grouped.values())
+          .sort((left, right) => new Date(right.latest || 0) - new Date(left.latest || 0));
+        const selected = sectChatState.conversations.find(item => item.key === sectChatState.selectedUserId) ||
           sectChatState.conversations[0];
-        sectChatState.selectedUserId = selected ? selected.user_id : '';
+        sectChatState.selectedUserId = selected ? selected.key : '';
         renderSectChatConversations();
-        sectChatState.messages = selected
-          ? (data || []).filter(message => String(message.user_id || '') === selected.user_id)
-            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-          : [];
+        sectChatState.messages = selected ? await fetchAllSectMessageRows(() => {
+          let query = supabaseClient.from('sect_messages').select('*');
+          if (selected.user_id && selected.user_email) {
+            query = query.or(`user_id.eq.${selected.user_id},user_email.eq.${selected.user_email}`);
+          } else if (selected.user_id) {
+            query = query.eq('user_id', selected.user_id);
+          } else {
+            query = query.eq('user_email', selected.user_email);
+          }
+          return query.order('created_at', { ascending: true });
+        }) : [];
         if (selected) {
-          const { error: readError } = await supabaseClient.from('sect_messages').update({ is_read: true })
-            .eq('user_id', selected.user_id).eq('sender_role', 'disciple').eq('is_read', false);
+          let readQuery = supabaseClient.from('sect_messages').update({ is_read: true });
+          if (selected.user_id && selected.user_email) {
+            readQuery = readQuery.or(`user_id.eq.${selected.user_id},user_email.eq.${selected.user_email}`);
+          } else if (selected.user_id) {
+            readQuery = readQuery.eq('user_id', selected.user_id);
+          } else {
+            readQuery = readQuery.eq('user_email', selected.user_email);
+          }
+          const { error: readError } = await readQuery
+            .eq('sender_role', 'disciple').eq('is_read', false);
           if (readError) throw readError;
+          selected.unread = 0;
+          renderSectChatConversations();
         }
       } else {
-        const { data, error } = await supabaseClient.from('sect_messages').select('*')
-          .eq('user_id', authenticatedUser.id).order('created_at', { ascending: true }).limit(100);
-        if (error) throw error;
-        sectChatState.messages = data || [];
+        sectChatState.messages = await fetchAllSectMessageRows(() =>
+          supabaseClient.from('sect_messages').select('*')
+            .or(`user_id.eq.${authenticatedUser.id},user_email.eq.${authenticatedUser.email}`)
+            .order('created_at', { ascending: true }));
       }
       renderSectChatMessages();
       void refreshSectUnread();
@@ -2617,6 +2685,17 @@
         sectChatState.reloadPending = false;
         window.setTimeout(() => { void loadSectMessages(); }, 0);
       }
+    }
+  }
+
+  async function fetchAllSectMessageRows(createQuery) {
+    const rows = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await createQuery().range(offset, offset + 999);
+      if (error) throw error;
+      const batch = data || [];
+      rows.push(...batch);
+      if (batch.length < 1000) return rows;
     }
   }
 
@@ -2635,39 +2714,41 @@
   }
 
   function renderSectChatConversations() {
-    const list = document.getElementById('sect-chat-conversations');
-    if (!list) return;
-    list.replaceChildren();
-    if (!sectChatState.conversations.length) {
-      list.textContent = 'Chưa có đạo hữu gửi truyền âm.';
-      return;
-    }
-    sectChatState.conversations.forEach(conversation => {
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = `sect-chat-conversation${conversation.user_id === sectChatState.selectedUserId ? ' active' : ''}`;
-      button.dataset.chatUser = conversation.user_id;
-      const avatar = document.createElement('img');
-      avatar.className = 'sect-chat-avatar';
-      avatar.alt = '';
-      avatar.setAttribute('aria-hidden', 'true');
-      avatar.loading = 'lazy';
-      avatar.decoding = 'async';
-      setChatAvatarSource(avatar, conversation.avatar_url);
-      const name = document.createElement('strong');
-      name.textContent = conversation.full_name;
-      const email = document.createElement('span');
-      email.textContent = conversation.user_email;
-      const details = document.createElement('span');
-      details.className = 'sect-chat-conversation-details';
-      details.append(name, email);
-      button.append(avatar, details);
-      if (conversation.unread) {
-        const unread = document.createElement('b');
-        unread.textContent = String(conversation.unread);
-        button.appendChild(unread);
+    ['sect-chat-conversations', 'admin-sect-chat-conversations'].forEach(id => {
+      const list = document.getElementById(id);
+      if (!list) return;
+      list.replaceChildren();
+      if (!sectChatState.conversations.length) {
+        list.textContent = 'Chưa có đạo hữu gửi truyền âm.';
+        return;
       }
-      list.appendChild(button);
+      sectChatState.conversations.forEach(conversation => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `sect-chat-conversation${conversation.key === sectChatState.selectedUserId ? ' active' : ''}`;
+        button.dataset.chatUser = conversation.key;
+        const avatar = document.createElement('img');
+        avatar.className = 'sect-chat-avatar';
+        avatar.alt = '';
+        avatar.setAttribute('aria-hidden', 'true');
+        avatar.loading = 'lazy';
+        avatar.decoding = 'async';
+        setChatAvatarSource(avatar, conversation.avatar_url);
+        const name = document.createElement('strong');
+        name.textContent = conversation.full_name;
+        const email = document.createElement('span');
+        email.textContent = conversation.user_email;
+        const details = document.createElement('span');
+        details.className = 'sect-chat-conversation-details';
+        details.append(name, email);
+        button.append(avatar, details);
+        if (conversation.unread) {
+          const unread = document.createElement('b');
+          unread.textContent = String(conversation.unread);
+          button.appendChild(unread);
+        }
+        list.appendChild(button);
+      });
     });
   }
 
@@ -2676,13 +2757,14 @@
       .map(profile => [String(profile.user_id), profile]));
     const containers = [
       document.getElementById('sect-chat-messages'),
-      document.getElementById('sect-chat-member-messages')
+      document.getElementById('sect-chat-member-messages'),
+      document.getElementById('admin-sect-chat-messages')
     ].filter(Boolean);
     containers.forEach(container => {
       container.replaceChildren();
       sectChatState.messages.forEach(message => {
         const item = document.createElement('article');
-        const isOwnerMessage = message.sender_role === 'owner';
+        const isOwnerMessage = ['owner', 'admin', 'tong_chu'].includes(message.sender_role);
         item.className = `sect-chat-message${isOwnerMessage ? ' is-owner' : ''}`;
         const avatar = document.createElement('img');
         avatar.className = 'sect-chat-avatar';
@@ -2700,7 +2782,7 @@
         const text = document.createElement('p');
         text.textContent = String(message.content || '');
         const meta = document.createElement('small');
-        meta.textContent = `${message.sender_role === 'owner' ? 'Tông Chủ' : String(message.full_name || 'Đạo Hữu')} · ${message.created_at ? new Date(message.created_at).toLocaleString('vi-VN') : ''}`;
+        meta.textContent = `${isOwnerMessage ? 'Tông Chủ' : String(message.full_name || 'Đạo Hữu')} · ${message.created_at ? new Date(message.created_at).toLocaleString('vi-VN') : ''}`;
         body.append(meta, text);
         if (isAdminUser()) {
           const remove = document.createElement('button');
@@ -2724,11 +2806,18 @@
       openCommunityAuthGate('gửi truyền âm riêng');
       return;
     }
-    if (!isAdminUser() && isDiscipleBanned()) {
-      setSectChatStatus('⚠️ Tài khoản của đạo hữu đã bị Tông Môn Phong Ấn!', true);
-      return;
+    if (!isAdminUser()) {
+      try {
+        if (!await verifyDiscipleCanInteract(document.getElementById('sect-chat-status'))) {
+          setSectChatStatus('⚠️ Linh tịch của đạo hữu đã bị Tông Chủ phong ấn', true);
+          return;
+        }
+      } catch (error) {
+        setSectChatStatus(`Không thể xác minh linh tịch: ${error.message || 'Lỗi Supabase.'}`, true);
+        return;
+      }
     }
-    const selected = sectChatState.conversations.find(item => item.user_id === sectChatState.selectedUserId);
+    const selected = sectChatState.conversations.find(item => item.key === sectChatState.selectedUserId);
     if (isAdminUser() && !selected) {
       setSectChatStatus('Hãy chọn một hội thoại để hồi âm.', true);
       return;
@@ -2753,7 +2842,7 @@
           ? 'Tông Chủ'
           : String(state.disciple && state.disciple.full_name || getMemberFullName(authenticatedUser)),
         user_avatar: senderAvatar,
-        sender_role: isOwner ? 'owner' : 'disciple',
+        sender_role: isOwner ? 'tong_chu' : 'disciple',
         content,
         is_read: false
       };
@@ -2801,6 +2890,24 @@
       updateSectCommentReplyLabel();
     });
     list.addEventListener('click', event => {
+      const threadToggle = event.target.closest('[data-sect-thread-toggle]');
+      if (threadToggle) {
+        const rootId = threadToggle.dataset.sectThreadToggle;
+        const replyWrap = threadToggle.closest('li')?.querySelector('.sect-comment-replies');
+        const replyContent = replyWrap && replyWrap.firstElementChild;
+        if (!rootId || !replyWrap || !replyContent) return;
+        const expanded = !sectCommentState.expandedRoots.has(rootId);
+        if (expanded) sectCommentState.expandedRoots.add(rootId);
+        else sectCommentState.expandedRoots.delete(rootId);
+        replyWrap.classList.toggle('is-collapsed', !expanded);
+        replyContent.inert = !expanded;
+        replyContent.setAttribute('aria-hidden', String(!expanded));
+        threadToggle.setAttribute('aria-expanded', String(expanded));
+        threadToggle.textContent = expanded
+          ? '🔼 Thu gọn cuộc hội thoại'
+          : `💬 Xem ${threadToggle.dataset.replyCount} phản hồi`;
+        return;
+      }
       const button = event.target.closest('[data-sect-action]');
       if (!button) return;
       const row = sectCommentState.rows.find(comment => String(comment.id) === button.dataset.commentId);
@@ -2809,13 +2916,19 @@
       if (action === 'reply') {
         sectCommentState.replyTo = row;
         updateSectCommentReplyLabel();
-        document.getElementById('sect-comment-input').focus();
+        const input = document.getElementById('sect-comment-input');
+        const mention = `@${String(row.user_name || 'Đạo Hữu').trim()} `;
+        if (input && !input.value.startsWith(mention)) {
+          input.value = `${mention}${input.value.replace(/^\s+/, '')}`;
+        }
+        document.getElementById('sect-comment-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        input?.focus();
       } else if (action === 'pin' && isAdminUser()) {
         void moderateSectComment(row, { is_pinned: !row.is_pinned });
       } else if (action === 'delete' && isAdminUser()) {
         void deleteSectComment(row);
       } else if (action === 'reward' && isAdminUser()) {
-        void rewardSectComment(row, Number(button.dataset.amount));
+        void rewardSectComment(row);
       }
     });
     deferHomeLoad('sect-comments', document.getElementById('sect-discussion'), () => {
@@ -2855,7 +2968,10 @@
 
   async function loadSectComments(append = false) {
     if (!supabaseClient || !document.getElementById('sect-comment-list')) return;
-    if (sectCommentState.loading) return;
+    if (sectCommentState.loading) {
+      sectCommentState.reloadPending = true;
+      return;
+    }
     if (!append) {
       sectCommentState.offset = 0;
       sectCommentState.rows = [];
@@ -2877,11 +2993,16 @@
       const rootIds = rootRows.map(item => item.id);
       let replies = [];
       if (rootIds.length) {
-        const { data, error: replyError } = await supabaseClient.from('sect_comments')
-          .select('id,parent_id,user_name,user_avatar,sect_title,active_frame,content,is_pinned,rewarded_stones,created_at')
-          .in('parent_id', rootIds).order('created_at', { ascending: true }).limit(100);
-        if (replyError) throw replyError;
-        replies = data || [];
+        for (let offset = 0; ; offset += 1000) {
+          const { data, error: replyError } = await supabaseClient.from('sect_comments')
+            .select('id,parent_id,user_name,user_avatar,sect_title,active_frame,content,is_pinned,rewarded_stones,created_at')
+            .in('parent_id', rootIds).order('is_pinned', { ascending: false })
+            .order('created_at', { ascending: true }).range(offset, offset + 999);
+          if (replyError) throw replyError;
+          const batch = data || [];
+          replies.push(...batch);
+          if (batch.length < 1000) break;
+        }
       }
       const incoming = [...rootRows, ...replies];
       const byId = new Map(sectCommentState.rows.map(item => [String(item.id), item]));
@@ -2895,6 +3016,10 @@
       console.error('Không thể tải Đàm Đạo Các:', error);
     } finally {
       sectCommentState.loading = false;
+      if (sectCommentState.reloadPending) {
+        sectCommentState.reloadPending = false;
+        window.setTimeout(() => { void loadSectComments(false); }, 0);
+      }
     }
   }
 
@@ -2916,10 +3041,30 @@
       item.dataset.rootComment = String(comment.id);
       const article = renderSectCommentCard(comment, false);
       const replies = sectCommentState.rows.filter(child => String(child.parent_id) === String(comment.id));
-      const replyWrap = document.createElement('div');
-      replyWrap.className = 'sect-comment-replies';
-      replies.forEach(reply => replyWrap.appendChild(renderSectCommentCard(reply, true)));
-      item.append(article, replyWrap);
+      item.appendChild(article);
+      if (replies.length) {
+        const expanded = sectCommentState.expandedRoots.has(String(comment.id));
+        const toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'sect-comment-thread-toggle';
+        toggle.dataset.sectThreadToggle = String(comment.id);
+        toggle.dataset.replyCount = String(replies.length);
+        toggle.setAttribute('aria-controls', `sect-comment-replies-${comment.id}`);
+        toggle.setAttribute('aria-expanded', String(expanded));
+        toggle.textContent = expanded
+          ? '🔼 Thu gọn cuộc hội thoại'
+          : `💬 Xem ${replies.length} phản hồi`;
+        const replyWrap = document.createElement('div');
+        replyWrap.id = `sect-comment-replies-${comment.id}`;
+        replyWrap.className = `sect-comment-replies${expanded ? '' : ' is-collapsed'}`;
+        const replyContent = document.createElement('div');
+        replyContent.className = 'sect-comment-replies-inner';
+        replyContent.inert = !expanded;
+        replyContent.setAttribute('aria-hidden', String(!expanded));
+        replies.forEach(reply => replyContent.appendChild(renderSectCommentCard(reply, true)));
+        replyWrap.appendChild(replyContent);
+        item.append(toggle, replyWrap);
+      }
       list.appendChild(item);
     });
   }
@@ -2962,9 +3107,9 @@
     meta.textContent = comment.created_at ? new Date(comment.created_at).toLocaleString('vi-VN') : '';
     const actions = document.createElement('div');
     actions.className = 'sect-comment-actions';
-    if (!isReply) addSectCommentAction(actions, 'reply', comment, '↩ Phản hồi');
-    if (isAdminUser() && comment.sect_title !== 'Tông Chủ') {
-      [10, 30, 50, 100].forEach(amount => addSectCommentAction(actions, 'reward', comment, `💎 +${amount}`, amount));
+    addSectCommentAction(actions, 'reply', comment, '↩ Phản hồi');
+    if (isAdminUser()) {
+      addSectCommentAction(actions, 'reward', comment, '💎 Tặng Linh Thạch');
       addSectCommentAction(actions, 'pin', comment, comment.is_pinned ? '📌 Bỏ ghim' : '📌 Ghim');
       addSectCommentAction(actions, 'delete', comment, '🗑️ Xóa');
     }
@@ -3000,11 +3145,11 @@
       setSectCommentStatus('Chưa tải được hồ sơ môn đồ. Vui lòng thử lại sau.', true);
       return;
     }
-    if (isDiscipleBanned()) {
-      setSectCommentStatus('⚠️ Tài khoản của đạo hữu đã bị Tông Môn Phong Ấn!', true);
-      return;
-    }
     try {
+      if (!await verifyDiscipleCanInteract(document.getElementById('sect-comment-status'))) return;
+      const replyRootId = sectCommentState.replyTo
+        ? String(sectCommentState.replyTo.parent_id || sectCommentState.replyTo.id)
+        : '';
       const { error } = await supabaseClient.from('sect_comments').insert({
         user_email: String(authenticatedUser.email || ''),
         user_name: String(state.disciple.username || state.disciple.full_name || getMemberFullName(authenticatedUser)),
@@ -3012,9 +3157,10 @@
         sect_title: String(state.disciple.sect_title || 'Ngoại Môn Đệ Tử'),
         active_frame: String(state.disciple.active_frame || 'jade'),
         content,
-        parent_id: sectCommentState.replyTo ? sectCommentState.replyTo.id : null
+        parent_id: replyRootId || null
       });
       if (error) throw error;
+      if (replyRootId) sectCommentState.expandedRoots.add(replyRootId);
       input.value = '';
       sectCommentState.replyTo = null;
       updateSectCommentReplyLabel();
@@ -3038,6 +3184,11 @@
   async function deleteSectComment(comment) {
     if (!window.confirm('Xóa bình luận này và các phản hồi thuộc bình luận?')) return;
     try {
+      if (!comment.parent_id) {
+        const { error: repliesError } = await supabaseClient.from('sect_comments')
+          .delete().eq('parent_id', comment.id);
+        if (repliesError) throw repliesError;
+      }
       const { error } = await supabaseClient.from('sect_comments').delete().eq('id', comment.id);
       if (error) throw error;
       await loadSectComments(false);
@@ -3046,8 +3197,14 @@
     }
   }
 
-  async function rewardSectComment(comment, amount) {
-    if (![10, 30, 50, 100].includes(amount)) return;
+  async function rewardSectComment(comment) {
+    const enteredAmount = window.prompt('Nhập số lượng Linh Thạch muốn ban tặng:', '10');
+    if (enteredAmount === null) return;
+    const amount = Number(enteredAmount.trim());
+    if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1000000) {
+      setSectCommentStatus('Số Linh Thạch phải là số nguyên từ 1 đến 1.000.000.', true);
+      return;
+    }
     try {
       const { error } = await supabaseClient.rpc('admin_reward_sect_comment', {
         p_comment_id: comment.id,
@@ -4129,7 +4286,9 @@
     if (!isAdminUser() || !supabaseClient) return;
     const userId = button.dataset.userId;
     const banned = button.dataset.banned !== 'true';
-    if (!userId) return;
+    if (!userId || !window.confirm(banned
+      ? 'Phong ấn tài khoản môn đồ này?'
+      : 'Giải ấn tài khoản môn đồ này?')) return;
     button.disabled = true;
     try {
       const { data, error } = await supabaseClient.from('disciples')
@@ -4322,6 +4481,7 @@
         if (panelId === 'admin-panel-reviews') void loadAdminReviewData();
         if (panelId === 'admin-panel-game') void loadAdminGameScoresData();
         if (panelId === 'admin-panel-disciples') void loadAdminDisciples();
+        if (panelId === 'admin-panel-sect-messages') void loadSectMessages();
         return;
       }
       const memoryTab = clicked.closest('.admin-memory-subtab[data-memory-panel-target]');

@@ -8,8 +8,8 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=77">
-  <link rel="stylesheet" href="css/style.css?v=77">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=79">
+  <link rel="stylesheet" href="css/style.css?v=79">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -144,9 +144,6 @@
     <h1 id="admin-lock-title">Kết Giới Cấm Địa</h1>
     <p id="admin-lock-message">Nội Các chỉ mở cho Tông Chủ đã đăng nhập bằng tài khoản quản trị.</p>
     <div class="archive-lock-actions"><button type="button" class="btn btn-primary" id="admin-login-btn">⚡ Đăng Nhập / Đổi Tài Khoản</button><a class="archive-lock-dismiss" href="index.html">← Quay lại Đại Điện</a></div>
-  </section>
-  <section class="admin-dashboard-panel" id="admin-panel-sect-messages" role="tabpanel" aria-labelledby="admin-tab-sect-messages" hidden>
-    <section class="admin-tool-card"><h4>📨 Điều Phối Mật Thất Truyền Âm</h4><p>Tin nhắn riêng được đồng bộ thời gian thực trong khung chat nổi.</p><button type="button" class="admin-primary-button" id="admin-open-sect-messages">Mở danh sách hội thoại</button></section>
   </section>
 </main>
 
@@ -459,6 +456,23 @@
                 <p id="admin-disciples-status" class="admin-tool-status" role="status" aria-live="polite"></p>
               </section>
             </section>
+            <section class="admin-dashboard-panel" id="admin-panel-sect-messages" role="tabpanel" aria-labelledby="admin-tab-sect-messages" hidden>
+              <section class="admin-tool-card">
+                <h4>📨 Mật Thất Truyền Âm</h4>
+                <div class="admin-sect-chat-layout">
+                  <aside id="admin-sect-chat-conversations" class="sect-chat-conversations" aria-label="Danh sách hội thoại"></aside>
+                  <div class="admin-sect-chat-room">
+                    <strong id="admin-sect-chat-room-title">Chọn một đạo hữu để xem hội thoại</strong>
+                    <div id="admin-sect-chat-messages" class="sect-chat-messages" aria-live="polite"></div>
+                    <form id="admin-sect-chat-form" class="sect-chat-form">
+                      <textarea rows="2" maxlength="1200" placeholder="Nhập lời hồi âm..." required></textarea>
+                      <button type="submit" class="admin-primary-button">Gửi</button>
+                    </form>
+                  </div>
+                </div>
+                <p id="admin-sect-chat-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+              </section>
+            </section>
           </section>
 <aside id="floating-bg-player" class="floating-bg-player playing" aria-label="Trình phát nhạc nền">
     <button id="bg-music-toggle-btn" class="bg-music-disk-btn" title="Tạm dừng nhạc nền">
@@ -574,9 +588,9 @@
       </div>
     </div>
   </footer>
-<script defer src="js/memories.js?v=77"></script>
+<script defer src="js/memories.js?v=79"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="js/premium-effects.js?v=77"></script>
-<script defer src="js/app.js?v=77"></script>
+<script defer src="js/premium-effects.js?v=79"></script>
+<script defer src="js/app.js?v=79"></script>
 </body>
 </html>
