@@ -2364,7 +2364,13 @@
     widget.id = 'sect-chat-widget';
     widget.className = 'sect-chat-widget';
     widget.innerHTML = '<button type="button" id="sect-chat-toggle" class="sect-chat-toggle" aria-label="Mở Mật Thất Truyền Âm">💬<span id="sect-chat-unread" class="sect-chat-unread" hidden>0</span></button><section id="sect-chat-panel" class="sect-chat-panel" aria-label="Mật Thất Truyền Âm" hidden><header class="sect-chat-header"><div><strong>🕯️ Mật Thất Truyền Âm</strong><span id="sect-chat-subtitle">Trò chuyện riêng với Tông Chủ</span></div><button type="button" id="sect-chat-close" aria-label="Đóng">✕</button></header><div id="sect-chat-admin-layout" class="sect-chat-admin-layout" hidden><aside id="sect-chat-conversations" class="sect-chat-conversations"></aside><div class="sect-chat-room"><div id="sect-chat-messages" class="sect-chat-messages" aria-live="polite"></div><form id="sect-chat-form" class="sect-chat-form"><textarea id="sect-chat-input" rows="2" maxlength="1200" placeholder="Nhập lời truyền âm..." required></textarea><button type="submit" class="admin-primary-button">Gửi</button></form></div></div><div id="sect-chat-member-layout" class="sect-chat-member-layout"><div id="sect-chat-member-messages" class="sect-chat-messages" aria-live="polite"></div><form id="sect-chat-member-form" class="sect-chat-form"><textarea id="sect-chat-member-input" rows="2" maxlength="1200" placeholder="Gửi lời nhắn riêng tới Tông Chủ..." required></textarea><button type="submit" class="admin-primary-button">Gửi</button></form></div><p id="sect-chat-status" class="sect-chat-status" role="status" aria-live="polite"></p></section></aside>';
-    document.body.appendChild(widget);
+    const cluster = document.createElement('div');
+    cluster.id = 'floating-controls-cluster';
+    cluster.className = 'floating-controls-cluster';
+    cluster.append(widget);
+    const musicPlayer = document.getElementById('floating-bg-player');
+    if (musicPlayer) cluster.append(musicPlayer);
+    document.body.appendChild(cluster);
     const panel = document.getElementById('sect-chat-panel');
     document.getElementById('sect-chat-toggle').addEventListener('click', () => {
       if (!authenticatedUser) {
@@ -2685,7 +2691,7 @@
     const parent = sectCommentState.replyTo;
     label.hidden = !parent;
     cancel.hidden = !parent;
-    label.textContent = parent ? `Đang trả lời ${parent.full_name || 'Đạo Hữu'}` : '';
+    label.textContent = parent ? `Đang trả lời ${parent.user_name || 'Đạo Hữu'}` : '';
     input.placeholder = parent ? 'Viết phản hồi...' : 'Đăng nhập để lưu lại lời đàm đạo...';
   }
 
@@ -2699,7 +2705,8 @@
     sectCommentState.loading = true;
     setSectCommentStatus('Đang tải lời đàm đạo…');
     try {
-      let query = supabaseClient.from('sect_comments').select('*')
+      let query = supabaseClient.from('sect_comments')
+        .select('id,parent_id,user_name,user_avatar,sect_title,active_frame,content,is_pinned,rewarded_stones,created_at')
         .is('parent_id', null)
         .order('is_pinned', { ascending: false })
         .order('created_at', { ascending: false })
@@ -2712,7 +2719,8 @@
       const rootIds = rootRows.map(item => item.id);
       let replies = [];
       if (rootIds.length) {
-        const { data, error: replyError } = await supabaseClient.from('sect_comments').select('*')
+        const { data, error: replyError } = await supabaseClient.from('sect_comments')
+          .select('id,parent_id,user_name,user_avatar,sect_title,active_frame,content,is_pinned,rewarded_stones,created_at')
           .in('parent_id', rootIds).order('created_at', { ascending: true }).limit(100);
         if (replyError) throw replyError;
         replies = data || [];
@@ -2721,17 +2729,6 @@
       const byId = new Map(sectCommentState.rows.map(item => [String(item.id), item]));
       incoming.forEach(item => byId.set(String(item.id), item));
       sectCommentState.rows = Array.from(byId.values());
-      const userIds = Array.from(new Set(incoming.map(item => String(item.user_id || '')).filter(Boolean)));
-      const profiles = new Map();
-      if (userIds.length) {
-        const { data: members, error: profileError } = await supabaseClient.from('sect_public_disciples')
-          .select('user_id,full_name,sect_title,avatar_url,active_frame,is_owner')
-          .in('user_id', userIds);
-        if (!profileError) (members || []).forEach(member => profiles.set(String(member.user_id), member));
-      }
-      sectCommentState.rows.forEach(comment => {
-        comment.profile = profiles.get(String(comment.user_id)) || comment.profile || {};
-      });
       renderSectComments(append);
       document.getElementById('sect-comment-load-more').hidden = !sectCommentState.hasMore;
       setSectCommentStatus('');
@@ -2772,25 +2769,24 @@
   function renderSectCommentCard(comment, isReply) {
     const card = document.createElement('article');
     card.className = `sect-comment-card${isReply ? ' is-reply' : ''}${comment.is_pinned ? ' is-pinned' : ''}`;
-    const profile = comment.profile || {};
     const avatar = document.createElement('img');
-    avatar.className = `sect-comment-avatar ${frameClass(profile.active_frame)}`;
+    avatar.className = `sect-comment-avatar ${frameClass(comment.active_frame)}`;
     avatar.alt = '';
     avatar.loading = 'lazy';
     avatar.decoding = 'async';
-    avatar.src = String(profile.avatar_url || makeXianxiaAvatar(0).src);
+    avatar.src = String(comment.user_avatar || makeXianxiaAvatar(0).src);
     avatar.addEventListener('error', () => { avatar.src = makeXianxiaAvatar(0).src; }, { once: true });
     const body = document.createElement('div');
     body.className = 'sect-comment-body';
     const header = document.createElement('header');
     const name = document.createElement('strong');
-    name.textContent = String(profile.full_name || comment.full_name || 'Đạo Hữu');
+    name.textContent = String(comment.user_name || 'Đạo Hữu');
     header.appendChild(name);
     const role = document.createElement('span');
     role.className = 'sect-comment-title';
-    role.textContent = String(profile.sect_title || comment.sect_title || 'Đạo Hữu');
+    role.textContent = String(comment.sect_title || 'Đạo Hữu');
     header.appendChild(role);
-    if (comment.is_owner === true) {
+    if (comment.sect_title === 'Tông Chủ') {
       const badge = document.createElement('b');
       badge.className = 'sect-owner-badge';
       badge.textContent = '👑 Tông Chủ';
@@ -2809,7 +2805,7 @@
     const actions = document.createElement('div');
     actions.className = 'sect-comment-actions';
     if (!isReply) addSectCommentAction(actions, 'reply', comment, '↩ Phản hồi');
-    if (isAdminUser() && String(comment.user_id) !== String(authenticatedUser && authenticatedUser.id)) {
+    if (isAdminUser() && comment.sect_title !== 'Tông Chủ') {
       [10, 30, 50, 100].forEach(amount => addSectCommentAction(actions, 'reward', comment, `💎 +${amount}`, amount));
       addSectCommentAction(actions, 'pin', comment, comment.is_pinned ? '📌 Bỏ ghim' : '📌 Ghim');
       addSectCommentAction(actions, 'delete', comment, '🗑️ Xóa');
@@ -2848,9 +2844,11 @@
     }
     try {
       const { error } = await supabaseClient.from('sect_comments').insert({
-        user_id: authenticatedUser.id,
-        full_name: String(state.disciple.full_name || getMemberFullName(authenticatedUser)),
+        user_email: String(authenticatedUser.email || ''),
+        user_name: String(state.disciple.full_name || getMemberFullName(authenticatedUser)),
+        user_avatar: String(state.disciple.avatar_url || ''),
         sect_title: String(state.disciple.sect_title || 'Ngoại Môn Đệ Tử'),
+        active_frame: String(state.disciple.active_frame || 'jade'),
         content,
         parent_id: sectCommentState.replyTo ? sectCommentState.replyTo.id : null
       });
@@ -5124,12 +5122,12 @@
   async function drawCultivationOracle(control) {
     const { button, quote: quoteElement, status, card, tube } = control;
     const user = authenticatedUser;
-    const maxims = document.querySelector('.thien-co-maxims');
-    if (maxims) maxims.scrollIntoView({ behavior: 'smooth', block: 'center' });
     if (!user) {
       openOracleAuthSeal();
       return;
     }
+    const maxims = document.querySelector('.thien-co-maxims');
+    if (maxims) maxims.scrollIntoView({ behavior: 'smooth', block: 'center' });
     const today = vietnamDateKey();
     const storageKey = `tmtc-daily-oracle-${user.id}`;
     let previousClaim = null;
@@ -5711,16 +5709,16 @@
     const context = canvas.getContext('2d');
     if (!context) return;
 
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     const mobile = () => window.innerWidth < 768;
-    const stars = Array.from({ length: mobile() ? 90 : 190 }, () => ({
+    const stars = Array.from({ length: mobile() ? 42 : 72 }, () => ({
       x: Math.random(),
       y: Math.random(),
-      radius: Math.random() * 1.35 + 0.25,
+      radius: Math.random() * 1.15 + 0.25,
       phase: Math.random() * Math.PI * 2,
       color: Math.random() > 0.78 ? '#f5d98b' : Math.random() > 0.55 ? '#8de8d4' : '#e8f5f2'
     }));
-    const motes = Array.from({ length: mobile() ? 18 : 38 }, () => ({
+    const motes = Array.from({ length: mobile() ? 12 : 18 }, () => ({
       x: Math.random(),
       y: Math.random(),
       speed: Math.random() * 0.018 + 0.006,
@@ -5729,7 +5727,7 @@
       radius: Math.random() * 1.8 + 0.7,
       jade: Math.random() > 0.5
     }));
-    const leaves = Array.from({ length: mobile() ? 8 : 13 }, () => ({
+    const leaves = Array.from({ length: mobile() ? 5 : 9 }, () => ({
       x: Math.random(),
       y: Math.random(),
       speed: Math.random() * 0.035 + 0.012,
@@ -5737,23 +5735,27 @@
       phase: Math.random() * Math.PI * 2,
       size: Math.random() * 5 + 4
     }));
-    const flyers = [
-      { period: 42, offset: 0.08, trail: [] },
-      { period: 57, offset: 0.58, trail: [] }
+    const swords = [
+      { period: 29, offset: 0.04, angle: -0.34, gold: false },
+      { period: 35, offset: 0.26, angle: 0.2, gold: true },
+      { period: 41, offset: 0.48, angle: -0.18, gold: false },
+      { period: 32, offset: 0.68, angle: 0.3, gold: true },
+      { period: 46, offset: 0.86, angle: -0.25, gold: false }
     ];
+    const meteors = Array.from({ length: 2 }, () => ({
+      active: false, x: 0, y: 0, age: 0, speedX: 190, speedY: 105, duration: 0.72
+    }));
     let width = 0;
     let height = 0;
     let frameId = 0;
     let lastFrameTime = 0;
     let resizeTimer = 0;
     let animationPaused = false;
-    let meteor = null;
-    let nextMeteorAt = 6;
+    let nextMeteorAt = 4;
     const startedAt = performance.now();
 
     const resize = () => {
-      if (mobile() && motes.length > 25) motes.length = 25;
-      const ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+      const ratio = Math.min(window.devicePixelRatio || 1, mobile() ? 1.5 : 2);
       width = window.innerWidth;
       height = window.innerHeight;
       canvas.width = Math.round(width * ratio);
@@ -5761,101 +5763,69 @@
       canvas.style.width = `${width}px`;
       canvas.style.height = `${height}px`;
       context.setTransform(ratio, 0, 0, ratio, 0, 0);
-      draw(reducedMotion ? 0 : (performance.now() - startedAt) / 1000);
+      draw(reducedMotionQuery.matches ? 0 : (performance.now() - startedAt) / 1000, 0);
     };
 
-    const drawCultivator = (x, y, angle, scale) => {
-      context.save();
-      context.translate(x, y);
-      context.rotate(angle);
-      context.scale(scale, scale);
-      context.fillStyle = 'rgba(7, 18, 19, 0.82)';
-      context.strokeStyle = 'rgba(173, 235, 213, 0.64)';
-      context.lineWidth = 0.8;
-      context.beginPath();
-      context.moveTo(-2, -3);
-      context.quadraticCurveTo(-7, 1, -8, 8);
-      context.quadraticCurveTo(-3, 7, 0, 4);
-      context.quadraticCurveTo(5, 9, 9, 8);
-      context.quadraticCurveTo(7, 1, 2, -3);
-      context.closePath();
-      context.fill();
-      context.stroke();
-      context.beginPath();
-      context.arc(0, -6, 2.2, 0, Math.PI * 2);
-      context.fill();
-      context.beginPath();
-      context.moveTo(-2, -8);
-      context.quadraticCurveTo(0, -13, 5, -9);
-      context.stroke();
-      context.restore();
-    };
-
-    function draw(seconds) {
+    function draw(seconds, delta) {
       context.clearRect(0, 0, width, height);
       context.save();
       context.globalCompositeOperation = 'lighter';
 
-      stars.forEach(star => {
+      for (let index = 0; index < stars.length; index += 1) {
+        const star = stars[index];
         const opacity = 0.28 + (Math.sin(seconds * 1.3 + star.phase) + 1) * 0.3;
         context.globalAlpha = opacity;
         context.fillStyle = star.color;
         context.beginPath();
         context.arc(star.x * width, star.y * height * 0.78, star.radius, 0, Math.PI * 2);
         context.fill();
-      });
+      }
 
-      motes.forEach(mote => {
+      for (let index = 0; index < motes.length; index += 1) {
+        const mote = motes[index];
         const progress = ((mote.y - seconds * mote.speed + 1) % 1 + 1) % 1;
         const x = (mote.x + Math.sin(seconds * 0.55 + mote.phase) * mote.sway + 1) % 1;
         const y = progress * height;
-        const glow = context.createRadialGradient(x * width, y, 0, x * width, y, mote.radius * 5);
-        glow.addColorStop(0, mote.jade ? 'rgba(111, 255, 207, 0.8)' : 'rgba(255, 213, 120, 0.8)');
-        glow.addColorStop(1, 'rgba(255, 255, 255, 0)');
         context.globalAlpha = 0.35 + (Math.sin(seconds * 2 + mote.phase) + 1) * 0.25;
-        context.fillStyle = glow;
+        context.fillStyle = mote.jade ? '#6fffcf' : '#ffd578';
+        context.shadowBlur = mote.radius * 4;
+        context.shadowColor = mote.jade ? '#55e6c1' : '#f5c451';
         context.beginPath();
-        context.arc(x * width, y, mote.radius * 5, 0, Math.PI * 2);
+        context.arc(x * width, y, mote.radius, 0, Math.PI * 2);
         context.fill();
-      });
+      }
+      context.shadowBlur = 0;
 
-      flyers.forEach((flyer, index) => {
-        const progress = ((seconds / flyer.period + flyer.offset) % 1);
-        if (typeof flyer.lastProgress === 'number' && progress < flyer.lastProgress) {
-          flyer.trail.length = 0;
-        }
-        flyer.lastProgress = progress;
-        const x = width * (0.08 + progress * 0.84);
-        const y = height * (0.29 + Math.sin(progress * Math.PI * 2 + index) * 0.12);
-        const angle = Math.atan2(Math.cos(progress * Math.PI * 2 + index) * 0.12 * height, width * 0.84);
-        flyer.trail.push({ x, y });
-        if (flyer.trail.length > 22) flyer.trail.shift();
-
-        if (flyer.trail.length > 1) {
+      for (let index = 0; index < swords.length; index += 1) {
+        const sword = swords[index];
+        const progress = (seconds / sword.period + sword.offset) % 1;
+        const x = width * (progress * 1.2 - 0.1);
+        const y = height * (0.14 + index * 0.13 + Math.sin(progress * Math.PI * 2) * 0.035);
+        const trailLength = mobile() ? 62 : 92;
+        const tailX = x - Math.cos(sword.angle) * trailLength;
+        const tailY = y - Math.sin(sword.angle) * trailLength;
+        const trailX = x - tailX;
+        const trailY = y - tailY;
+        context.strokeStyle = sword.gold ? '#f5d98b' : '#7cf5d2';
+        context.lineWidth = 2.2;
+        context.shadowBlur = 10;
+        context.shadowColor = sword.gold ? '#f5c451' : '#55e6c1';
+        for (let segment = 0; segment < 4; segment += 1) {
+          const start = segment / 4;
+          const end = (segment + 1) / 4;
+          context.globalAlpha = 0.08 + segment * 0.1;
           context.beginPath();
-          flyer.trail.forEach((point, pointIndex) => {
-            if (pointIndex === 0) context.moveTo(point.x, point.y);
-            else context.lineTo(point.x, point.y);
-          });
-          const trail = context.createLinearGradient(flyer.trail[0].x, flyer.trail[0].y, x, y);
-          trail.addColorStop(0, 'rgba(45, 212, 191, 0)');
-          trail.addColorStop(1, 'rgba(186, 255, 228, 0.55)');
-          context.globalAlpha = 0.55;
-          context.strokeStyle = trail;
-          context.lineWidth = index === 0 ? 2 : 1.2;
-          context.shadowBlur = 12;
-          context.shadowColor = '#55e6c1';
+          context.moveTo(tailX + trailX * start, tailY + trailY * start);
+          context.lineTo(tailX + trailX * end, tailY + trailY * end);
           context.stroke();
-          context.shadowBlur = 0;
         }
-
         context.save();
         context.translate(x, y);
-        context.rotate(angle);
-        context.globalAlpha = 0.82;
-        context.shadowBlur = 12;
-        context.shadowColor = '#86ffe0';
-        context.fillStyle = index === 0 ? '#d5fff1' : '#f6d88c';
+        context.rotate(sword.angle);
+        context.globalAlpha = 0.84;
+        context.shadowBlur = 8;
+        context.shadowColor = sword.gold ? '#f5c451' : '#86ffe0';
+        context.fillStyle = sword.gold ? '#f6d88c' : '#d5fff1';
         context.beginPath();
         context.moveTo(-15, 0);
         context.lineTo(9, -1.6);
@@ -5864,10 +5834,11 @@
         context.lineTo(-15, 0);
         context.fill();
         context.restore();
-        if (index === 0) drawCultivator(x - 1, y - 9, angle, 0.9);
-      });
+      }
+      context.shadowBlur = 0;
 
-      leaves.forEach(leaf => {
+      for (let index = 0; index < leaves.length; index += 1) {
+        const leaf = leaves[index];
         const progress = (leaf.y + seconds * leaf.speed) % 1;
         const x = (leaf.x + Math.sin(seconds * 0.4 + leaf.phase) * leaf.sway + 1) % 1;
         const y = progress * height;
@@ -5880,39 +5851,46 @@
         context.ellipse(0, 0, leaf.size, leaf.size * 0.24, 0, 0, Math.PI * 2);
         context.fill();
         context.restore();
-      });
-
-      if (!reducedMotion && seconds > nextMeteorAt) {
-        meteor = { x: Math.random() * width * 0.7, y: Math.random() * height * 0.36, age: 0 };
-        nextMeteorAt = seconds + 7 + Math.random() * 10;
       }
-      if (meteor) {
-        meteor.age += 1 / 60;
-        context.globalAlpha = Math.max(0, 1 - meteor.age / 0.8);
+
+      if (!reducedMotionQuery.matches && seconds > nextMeteorAt) {
+        for (let index = 0; index < meteors.length; index += 1) {
+          if (meteors[index].active) continue;
+          const meteor = meteors[index];
+          meteor.active = true;
+          meteor.x = Math.random() * width * 0.7;
+          meteor.y = Math.random() * height * 0.36;
+          meteor.age = 0;
+          nextMeteorAt = seconds + 7 + Math.random() * 10;
+          break;
+        }
+      }
+      for (let index = 0; index < meteors.length; index += 1) {
+        const meteor = meteors[index];
+        if (!meteor.active) continue;
+        meteor.age += delta;
+        context.globalAlpha = Math.max(0, 1 - meteor.age / meteor.duration);
         context.strokeStyle = 'rgba(224, 255, 241, 0.9)';
         context.lineWidth = 1.5;
         context.shadowBlur = 12;
         context.shadowColor = '#a8ffe1';
         context.beginPath();
-        context.moveTo(meteor.x + meteor.age * 180, meteor.y + meteor.age * 90);
-        context.lineTo(meteor.x + meteor.age * 180 - 48, meteor.y + meteor.age * 90 - 24);
+        context.moveTo(meteor.x + meteor.age * meteor.speedX, meteor.y + meteor.age * meteor.speedY);
+        context.lineTo(meteor.x + meteor.age * meteor.speedX - 48, meteor.y + meteor.age * meteor.speedY - 24);
         context.stroke();
-        if (meteor.age >= 0.8) meteor = null;
+        if (meteor.age >= meteor.duration) meteor.active = false;
       }
       context.restore();
     }
 
     const animate = now => {
-      if (mobile() && now - lastFrameTime < 1000 / 30) {
-        frameId = window.requestAnimationFrame(animate);
-        return;
-      }
+      const delta = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.05) : 0;
       lastFrameTime = now;
-      draw((now - startedAt) / 1000);
+      draw((now - startedAt) / 1000, delta);
       frameId = window.requestAnimationFrame(animate);
     };
     const start = () => {
-      if (reducedMotion || document.hidden || animationPaused || frameId) return;
+      if (reducedMotionQuery.matches || document.hidden || animationPaused || frameId) return;
       frameId = window.requestAnimationFrame(animate);
     };
     const stop = () => {
@@ -5929,14 +5907,16 @@
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(resize, 150);
     };
+    const syncMotion = () => {
+      if (reducedMotionQuery.matches || document.hidden) stop();
+      else start();
+    };
 
     resize();
     start();
     window.addEventListener('resize', scheduleResize, { passive: true });
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) stop();
-      else start();
-    });
+    document.addEventListener('visibilitychange', syncMotion);
+    if (reducedMotionQuery.addEventListener) reducedMotionQuery.addEventListener('change', syncMotion);
   }
 
   // ========================================================
@@ -7044,7 +7024,10 @@
   function openOracleAuthSeal() {
     const modal = document.getElementById('authSealModal');
     const authButton = document.getElementById('archive-lock-auth');
-    if (!modal || !authButton) return;
+    if (!modal || !authButton) {
+      openCommunityAuthGate('xin quẻ và xem thiên cơ từ Thiên Cơ Lão Tổ');
+      return;
+    }
     delete authButton.dataset.stageId;
     authButton.dataset.action = 'oracle';
     const message = modal.querySelector('.archive-lock-dialog p');
@@ -7092,11 +7075,9 @@
     let lastFrameTime = 0;
     let resizeTimer = 0;
     let canvasPaused = false;
-    let nextSwordAt = 6 + Math.random() * 6;
-    let swordTrail = null;
 
     const resize = () => {
-      const ratio = Math.min(window.devicePixelRatio || 1, 2);
+      const ratio = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.5 : 2);
       width = window.innerWidth;
       height = window.innerHeight;
       canvas.width = Math.max(1, Math.round(width * ratio));
@@ -7109,7 +7090,8 @@
 
     const drawParticles = (time, delta) => {
       context.clearRect(0, 0, width, height);
-      particles.forEach(particle => {
+      for (let index = 0; index < particles.length; index += 1) {
+        const particle = particles[index];
         if (!reducedMotionQuery.matches && delta > 0) {
           particle.x = (particle.x + particle.speedX * delta + 1) % 1;
           particle.y = (particle.y + particle.speedY * delta + 1) % 1;
@@ -7118,58 +7100,18 @@
         const y = particle.y * height;
         const pulse = 0.4 + (Math.sin(time * 0.0012 + particle.phase) + 1) * 0.24;
         context.beginPath();
-        context.fillStyle = particle.gold
-          ? `rgba(255, 222, 130, ${pulse})`
-          : `rgba(112, 255, 220, ${pulse})`;
+        context.globalAlpha = pulse;
+        context.fillStyle = particle.gold ? '#ffde82' : '#70ffdc';
         context.shadowBlur = 9;
-        context.shadowColor = particle.gold ? 'rgba(255, 195, 75, 0.75)' : 'rgba(45, 212, 191, 0.8)';
+        context.shadowColor = particle.gold ? '#ffc34b' : '#2dd4bf';
         context.arc(x, y, particle.radius, 0, Math.PI * 2);
         context.fill();
-      });
-
-      if (!reducedMotionQuery.matches) {
-        const seconds = time / 1000;
-        if (!swordTrail && seconds >= nextSwordAt) {
-          swordTrail = {
-            x: Math.random() * width * 0.8,
-            y: Math.random() * height * 0.58,
-            age: 0
-          };
-          nextSwordAt = seconds + 7 + Math.random() * 9;
-        }
-        if (swordTrail) {
-          swordTrail.age += delta;
-          const progress = swordTrail.age / 0.72;
-          if (progress >= 1) {
-            swordTrail = null;
-          } else {
-            const x = swordTrail.x + progress * 150;
-            const y = swordTrail.y + progress * 74;
-            const gradient = context.createLinearGradient(x - 64, y - 32, x, y);
-            gradient.addColorStop(0, 'rgba(112, 255, 220, 0)');
-            gradient.addColorStop(0.65, 'rgba(112, 255, 220, 0.75)');
-            gradient.addColorStop(1, 'rgba(255, 227, 151, 0)');
-            context.save();
-            context.globalAlpha = Math.sin(progress * Math.PI);
-            context.strokeStyle = gradient;
-            context.lineWidth = 1.2;
-            context.shadowBlur = 12;
-            context.shadowColor = 'rgba(45, 212, 191, 0.82)';
-            context.beginPath();
-            context.moveTo(x - 64, y - 32);
-            context.lineTo(x, y);
-            context.stroke();
-            context.restore();
-          }
-        }
       }
+      context.globalAlpha = 1;
+      context.shadowBlur = 0;
     };
 
     const animate = now => {
-      if (window.innerWidth < 768 && lastFrameTime && now - lastFrameTime < 1000 / 30) {
-        frameId = window.requestAnimationFrame(animate);
-        return;
-      }
       const delta = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.05) : 0;
       lastFrameTime = now;
       drawParticles(now, delta);

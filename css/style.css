@@ -8083,7 +8083,18 @@ body.museum-body {
     linear-gradient(160deg, rgba(4, 13, 11, 0.3), rgba(8, 20, 18, 0.52));
 }
 
-body.museum-body > :not(#cultivation-bg):not(#spiritParticlesCanvas):not(#authSealModal):not(.ambient-glow):not(#sticky-header):not(.modal):not(.lightbox-modal):not(.cinema-modal):not(.feature-modal):not(#floating-bg-player):not(#auth-modal) {
+#cultivation-bg::before {
+  position: absolute;
+  inset: -12%;
+  content: "";
+  background:
+    radial-gradient(ellipse at 24% 34%, rgba(35, 177, 139, .12), transparent 34%),
+    radial-gradient(ellipse at 76% 65%, rgba(226, 176, 75, .1), transparent 38%);
+  opacity: .72;
+  transform: translateZ(0);
+}
+
+body.museum-body > :not(#cultivation-bg):not(#spiritParticlesCanvas):not(#authSealModal):not(.ambient-glow):not(#sticky-header):not(.modal):not(.lightbox-modal):not(.cinema-modal):not(.feature-modal):not(#floating-bg-player):not(#auth-modal):not(.floating-controls-cluster) {
   position: relative;
   z-index: 1;
 }
@@ -8120,7 +8131,7 @@ body.museum-body > :not(#cultivation-bg):not(#spiritParticlesCanvas):not(#authSe
   transform: translate(-50%, -50%);
   overflow: visible;
   opacity: 0.13;
-  animation: star-chart-rotation 70s linear infinite;
+  animation: star-chart-rotation 150s linear infinite;
   will-change: transform;
 }
 
@@ -8220,8 +8231,47 @@ body.museum-body > :not(#cultivation-bg):not(#spiritParticlesCanvas):not(#authSe
   aspect-ratio: 1;
   transform: translateX(-50%);
   opacity: 0.075;
-  animation: taiji-rotation 120s linear infinite;
+  animation: taiji-rotation 210s linear infinite;
   will-change: transform;
+}
+
+.bagua-aura-rings {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(94vw, 980px);
+  aspect-ratio: 1;
+  opacity: .075;
+  pointer-events: none;
+}
+
+.bagua-aura-rings span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  border: 1px solid rgba(111, 226, 192, .54);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  animation: bagua-ring-rotation 180s linear infinite;
+  will-change: transform;
+}
+
+.bagua-aura-rings span:nth-child(2) {
+  width: 80%;
+  height: 80%;
+  border-color: rgba(245, 204, 117, .48);
+  border-style: dashed;
+  animation-direction: reverse;
+  animation-duration: 140s;
+}
+
+.bagua-aura-rings span:nth-child(3) {
+  width: 60%;
+  height: 60%;
+  border-color: rgba(111, 226, 192, .38);
+  animation-duration: 220s;
 }
 
 .taiji-orbit svg {
@@ -8476,6 +8526,10 @@ body.museum-body > :not(#cultivation-bg):not(#spiritParticlesCanvas):not(#authSe
   to { transform: translateX(-50%) rotate(360deg); }
 }
 
+@keyframes bagua-ring-rotation {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
 @keyframes bamboo-sway {
   from { transform: rotate(-2deg); }
   to { transform: rotate(2deg); }
@@ -8526,6 +8580,7 @@ body.museum-body > :not(#cultivation-bg):not(#spiritParticlesCanvas):not(#authSe
 @media (prefers-reduced-motion: reduce) {
   .star-chart,
   .taiji-orbit,
+  .bagua-aura-rings span,
   .qi-mist,
   .qi-sword,
   .qi-stone,
@@ -14995,11 +15050,80 @@ html[data-page="tongmon"] .tongmon-main {
 }
 .sect-comment-action:hover { border-color: rgba(236, 201, 111, .7); }
 
-.sect-chat-widget {
+.floating-controls-cluster {
   position: fixed;
-  z-index: 1200;
-  right: max(18px, env(safe-area-inset-right));
-  bottom: 112px;
+  right: 18px;
+  bottom: 18px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  pointer-events: none;
+}
+
+.floating-controls-cluster > * { pointer-events: auto; }
+
+.floating-controls-cluster #floating-bg-player {
+  position: relative !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: auto !important;
+}
+
+@media (min-width: 768px) {
+  .floating-controls-cluster #floating-bg-player:not(.is-expanded) {
+    width: 56px !important;
+    height: 56px !important;
+    min-width: 56px !important;
+    max-width: 56px !important;
+    padding: 0 !important;
+    gap: 0 !important;
+    overflow: hidden;
+    border-radius: 50% !important;
+  }
+
+  .floating-controls-cluster #floating-bg-player:not(.is-expanded) .bg-music-disk-btn {
+    flex: 0 0 56px;
+    width: 56px !important;
+    height: 56px !important;
+  }
+
+  .floating-controls-cluster #floating-bg-player:not(.is-expanded) .bg-music-info,
+  .floating-controls-cluster #floating-bg-player:not(.is-expanded) .bg-music-skip-btn,
+  .floating-controls-cluster #floating-bg-player:not(.is-expanded) .bg-music-collapse-btn {
+    display: none !important;
+  }
+
+  .floating-controls-cluster #floating-bg-player:hover,
+  .floating-controls-cluster #floating-bg-player:focus-within {
+    width: auto !important;
+    height: auto !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 36px) !important;
+    padding: .35rem .5rem .35rem .35rem !important;
+    gap: .45rem !important;
+    overflow: visible;
+    border-radius: 999px !important;
+  }
+
+  .floating-controls-cluster #floating-bg-player:hover .bg-music-info,
+  .floating-controls-cluster #floating-bg-player:focus-within .bg-music-info {
+    display: flex !important;
+    min-width: 0;
+  }
+
+  .floating-controls-cluster #floating-bg-player:hover .bg-music-skip-btn,
+  .floating-controls-cluster #floating-bg-player:focus-within .bg-music-skip-btn,
+  .floating-controls-cluster #floating-bg-player:hover .bg-music-collapse-btn,
+  .floating-controls-cluster #floating-bg-player:focus-within .bg-music-collapse-btn {
+    display: inline-flex !important;
+  }
+}
+
+.sect-chat-widget {
+  position: static;
+  z-index: auto;
 }
 
 .sect-chat-toggle {
@@ -15030,9 +15154,10 @@ html[data-page="tongmon"] .tongmon-main {
 }
 
 .sect-chat-panel {
-  position: absolute;
-  right: 0;
-  bottom: 68px;
+  position: fixed;
+  right: 18px;
+  bottom: 86px;
+  z-index: 1000;
   display: flex;
   width: min(660px, calc(100vw - 28px));
   height: min(540px, calc(100dvh - 190px));
@@ -15147,8 +15272,7 @@ html[data-page="tongmon"] .tongmon-main {
 .admin-dashboard-panel .sect-chat-panel { position: relative; }
 
 @media (max-width: 600px) {
-  .sect-chat-widget { right: 14px; bottom: 102px; }
-  .sect-chat-panel { right: -2px; width: min(440px, calc(100vw - 20px)); height: min(520px, calc(100dvh - 170px)); }
+  .sect-chat-panel { right: 18px; bottom: 86px; width: min(440px, calc(100vw - 36px)); height: min(520px, calc(100dvh - 170px)); }
   .sect-chat-admin-layout { grid-template-columns: minmax(104px, 34%) 1fr; }
   .sect-chat-form { grid-template-columns: 1fr; }
   .sect-chat-form .admin-primary-button { justify-self: end; }
