@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="xianxia" data-sky-mood="cosmic" data-page="admin">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nội Các Quản Trị • Thiên Mệnh Chi Thành</title>
+  <meta name="description" content="Thiên Mệnh Chi Thành — biên niên ký lưu giữ những cột mốc trưởng thành và ký ức của Hải Thành.">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=72">
+  <link rel="stylesheet" href="css/style.css?v=72">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+</head>
+<body class="museum-body">
+<div id="cultivation-bg" aria-hidden="true">
+    <canvas id="xianxia-canvas" aria-hidden="true"></canvas>
+    <div class="qi-mist qi-mist-one"></div>
+    <div class="qi-mist qi-mist-two"></div>
+    <div class="xianxia-moon"></div>
+    <div class="taiji-orbit" aria-hidden="true">
+      <svg viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="88"></circle>
+        <circle cx="100" cy="100" r="72"></circle>
+        <path d="M100 28a36 36 0 0 1 0 72 36 36 0 0 0 0 72 72 72 0 0 1 0-144z"></path>
+        <circle cx="100" cy="64" r="7"></circle>
+        <circle cx="100" cy="136" r="7"></circle>
+        <path d="M100 12v176M12 100h176M38 38l124 124M162 38 38 162"></path>
+      </svg>
+    </div>
+
+    <svg class="floating-islands" viewBox="0 0 900 260" aria-hidden="true">
+      <path d="M70 154 126 116l35 12 38-48 54 48 38-20 54 46 28 8-22 20H80z"></path>
+      <path d="M530 132 574 98l37 9 44-54 50 54 34-18 51 39 44 14-18 17H520z"></path>
+      <path d="M180 190h105M655 177h110"></path>
+    </svg>
+    <svg class="bamboo-shadow bamboo-left" viewBox="0 0 220 300" aria-hidden="true">
+      <path d="M22 300C50 210 66 124 106 8M58 226l-45-24m60-25 46-31m-23-26-45-28m58-34 40-28"></path>
+      <path d="M34 205q-40-30-28-58 28 5 38 43m27-49q-8-43 20-60 18 24-9 68m14 24q43-38 66-17-10 30-58 35m-39-85Q53 69 67 43q29 18 19 53"></path>
+    </svg>
+    <svg class="bamboo-shadow bamboo-right" viewBox="0 0 220 300" aria-hidden="true">
+      <path d="M198 300C170 210 154 124 114 8M162 226l45-24m-60-25-46-31m23-26 45-28m-58-34-40-28"></path>
+      <path d="M186 205q40-30 28-58-28 5-38 43m-27-49q8-43-20-60-18 24 9 68m-14 24q-43-38-66-17 10 30 58 35m39-85q23-32 9-58-29 18-19 53"></path>
+    </svg>
+    <div class="ancient-seals seal-left" aria-hidden="true">天道<br>劍心<br>靈脈</div>
+    <div class="ancient-seals seal-right" aria-hidden="true">仙山<br>雲海<br>長生</div>
+    <svg class="flying-crane crane-one" viewBox="0 0 120 48" aria-hidden="true">
+      <path d="M4 28q24-22 44-4 12-17 28-15-9 8-11 17 19-9 39-2l12-8-5 12q-23 13-48 1-24 16-53-1L4 28zm54-4q-7-15-1-23 6 11 6 22m9-4q6-14 15-16-3 10-10 18"></path>
+    </svg>
+    <svg class="flying-crane crane-two" viewBox="0 0 120 48" aria-hidden="true">
+      <path d="M4 28q24-22 44-4 12-17 28-15-9 8-11 17 19-9 39-2l12-8-5 12q-23 13-48 1-24 16-53-1L4 28zm54-4q-7-15-1-23 6 11 6 22m9-4q6-14 15-16-3 10-10 18"></path>
+    </svg>
+    <svg class="flying-cultivator" viewBox="0 0 150 130" aria-hidden="true">
+      <path d="M19 93h112M30 90l-9 7 11 2m99-6 10 5-11 2" class="cultivator-sword"></path>
+      <path d="M68 35q-8 12-5 27l-17 24q18 5 31-9l12 9 21 5q-5-15-19-24l-4-25-19-7z" class="cultivator-robe"></path>
+      <circle cx="75" cy="27" r="10" class="cultivator-body"></circle>
+      <path d="M64 24q3-18 24-12l10 10-26-2-8 4m15 38q-21 1-34-9m35 11q15-9 27-4" class="cultivator-trails"></path>
+    </svg>
+    <svg class="star-chart" viewBox="0 0 600 600" aria-hidden="true">
+      <circle cx="300" cy="300" r="220"></circle>
+      <circle cx="300" cy="300" r="180"></circle>
+      <circle cx="300" cy="300" r="120"></circle>
+      <polygon points="300,62 354,246 538,300 354,354 300,538 246,354 62,300 246,246"></polygon>
+      <polygon points="300,100 500,300 300,500 100,300"></polygon>
+      <path d="M300 62v476M62 300h476M131 131l338 338M469 131 131 469"></path>
+      <circle class="star-chart-node" cx="300" cy="62" r="5"></circle>
+      <circle class="star-chart-node" cx="538" cy="300" r="5"></circle>
+      <circle class="star-chart-node" cx="300" cy="538" r="5"></circle>
+      <circle class="star-chart-node" cx="62" cy="300" r="5"></circle>
+    </svg>
+    <span class="qi-sword sword-one"><svg viewBox="0 0 120 24"><path d="M7 12h72l26-5-8 5 8 5-26-5H7l-4-4z"></path><path d="M26 8v8M17 12h9"></path></svg></span>
+    <span class="qi-sword sword-two"><svg viewBox="0 0 120 24"><path d="M7 12h72l26-5-8 5 8 5-26-5H7l-4-4z"></path><path d="M26 8v8M17 12h9"></path></svg></span>
+    <span class="qi-sword sword-three"><svg viewBox="0 0 120 24"><path d="M7 12h72l26-5-8 5 8 5-26-5H7l-4-4z"></path><path d="M26 8v8M17 12h9"></path></svg></span>
+    <span class="qi-sword sword-four"><svg viewBox="0 0 120 24"><path d="M7 12h72l26-5-8 5 8 5-26-5H7l-4-4z"></path><path d="M26 8v8M17 12h9"></path></svg></span>
+    <span class="qi-stone stone-one"></span>
+    <span class="qi-stone stone-two"></span>
+    <span class="qi-stone stone-three"></span>
+    <span class="qi-stone stone-four"></span>
+    <span class="qi-firefly firefly-one"></span>
+    <span class="qi-firefly firefly-two"></span>
+    <span class="qi-firefly firefly-three"></span>
+    <span class="qi-firefly firefly-four"></span>
+    <span class="qi-firefly firefly-five"></span>
+    <span class="qi-firefly firefly-six"></span>
+    <span class="bamboo-leaf leaf-one"></span>
+    <span class="bamboo-leaf leaf-two"></span>
+    <span class="bamboo-leaf leaf-three"></span>
+    <span class="bamboo-leaf leaf-four"></span>
+    <span class="bamboo-leaf leaf-five"></span>
+    <span class="bamboo-leaf leaf-six"></span>
+    <svg class="immortal-landscape" viewBox="0 0 1440 420" preserveAspectRatio="none" aria-hidden="true">
+      <path class="mountain-back" d="M0 235 95 150l60 52 118-140 104 146 99-92 82 109 118-154 135 147 91-91 122 131 103-118 133 127 80-65v178H0z"></path>
+      <path class="mountain-front" d="m0 293 115-82 92 65 124-96 109 86 110-75 95 83 126-112 117 112 112-78 102 92 113-64 125 82v114H0z"></path>
+      <path class="immortal-gate" d="M625 335v-75q0-60 95-60t95 60v75m-166-53h142m-158 53h174m-154-55v55m82-55v55m73-55v55m-185-81 17-28 19 28m39 0 17-28 19 28m39 0 17-28 19 28"></path>
+      <path class="pavilion-roof" d="m1035 293 40-29 42 29-8-19 28 8-62-49-62 49 28-8-8 19zm-18 4h121m-102 0v42m82-42v42m-93 0h105"></path>
+    </svg>
+    <div class="xianxia-cloud cloud-one"></div>
+    <div class="xianxia-cloud cloud-two"></div>
+    <div class="xianxia-cloud cloud-three"></div>
+    <div class="meridian-axis"><span class="meridian-light"></span></div>
+    <svg class="tribulation-lightning" viewBox="0 0 300 180" aria-hidden="true">
+      <path d="m208 2-38 67h34l-49 61 24-52h-32z"></path>
+      <path d="m266 38-24 42h24l-37 47 17-39h-22z"></path>
+    </svg>
+  </div>
+<canvas id="spiritParticlesCanvas" aria-hidden="true"></canvas>
+<div class="ambient-glow glow-1"></div><div class="ambient-glow glow-2"></div><div class="ambient-glow glow-3"></div>
+<header id="sticky-header" class="sticky-nav">
+    <div class="nav-container">
+      <div class="nav-brand-row">
+        <a href="index.html" class="nav-brand">
+          <img src="images/2026/IMG_4295_Original.JPG" alt="Hải Thành" class="brand-logo-img">
+          <span class="brand-title">THIÊN MỆNH CHI THÀNH</span>
+        </a>
+        <div class="nav-account-actions">
+          <button type="button" class="nav-btn nav-cultivation-badge" id="nav-cultivation-badge" aria-label="Tu Vi Đạo Hữu" title="Mở Động Phủ Tu Luyện">✦ <span id="nav-cultivation-label">Phàm Nhân</span> • <span id="nav-cultivation-total">0</span></button>
+          <button type="button" class="nav-btn nav-btn-auth" id="btn-header-auth" aria-haspopup="dialog" aria-controls="auth-modal">◈ Đăng nhập</button>
+        </div>
+      </div>
+
+      <!-- Quick Chapter Dropdown / Nav -->
+      <nav class="nav-chapters" id="nav-chapters-bar" aria-label="Điều hướng giai đoạn">
+        <!-- Rendered dynamically -->
+      </nav>
+
+      <div class="nav-actions">
+        <!-- Theme Switcher Dropdown (Nâng cấp Theme Switcher) -->
+        <a id="nav-tongmon-link" class="nav-btn nav-btn-game" href="tongmon.html" aria-label="Tông Môn Các: Độ Kiếp và Thẻ Đệ Tử">
+          <span class="btn-icon">⚔️</span>
+          <span class="btn-text">Tông Môn Các</span>
+        </a>
+        <a class="nav-btn nav-page-link" id="nav-home-link" href="index.html" aria-label="Quay lại Đại Điện">← Đại Điện</a>
+        <a class="nav-btn nav-page-link" href="gallery.html" aria-label="Tàng Kinh Các - xem ảnh"><span class="btn-icon">🖼️</span><span class="btn-text">Tàng Kinh Các</span></a>
+        <a class="nav-btn nav-page-link" id="nav-admin-link" href="admin.html" aria-label="Nội Các Quản Trị" hidden><span class="btn-icon">⚙️</span><span class="btn-text">Nội Các</span></a>
+      </div>
+    </div>
+    <div class="scroll-progress-line" id="scroll-progress"></div>
+  </header>
+<main class="page-access-layout">
+  <section id="admin-access-denied" class="archive-lock-dialog page-access-card" role="status" aria-labelledby="admin-lock-title">
+    <span class="archive-lock-seal" aria-hidden="true">⛔</span>
+    <h1 id="admin-lock-title">Kết Giới Cấm Địa</h1>
+    <p id="admin-lock-message">Nội Các chỉ mở cho Tông Chủ đã đăng nhập bằng tài khoản quản trị.</p>
+    <div class="archive-lock-actions"><button type="button" class="btn btn-primary" id="admin-login-btn">⚡ Đăng Nhập / Đổi Tài Khoản</button><a class="archive-lock-dismiss" href="index.html">← Quay lại Đại Điện</a></div>
+  </section>
+</main>
+
+<section id="admin-dashboard" hidden>
+            <h3 class="auth-admin-heading">Quản Trị Tiên Giới (Admin)</h3>
+            <div class="admin-dashboard-tabs" role="tablist" aria-label="Khu vực quản trị">
+              <button type="button" class="admin-dashboard-tab active" id="admin-tab-decrees" role="tab" aria-selected="true" aria-controls="admin-panel-decrees" data-admin-panel-target="admin-panel-decrees">📊 Tổng Quan &amp; Cấu Hình</button>
+              <button type="button" class="admin-dashboard-tab" id="admin-tab-memory" role="tab" aria-selected="false" aria-controls="admin-panel-memory" data-admin-panel-target="admin-panel-memory">🖼️ Mốc &amp; Tàn Hồn (Ảnh)</button>
+              <button type="button" class="admin-dashboard-tab" id="admin-tab-reviews" role="tab" aria-selected="false" aria-controls="admin-panel-reviews" data-admin-panel-target="admin-panel-reviews">💬 Duyệt Lưu Bút &amp; Bình Luận</button>
+              <button type="button" class="admin-dashboard-tab" id="admin-tab-game" role="tab" aria-selected="false" aria-controls="admin-panel-game" data-admin-panel-target="admin-panel-game">🎯 Đố Vui Độ Kiếp</button>
+              <button type="button" class="admin-dashboard-tab" id="admin-tab-backup" role="tab" aria-selected="false" aria-controls="admin-panel-backup" data-admin-panel-target="admin-panel-backup">💾 Sao Lưu Dữ Liệu</button>
+            </div>
+
+            <section class="admin-dashboard-panel" id="admin-panel-decrees" role="tabpanel" aria-labelledby="admin-tab-decrees">
+              <div class="admin-overview-grid" aria-label="Tổng quan Tông Môn">
+                <article class="admin-overview-stat"><span>Lượt khách nhập cốc</span><strong id="admin-metric-visitors">—</strong></article>
+                <article class="admin-overview-stat"><span>Ảnh &amp; ký ức</span><strong id="admin-metric-memories">—</strong></article>
+                <article class="admin-overview-stat"><span>Lời nhắn lưu bút</span><strong id="admin-metric-guestbook">—</strong></article>
+                <article class="admin-overview-stat"><span>Bình luận các mốc</span><strong id="admin-metric-comments">—</strong></article>
+              </div>
+              <div class="admin-config-tabs" role="tablist" aria-label="Cấu hình Nội Các">
+                <button type="button" class="admin-memory-subtab active" id="admin-config-tab-features" role="tab" aria-controls="admin-panel-features" data-admin-config-target="admin-panel-features" aria-selected="true">🎛️ Chức năng</button>
+                <button type="button" class="admin-memory-subtab" id="admin-config-tab-theme" role="tab" aria-controls="admin-panel-theme" data-admin-config-target="admin-panel-theme" aria-selected="false">🎨 Giao diện</button>
+                <button type="button" class="admin-memory-subtab" id="admin-config-tab-attributes" role="tab" aria-controls="admin-panel-attributes" data-admin-config-target="admin-panel-attributes" aria-selected="false">⚡ Thuộc tính &amp; Tu vi</button>
+              </div>
+              <section class="admin-tool-card" aria-labelledby="admin-announcement-heading">
+                <h4 id="admin-announcement-heading">📣 Dải Thông Báo Tông Môn</h4>
+                <form id="admin-announcement-form" class="admin-form">
+                  <label class="admin-toggle-row" for="admin-announcement-enabled">
+                    <input type="checkbox" id="admin-announcement-enabled">
+                    <span class="admin-toggle-switch" aria-hidden="true"></span>
+                    <span>Hiển thị thông báo ở đầu trang chủ</span>
+                  </label>
+                  <label for="admin-announcement-text">Nội dung thông báo</label>
+                  <textarea id="admin-announcement-text" rows="3" maxlength="500" placeholder="Thông báo cập nhật mới..."></textarea>
+                  <button type="submit" class="admin-primary-button">💾 Lưu Thông Báo</button>
+                </form>
+                <p id="admin-announcement-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+              </section>
+              <section id="admin-config-panels" aria-live="polite"></section>
+              <div class="admin-overview-actions">
+                <button type="button" class="admin-secondary-button" id="admin-metrics-refresh">↻ Làm mới số liệu</button>
+              </div>
+              <section class="admin-tool-card" aria-labelledby="admin-decree-heading">
+                <h4 id="admin-decree-heading">📜 Ban Bố Chiếu Thư Tông Chủ</h4>
+                <form id="admin-decree-form" class="admin-form">
+                  <label for="admin-decree-type">Danh xưng chỉ thị</label>
+                  <select id="admin-decree-type" required>
+                    <option value="phap-chi">📜 Pháp Chỉ Tông Môn</option>
+                    <option value="cao-thi">🔥 Cáo Thị Khẩn</option>
+                    <option value="tam-dac">✨ Tâm Đắc Lão Tổ</option>
+                    <option value="tin-mung">🎉 Tin Mừng Tông Môn</option>
+                  </select>
+                  <label for="admin-decree-title">Tiêu đề chiếu thư</label>
+                  <input id="admin-decree-title" type="text" maxlength="160" required>
+                  <label for="admin-decree-content">Nội dung chỉ thị</label>
+                  <textarea id="admin-decree-content" rows="4" maxlength="3000" required></textarea>
+                  <label class="admin-toggle-row" for="admin-decree-pinned">
+                    <input type="checkbox" id="admin-decree-pinned">
+                    <span>Ghim đầu trang</span>
+                  </label>
+                  <div class="admin-memory-form-actions">
+                    <button type="submit" class="admin-primary-button" id="admin-decree-submit">⚡ Ban Bố Chiếu Thư</button>
+                    <button type="button" class="admin-secondary-button" id="admin-decree-cancel-edit" hidden>Hủy sửa</button>
+                  </div>
+                </form>
+                <p id="admin-decree-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+                <h4 class="admin-subsection-title">Chiếu thư đã ban</h4>
+                <div id="admin-decree-list" class="admin-decree-list" aria-live="polite"></div>
+              </section>
+            </section>
+
+            <section class="admin-config-panel" id="admin-panel-features" role="tabpanel" aria-labelledby="admin-config-tab-features" hidden>
+              <section class="admin-tool-card" aria-labelledby="admin-feature-heading">
+                <h4 id="admin-feature-heading">🎛️ Công Tắc Hiển Thị Toàn Trang</h4>
+                <p class="admin-form-intro">Thay đổi sẽ được lưu toàn cục và áp dụng cho khách truy cập lẫn đạo hữu.</p>
+                <div class="admin-feature-toggle-list">
+                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="decrees"><span class="admin-toggle-switch" aria-hidden="true"></span><span>📜 Chiếu Thư Tông Chủ</span></label>
+                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="oracle"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🔮 Thiên Cơ Lão Tổ</span></label>
+                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="ticket"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🎟️ Cấp Thẻ Đệ Tử</span></label>
+                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="game"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🎯 Đố Vui Độ Kiếp</span></label>
+                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="audio"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🎧 Nhạc Dưỡng Thần</span></label>
+                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="autoPlayMusic"><span class="admin-toggle-switch" aria-hidden="true"></span><span>▶️ Tự phát &amp; nối tiếp nhạc khi chuyển trang</span></label>
+                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="attributes"><span class="admin-toggle-switch" aria-hidden="true"></span><span>💎 Bảng Thuộc Tính Tu Tiên</span></label>
+                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="leaderboard"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🏆 Bảng Vàng Tu Tiên</span></label>
+                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="hideAdminFromLeaderboard"><span class="admin-toggle-switch" aria-hidden="true"></span><span>👑 Ẩn Admin khỏi Bảng Vàng &amp; Tu Vi công khai</span></label>
+                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="comments"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🗣️ Tường Truyền Âm</span></label>
+                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="footerUtilities"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🏅 Đài Phong Thần &amp; Hũ Rượu Thời Gian</span></label>
+                </div>
+                <p id="admin-feature-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+              </section>
+            </section>
+
+            <section class="admin-config-panel" id="admin-panel-theme" role="tabpanel" aria-labelledby="admin-config-tab-theme" hidden>
+              <section class="admin-tool-card" aria-labelledby="admin-theme-heading">
+                <h4 id="admin-theme-heading">🎨 Cảnh Giới &amp; Nền Trời</h4>
+                <p class="admin-form-intro">Nền do Tông Chủ chọn sẽ đồng bộ cho mọi người khi mở trang.</p>
+                <form id="admin-theme-form" class="admin-form">
+                  <label for="admin-global-theme">Tông giao diện</label>
+                  <select id="admin-global-theme">
+                    <option value="xianxia">☯ Tiên Giới Cổ Phong</option>
+                    <option value="obsidian">🌑 Đêm Obsidian</option>
+                    <option value="sepia">📜 Giấy Cũ Hoài Niệm</option>
+                    <option value="midnight">🌌 Xanh Đêm Vũ Trụ</option>
+                    <option value="daylight">☁️ Sáng Tối Giản</option>
+                  </select>
+                  <label for="admin-global-sky">Cảnh giới bầu trời</label>
+                  <select id="admin-global-sky">
+                    <option value="cosmic">🌌 Tinh Tú Đêm</option>
+                    <option value="mountain">🏔️ Linh Sơn Sáng</option>
+                  </select>
+                  <button type="submit" class="admin-primary-button">💾 Lưu Cảnh Giới &amp; Nền Trời</button>
+                </form>
+                <p id="admin-theme-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+              </section>
+            </section>
+
+            <section class="admin-dashboard-panel" id="admin-panel-memory" role="tabpanel" aria-labelledby="admin-tab-memory" hidden>
+              <div class="admin-memory-subtabs" role="tablist" aria-label="Khu vực ký ức">
+                <button type="button" class="admin-memory-subtab active" data-memory-panel-target="admin-panel-add-memory" aria-selected="true">➕ Thêm Kỷ Niệm</button>
+                <button type="button" class="admin-memory-subtab" data-memory-panel-target="admin-panel-manage-memories" aria-selected="false">🗑️ Quản Lý &amp; Xóa Ảnh</button>
+              </div>
+            </section>
+
+            <section class="admin-memory-panel" id="admin-panel-add-memory" role="tabpanel" aria-labelledby="admin-tab-memory" hidden>
+              <form id="admin-memory-form" class="admin-form">
+                <h3 id="admin-memory-form-title">Thêm Kỷ Niệm Mới</h3>
+                <label for="admin-stage">Giai đoạn</label>
+                <select id="admin-stage" name="stage" required>
+                  <option value="luc-nho">Tuổi thơ</option>
+                  <option value="2021">2021</option>
+                  <option value="2022">2022</option>
+                  <option value="2023">2023</option>
+                  <option value="2024">2024</option>
+                  <option value="2025">2025</option>
+                  <option value="2026">2026</option>
+                </select>
+                <label for="admin-memory-title">Tiêu đề</label>
+                <input id="admin-memory-title" name="title" type="text" maxlength="160" required>
+                <label for="admin-memory-time">Thời gian</label>
+                <input id="admin-memory-time" name="time" type="text" maxlength="100" required>
+                <label for="admin-memory-type">Loại kỷ niệm</label>
+                <select id="admin-memory-type" name="type">
+                  <option value="photo">📷 Ảnh Kỷ Niệm</option>
+                  <option value="story">📜 Tâm Ma Bí Lục</option>
+                </select>
+                <label for="admin-memory-description">Chú thích / Tâm Ma Bí Lục</label>
+                <textarea id="admin-memory-description" name="description" rows="4" maxlength="2000"></textarea>
+                <label for="admin-memory-image-url">Link ảnh (có thể để trống nếu chọn file)</label>
+                <input id="admin-memory-image-url" name="image_url" type="url" inputmode="url" placeholder="https://...">
+                <label for="admin-memory-image">Ảnh hoặc video kỷ niệm</label>
+                <input id="admin-memory-image" name="image" type="file" accept="image/*,video/mp4,video/webm,video/quicktime,video/ogg">
+                <img id="admin-memory-image-preview" class="admin-memory-image-preview" alt="Ảnh xem trước" hidden>
+                <div class="admin-memory-form-actions">
+                  <button type="submit" class="admin-primary-button" id="admin-memory-submit">💾 Lưu Kỷ Niệm</button>
+                  <button type="button" class="admin-secondary-button" id="admin-memory-cancel-edit" hidden>Hủy sửa</button>
+                </div>
+              </form>
+            </section>
+
+            <section class="admin-config-panel" id="admin-panel-attributes" role="tabpanel" aria-labelledby="admin-config-tab-attributes" hidden>
+              <section class="admin-tool-card admin-cultivation-editor" aria-labelledby="admin-cultivation-title">
+                <h4 id="admin-cultivation-title">Chỉnh Sửa Bảng Thuộc Tính Tu Tiên</h4>
+                <form id="admin-cultivation-form" class="admin-form">
+                  <label for="admin-cultivation-stage">Giai đoạn</label>
+                  <select id="admin-cultivation-stage" required>
+                    <option value="luc-nho">Tuổi thơ</option>
+                    <option value="2021">2021</option>
+                    <option value="2022">2022</option>
+                    <option value="2023">2023</option>
+                    <option value="2024">2024</option>
+                    <option value="2025">2025</option>
+                    <option value="2026">2026</option>
+                  </select>
+                  <label for="admin-cultivation-level">Level</label>
+                  <input id="admin-cultivation-level" type="text" maxlength="80" required>
+                  <label for="admin-cultivation-name">Tên Cảnh Giới</label>
+                  <input id="admin-cultivation-name" type="text" maxlength="100" required>
+                  <label for="admin-cultivation-fate">Mệnh Cách</label>
+                  <textarea id="admin-cultivation-fate" rows="2" maxlength="240" required></textarea>
+                  <h5 class="admin-attribute-section-title">Linh Căn &amp; Căn Cốt Chính</h5>
+                  <div id="admin-cultivation-mainstats" class="admin-attribute-list"></div>
+                  <h5 class="admin-attribute-section-title">Thiên Phú Phụ</h5>
+                  <div id="admin-cultivation-skills" class="admin-cultivation-skills"></div>
+                  <button type="submit" class="admin-primary-button">💾 Lưu Thuộc Tính</button>
+                </form>
+                <p id="admin-cultivation-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+              </section>
+              <section class="admin-tool-card admin-user-cultivation-editor" aria-labelledby="admin-user-cultivation-heading">
+                <h4 id="admin-user-cultivation-heading">⚡ Điều Chỉnh Tu Vi Đạo Hữu</h4>
+                <form id="admin-user-cultivation-form" class="admin-form">
+                  <label for="admin-user-cultivation-id">📧 Gmail Đạo Hữu</label>
+                  <input id="admin-user-cultivation-id" type="email" placeholder="nhapemail@gmail.com" autocomplete="email" required>
+                  <label for="admin-user-cultivation-points">Tu Vi mới</label>
+                  <input id="admin-user-cultivation-points" type="number" min="0" step="1" required>
+                  <button type="submit" class="admin-primary-button">💾 Lưu Tu Vi Đạo Hữu</button>
+                </form>
+                <p id="admin-user-cultivation-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+                <button type="button" class="admin-secondary-button admin-cultivation-refresh" id="admin-cultivation-users-refresh">↻ Tải danh sách Đạo Hữu</button>
+                <div id="admin-cultivation-users-list" class="admin-cultivation-users-list" aria-live="polite"></div>
+              </section>
+            </section>
+
+            <section class="admin-memory-panel" id="admin-panel-manage-memories" role="tabpanel" aria-labelledby="admin-tab-memory" hidden>
+              <section class="admin-tool-card" aria-labelledby="admin-visitor-title">
+                <h4 id="admin-visitor-title">Bộ Đếm Đạo Hữu Lỡ Bước Nhập Môn</h4>
+                <label class="admin-toggle-row" for="admin-visitor-visible">
+                  <input type="checkbox" id="admin-visitor-visible">
+                  <span class="admin-toggle-switch" aria-hidden="true"></span>
+                  <span>Hiển thị bộ đếm ở Sảnh Chính</span>
+                </label>
+                <form id="admin-visitor-count-form" class="admin-form admin-visitor-count-form">
+                  <label for="admin-visitor-count">Số đếm đạo hữu hiện tại</label>
+                  <div class="admin-visitor-count-controls">
+                    <input id="admin-visitor-count" type="number" min="0" step="1" inputmode="numeric" required>
+                    <button type="submit" class="admin-primary-button">💾 Cập Nhật Bộ Đếm</button>
+                  </div>
+                </form>
+                <p id="admin-visitor-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+              </section>
+              <div class="admin-memory-manager">
+                <h3>Kỷ niệm động và ảnh gốc</h3>
+                <label class="admin-search-label" for="admin-memory-search">Tìm theo năm hoặc từ khóa</label>
+                <input id="admin-memory-search" type="search" placeholder="Ví dụ: 2024, sinh nhật, chuyến đi...">
+                <div class="admin-memory-filters" role="group" aria-label="Lọc kỷ niệm theo giai đoạn">
+                  <button type="button" class="admin-memory-filter active" data-admin-memory-filter="all" aria-pressed="true">Tất cả</button>
+                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="luc-nho" aria-pressed="false">Tuổi thơ</button>
+                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="2021" aria-pressed="false">2021</button>
+                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="2022" aria-pressed="false">2022</button>
+                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="2023" aria-pressed="false">2023</button>
+                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="2024" aria-pressed="false">2024</button>
+                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="2025" aria-pressed="false">2025</button>
+                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="2026" aria-pressed="false">2026</button>
+                </div>
+                <div id="admin-memory-list" class="admin-memory-list"></div>
+                <section class="admin-tool-card admin-deleted-memory-manager" aria-labelledby="admin-deleted-memory-heading">
+                  <h4 id="admin-deleted-memory-heading">♻️ Khôi Phục Ảnh &amp; Ký Ức Đã Xóa</h4>
+                  <div id="admin-deleted-memory-list" class="admin-deleted-memory-list" aria-live="polite"></div>
+                </section>
+                <section class="admin-tool-card admin-managed-decrees" aria-labelledby="admin-managed-decrees-heading">
+                  <h4 id="admin-managed-decrees-heading">📜 Quản Lý Chiếu Thư Tông Chủ</h4>
+                  <div id="admin-decree-list-memory" class="admin-decree-list" aria-live="polite"></div>
+                </section>
+              </div>
+            </section>
+            <section class="admin-dashboard-panel" id="admin-panel-reviews" role="tabpanel" aria-labelledby="admin-tab-reviews" hidden>
+              <section class="admin-tool-card">
+                <h4>💌 Duyệt Lưu Bút</h4>
+                <label class="admin-search-label" for="admin-guestbook-search">Tìm theo tên, năm hoặc nội dung</label>
+                <input id="admin-guestbook-search" type="search" placeholder="Nhập từ khóa...">
+                <div id="admin-guestbook-list" class="admin-review-list" aria-live="polite"></div>
+              </section>
+              <section class="admin-tool-card">
+                <h4>🗣️ Bình Luận Các Mốc</h4>
+                <label class="admin-search-label" for="admin-comment-search">Tìm theo mốc, năm hoặc nội dung</label>
+                <input id="admin-comment-search" type="search" placeholder="Nhập từ khóa...">
+                <div id="admin-comment-list" class="admin-review-list" aria-live="polite"></div>
+              </section>
+              <p id="admin-review-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+            </section>
+            <section class="admin-dashboard-panel" id="admin-panel-game" role="tabpanel" aria-labelledby="admin-tab-game" hidden>
+              <section class="admin-tool-card">
+                <h4>🎯 Bảng Đố Vui Độ Kiếp</h4>
+                <label class="admin-search-label" for="admin-game-search">Tìm theo tên hoặc tài khoản</label>
+                <input id="admin-game-search" type="search" placeholder="Nhập từ khóa...">
+                <div id="admin-game-score-list" class="admin-review-list" aria-live="polite"></div>
+                <p id="admin-game-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+              </section>
+            </section>
+            <section class="admin-dashboard-panel" id="admin-panel-backup" role="tabpanel" aria-labelledby="admin-tab-backup" hidden>
+              <section class="admin-tool-card">
+                <h4>💾 Sao Lưu Dữ Liệu Tông Môn</h4>
+                <p class="admin-form-intro">Xuất cấu hình, ký ức, lưu bút, bình luận và bảng Độ Kiếp thành một tệp JSON.</p>
+                <button type="button" class="admin-primary-button" id="admin-export-backup">⬇️ Xuất File Sao Lưu (.json)</button>
+                <p id="admin-backup-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+              </section>
+            </section>
+          </section>
+<aside id="floating-bg-player" class="floating-bg-player playing" aria-label="Trình phát nhạc nền">
+    <button id="bg-music-toggle-btn" class="bg-music-disk-btn" title="Tạm dừng nhạc nền">
+      <span class="bg-disk-icon" id="bg-disk-icon">🎵</span>
+    </button>
+    <div class="bg-music-info">
+      <span class="bg-music-tag">NHẠC NỀN TỔNG (SHUFFLE)</span>
+      <span class="bg-music-title" id="bg-music-current-title">Đang phát ngẫu nhiên...</span>
+    </div>
+    <button id="bg-music-next-btn" class="bg-music-skip-btn" title="Chuyển ngẫu nhiên bài kế tiếp">
+      ⏭️
+    </button>
+    <button type="button" id="bg-music-collapse-btn" class="bg-music-collapse-btn" aria-label="Thu nhỏ trình phát nhạc">⌄</button>
+  </aside>
+<div id="auth-modal" class="admin-modal auth-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" hidden>
+    <div class="admin-modal-backdrop" id="auth-modal-backdrop"></div>
+    <section class="admin-modal-dialog">
+      <header class="admin-modal-header">
+        <div>
+          <span class="admin-modal-kicker">NGỌC BỘI ĐẠO HỮU</span>
+          <h2 id="auth-modal-title">Cổng Đạo Hữu</h2>
+        </div>
+        <button type="button" class="admin-modal-close" id="auth-modal-close" aria-label="Đóng cửa sổ tài khoản">✕</button>
+      </header>
+
+      <div class="admin-modal-content">
+        <div class="auth-tabs" id="auth-tabs" role="tablist" aria-label="Chọn đăng nhập hoặc đăng ký">
+          <button type="button" class="auth-tab active" id="auth-tab-login" role="tab" aria-selected="true" aria-controls="auth-login-form">Đăng nhập</button>
+          <button type="button" class="auth-tab" id="auth-tab-signup" role="tab" aria-selected="false" aria-controls="auth-signup-form">Đăng ký</button>
+        </div>
+        <form id="auth-login-form" class="admin-form auth-form" autocomplete="on">
+          <p class="admin-form-intro">Đăng nhập để khai mở các pháp bảo tương tác của bảo tàng.</p>
+          <label for="auth-login-email">Email</label>
+          <input id="auth-login-email" name="email" type="email" autocomplete="username" required>
+          <label for="auth-login-password">Mật khẩu</label>
+          <input id="auth-login-password" name="password" type="password" autocomplete="current-password" required>
+          <button type="submit" class="admin-primary-button">Đăng nhập</button>
+        </form>
+        <form id="auth-signup-form" class="admin-form auth-form" autocomplete="on" novalidate hidden>
+          <p class="admin-form-intro">Lập danh tính Đạo Hữu để cùng lưu giữ những mảnh ký ức.</p>
+          <label for="auth-signup-name">Đạo Hiệu</label>
+          <input id="auth-signup-name" name="display_name" type="text" minlength="2" maxlength="25" autocomplete="nickname" required>
+          <label for="auth-signup-email">Email</label>
+          <input id="auth-signup-email" name="email" type="email" autocomplete="email" required>
+          <label for="auth-signup-password">Mật khẩu (ít nhất 6 ký tự)</label>
+          <input id="auth-signup-password" name="password" type="password" minlength="6" autocomplete="new-password" required>
+          <button type="submit" class="admin-primary-button">Tạo Tài Khoản Đạo Hữu</button>
+        </form>
+        <button type="button" class="admin-secondary-button auth-google-button" id="auth-google-sign-in">Tiếp tục với Google</button>
+        <p id="auth-status" class="admin-status" role="status" aria-live="polite"></p>
+
+        <section id="auth-account-panel" hidden>
+          <div class="admin-dashboard-heading">
+            <p id="auth-user-label"></p>
+            <button type="button" id="auth-sign-out" class="admin-secondary-button">Đăng xuất</button>
+          </div>
+          <section id="auth-cultivation-card" class="auth-cultivation-card" hidden aria-labelledby="auth-cultivation-title">
+            <div class="cultivation-card-heading">
+              <span class="admin-modal-kicker">TU VI ĐẠO HỮU</span>
+              <strong id="auth-cultivation-rank">Phàm Nhân Nhập Môn</strong>
+            </div>
+            <p class="cultivation-total">Tổng tu vi: <strong id="auth-cultivation-total">0</strong></p>
+            <div class="cultivation-streak-row">
+              <span class="cultivation-streak-badge" id="auth-cultivation-streak">🔥 Chuỗi 0 ngày</span>
+            </div>
+            <div class="cultivation-progress-wrap">
+              <progress id="auth-cultivation-progress" max="100" value="0" aria-label="Tiến độ cảnh giới"></progress>
+              <span id="auth-cultivation-progress-label">0 / 50 Tu Vi</span>
+            </div>
+            <p id="auth-cultivation-status" class="cultivation-status" role="status" aria-live="polite"></p>
+            <h3 id="auth-cultivation-title">Nhiệm vụ khai mở tu vi</h3>
+            <ul class="cultivation-mission-list">
+              <li>Điểm danh hằng ngày <strong>+10 · +20 từ 3 ngày · +35 từ 7 ngày</strong></li>
+              <li>Tặng Linh Thạch <strong>+10</strong> (tối đa 50/ngày)</li>
+              <li>In Vé Lưu Niệm <strong>+15</strong></li>
+              <li>Gửi lời nhắn Sổ Lưu Bút <strong>+20</strong></li>
+              <li>Trả lời đúng Đoán Năm <strong>+5/câu</strong></li>
+              <li>Rút Quẻ Lời Răn Của Lão Tổ <strong>+5/ngày</strong></li>
+            </ul>
+            <button type="button" class="btn btn-invite cultivation-invite-button" data-invite-friends>
+              <span>🔗 Mời Đạo Hữu</span>
+            </button>
+          </section>
+          <div id="auth-member-panel" class="auth-member-panel" hidden>
+            <span class="admin-modal-kicker">THẺ ĐẠO HỮU</span>
+            <p>Email đang đăng nhập: <strong id="auth-member-email"></strong></p>
+          </div>
+          
+        </section>
+
+      </div>
+    </section>
+  </div>
+<footer class="museum-footer">
+    <div class="container footer-container">
+      <div class="footer-brand">
+        <h3>✦ THIÊN MỆNH CHI THÀNH • HẢI THÀNH LÃO TỔ ✦</h3>
+        <p>Truyền âm nhập mật hoặc kết giao đạo hữu với Thành Chủ tại hạ giới qua các linh phù bên dưới:</p>
+      </div>
+      <nav class="footer-contact-links" aria-label="Kết giao với Hải Thành Lão Tổ">
+        <a class="footer-contact-link" id="footer-zalo-link" href="https://zalo.me/0988305473" target="_blank" rel="noopener noreferrer">💬 Zalo: 0988305473</a>
+        <a class="footer-contact-link" href="https://www.tiktok.com/@haithanh.05" target="_blank" rel="noopener noreferrer">🎵 TikTok: @haithanh.05</a>
+        <a class="footer-contact-link" href="https://www.instagram.com/haithanh.05" target="_blank" rel="noopener noreferrer">📸 Instagram: @haithanh.05</a>
+        <a class="footer-contact-link" href="https://www.facebook.com/haithanh2505" target="_blank" rel="noopener noreferrer">🌐 Facebook: haithanh2505</a>
+      </nav>
+      <div class="footer-bottom">
+        <div class="footer-actions">
+          <button type="button" class="btn btn-invite footer-invite-button" id="btn-invite-friends" data-invite-friends>🔗 Mời Đạo Hữu</button>
+          <a href="index.html" class="back-to-top">← Quay lại Đại Điện</a>
+        </div>
+        <p class="footer-copyright">© 2026 Thiên Mệnh Chi Thành • Chế tác bởi Kiếm Tốc Lập Code</p>
+      </div>
+    </div>
+  </footer>
+<script defer src="js/memories.js?v=72"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="js/app.js?v=72"></script>
+</body>
+</html>

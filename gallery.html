@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="xianxia" data-sky-mood="cosmic" data-page="gallery">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tàng Kinh Các • Thiên Mệnh Chi Thành</title>
+  <meta name="description" content="Thiên Mệnh Chi Thành — biên niên ký lưu giữ những cột mốc trưởng thành và ký ức của Hải Thành.">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=72">
+  <link rel="stylesheet" href="css/style.css?v=72">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+</head>
+<body class="museum-body">
+<div id="cultivation-bg" aria-hidden="true">
+    <canvas id="xianxia-canvas" aria-hidden="true"></canvas>
+    <div class="qi-mist qi-mist-one"></div>
+    <div class="qi-mist qi-mist-two"></div>
+    <div class="xianxia-moon"></div>
+    <div class="taiji-orbit" aria-hidden="true">
+      <svg viewBox="0 0 200 200">
+        <circle cx="100" cy="100" r="88"></circle>
+        <circle cx="100" cy="100" r="72"></circle>
+        <path d="M100 28a36 36 0 0 1 0 72 36 36 0 0 0 0 72 72 72 0 0 1 0-144z"></path>
+        <circle cx="100" cy="64" r="7"></circle>
+        <circle cx="100" cy="136" r="7"></circle>
+        <path d="M100 12v176M12 100h176M38 38l124 124M162 38 38 162"></path>
+      </svg>
+    </div>
+
+    <svg class="floating-islands" viewBox="0 0 900 260" aria-hidden="true">
+      <path d="M70 154 126 116l35 12 38-48 54 48 38-20 54 46 28 8-22 20H80z"></path>
+      <path d="M530 132 574 98l37 9 44-54 50 54 34-18 51 39 44 14-18 17H520z"></path>
+      <path d="M180 190h105M655 177h110"></path>
+    </svg>
+    <svg class="bamboo-shadow bamboo-left" viewBox="0 0 220 300" aria-hidden="true">
+      <path d="M22 300C50 210 66 124 106 8M58 226l-45-24m60-25 46-31m-23-26-45-28m58-34 40-28"></path>
+      <path d="M34 205q-40-30-28-58 28 5 38 43m27-49q-8-43 20-60 18 24-9 68m14 24q43-38 66-17-10 30-58 35m-39-85Q53 69 67 43q29 18 19 53"></path>
+    </svg>
+    <svg class="bamboo-shadow bamboo-right" viewBox="0 0 220 300" aria-hidden="true">
+      <path d="M198 300C170 210 154 124 114 8M162 226l45-24m-60-25-46-31m23-26 45-28m-58-34-40-28"></path>
+      <path d="M186 205q40-30 28-58-28 5-38 43m-27-49q8-43-20-60-18 24 9 68m-14 24q-43-38-66-17 10 30 58 35m39-85q23-32 9-58-29 18-19 53"></path>
+    </svg>
+    <div class="ancient-seals seal-left" aria-hidden="true">天道<br>劍心<br>靈脈</div>
+    <div class="ancient-seals seal-right" aria-hidden="true">仙山<br>雲海<br>長生</div>
+    <svg class="flying-crane crane-one" viewBox="0 0 120 48" aria-hidden="true">
+      <path d="M4 28q24-22 44-4 12-17 28-15-9 8-11 17 19-9 39-2l12-8-5 12q-23 13-48 1-24 16-53-1L4 28zm54-4q-7-15-1-23 6 11 6 22m9-4q6-14 15-16-3 10-10 18"></path>
+    </svg>
+    <svg class="flying-crane crane-two" viewBox="0 0 120 48" aria-hidden="true">
+      <path d="M4 28q24-22 44-4 12-17 28-15-9 8-11 17 19-9 39-2l12-8-5 12q-23 13-48 1-24 16-53-1L4 28zm54-4q-7-15-1-23 6 11 6 22m9-4q6-14 15-16-3 10-10 18"></path>
+    </svg>
+    <svg class="flying-cultivator" viewBox="0 0 150 130" aria-hidden="true">
+      <path d="M19 93h112M30 90l-9 7 11 2m99-6 10 5-11 2" class="cultivator-sword"></path>
+      <path d="M68 35q-8 12-5 27l-17 24q18 5 31-9l12 9 21 5q-5-15-19-24l-4-25-19-7z" class="cultivator-robe"></path>
+      <circle cx="75" cy="27" r="10" class="cultivator-body"></circle>
+      <path d="M64 24q3-18 24-12l10 10-26-2-8 4m15 38q-21 1-34-9m35 11q15-9 27-4" class="cultivator-trails"></path>
+    </svg>
+    <svg class="star-chart" viewBox="0 0 600 600" aria-hidden="true">
+      <circle cx="300" cy="300" r="220"></circle>
+      <circle cx="300" cy="300" r="180"></circle>
+      <circle cx="300" cy="300" r="120"></circle>
+      <polygon points="300,62 354,246 538,300 354,354 300,538 246,354 62,300 246,246"></polygon>
+      <polygon points="300,100 500,300 300,500 100,300"></polygon>
+      <path d="M300 62v476M62 300h476M131 131l338 338M469 131 131 469"></path>
+      <circle class="star-chart-node" cx="300" cy="62" r="5"></circle>
+      <circle class="star-chart-node" cx="538" cy="300" r="5"></circle>
+      <circle class="star-chart-node" cx="300" cy="538" r="5"></circle>
+      <circle class="star-chart-node" cx="62" cy="300" r="5"></circle>
+    </svg>
+    <span class="qi-sword sword-one"><svg viewBox="0 0 120 24"><path d="M7 12h72l26-5-8 5 8 5-26-5H7l-4-4z"></path><path d="M26 8v8M17 12h9"></path></svg></span>
+    <span class="qi-sword sword-two"><svg viewBox="0 0 120 24"><path d="M7 12h72l26-5-8 5 8 5-26-5H7l-4-4z"></path><path d="M26 8v8M17 12h9"></path></svg></span>
+    <span class="qi-sword sword-three"><svg viewBox="0 0 120 24"><path d="M7 12h72l26-5-8 5 8 5-26-5H7l-4-4z"></path><path d="M26 8v8M17 12h9"></path></svg></span>
+    <span class="qi-sword sword-four"><svg viewBox="0 0 120 24"><path d="M7 12h72l26-5-8 5 8 5-26-5H7l-4-4z"></path><path d="M26 8v8M17 12h9"></path></svg></span>
+    <span class="qi-stone stone-one"></span>
+    <span class="qi-stone stone-two"></span>
+    <span class="qi-stone stone-three"></span>
+    <span class="qi-stone stone-four"></span>
+    <span class="qi-firefly firefly-one"></span>
+    <span class="qi-firefly firefly-two"></span>
+    <span class="qi-firefly firefly-three"></span>
+    <span class="qi-firefly firefly-four"></span>
+    <span class="qi-firefly firefly-five"></span>
+    <span class="qi-firefly firefly-six"></span>
+    <span class="bamboo-leaf leaf-one"></span>
+    <span class="bamboo-leaf leaf-two"></span>
+    <span class="bamboo-leaf leaf-three"></span>
+    <span class="bamboo-leaf leaf-four"></span>
+    <span class="bamboo-leaf leaf-five"></span>
+    <span class="bamboo-leaf leaf-six"></span>
+    <svg class="immortal-landscape" viewBox="0 0 1440 420" preserveAspectRatio="none" aria-hidden="true">
+      <path class="mountain-back" d="M0 235 95 150l60 52 118-140 104 146 99-92 82 109 118-154 135 147 91-91 122 131 103-118 133 127 80-65v178H0z"></path>
+      <path class="mountain-front" d="m0 293 115-82 92 65 124-96 109 86 110-75 95 83 126-112 117 112 112-78 102 92 113-64 125 82v114H0z"></path>
+      <path class="immortal-gate" d="M625 335v-75q0-60 95-60t95 60v75m-166-53h142m-158 53h174m-154-55v55m82-55v55m73-55v55m-185-81 17-28 19 28m39 0 17-28 19 28m39 0 17-28 19 28"></path>
+      <path class="pavilion-roof" d="m1035 293 40-29 42 29-8-19 28 8-62-49-62 49 28-8-8 19zm-18 4h121m-102 0v42m82-42v42m-93 0h105"></path>
+    </svg>
+    <div class="xianxia-cloud cloud-one"></div>
+    <div class="xianxia-cloud cloud-two"></div>
+    <div class="xianxia-cloud cloud-three"></div>
+    <div class="meridian-axis"><span class="meridian-light"></span></div>
+    <svg class="tribulation-lightning" viewBox="0 0 300 180" aria-hidden="true">
+      <path d="m208 2-38 67h34l-49 61 24-52h-32z"></path>
+      <path d="m266 38-24 42h24l-37 47 17-39h-22z"></path>
+    </svg>
+  </div>
+<canvas id="spiritParticlesCanvas" aria-hidden="true"></canvas>
+<div class="ambient-glow glow-1"></div><div class="ambient-glow glow-2"></div><div class="ambient-glow glow-3"></div>
+<header id="sticky-header" class="sticky-nav">
+    <div class="nav-container">
+      <div class="nav-brand-row">
+        <a href="index.html" class="nav-brand">
+          <img src="images/2026/IMG_4295_Original.JPG" alt="Hải Thành" class="brand-logo-img">
+          <span class="brand-title">THIÊN MỆNH CHI THÀNH</span>
+        </a>
+        <div class="nav-account-actions">
+          <button type="button" class="nav-btn nav-cultivation-badge" id="nav-cultivation-badge" aria-label="Tu Vi Đạo Hữu" title="Mở Động Phủ Tu Luyện">✦ <span id="nav-cultivation-label">Phàm Nhân</span> • <span id="nav-cultivation-total">0</span></button>
+          <button type="button" class="nav-btn nav-btn-auth" id="btn-header-auth" aria-haspopup="dialog" aria-controls="auth-modal">◈ Đăng nhập</button>
+        </div>
+      </div>
+
+      <!-- Quick Chapter Dropdown / Nav -->
+      <nav class="nav-chapters" id="nav-chapters-bar" aria-label="Điều hướng giai đoạn">
+        <!-- Rendered dynamically -->
+      </nav>
+
+      <div class="nav-actions">
+        <!-- Theme Switcher Dropdown (Nâng cấp Theme Switcher) -->
+        <a id="nav-tongmon-link" class="nav-btn nav-btn-game" href="tongmon.html" aria-label="Tông Môn Các: Độ Kiếp và Thẻ Đệ Tử">
+          <span class="btn-icon">⚔️</span>
+          <span class="btn-text">Tông Môn Các</span>
+        </a>
+        <a class="nav-btn nav-page-link" id="nav-home-link" href="index.html" aria-label="Quay lại Đại Điện">← Đại Điện</a>
+        <a class="nav-btn nav-page-link" href="gallery.html" aria-label="Tàng Kinh Các - xem ảnh"><span class="btn-icon">🖼️</span><span class="btn-text">Tàng Kinh Các</span></a>
+        <a class="nav-btn nav-page-link" id="nav-admin-link" href="admin.html" aria-label="Nội Các Quản Trị" hidden><span class="btn-icon">⚙️</span><span class="btn-text">Nội Các</span></a>
+      </div>
+    </div>
+    <div class="scroll-progress-line" id="scroll-progress"></div>
+  </header>
+<main id="stages-container" class="stages-main">
+    <!-- Stages are rendered dynamically from window.MEMORIES_DATA -->
+  </main>
+<div id="authSealModal" class="archive-lock-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="archive-lock-title" hidden>
+    <section class="archive-lock-dialog">
+      <button type="button" class="archive-lock-close" id="archive-lock-close" aria-label="Đóng hộp thoại">✕</button>
+      <span class="archive-lock-seal" aria-hidden="true">🔒</span>
+      <h2 id="archive-lock-title">Kết Giới Tông Môn Đang Khóa!</h2>
+      <p>Đạo hữu chưa ghi danh nhập môn nên thiên cơ bất khả lộ — mau đăng nhập hoặc ghi danh đệ tử để phá giải phong ấn, chiêm ngưỡng toàn bộ ký ức bí truyền của Hải Thành Lão Tổ!</p>
+      <div class="archive-lock-actions">
+        <button type="button" class="btn btn-primary archive-lock-auth" id="archive-lock-auth">⚡ Ghi Danh / Đăng Nhập Ngay</button>
+        <button type="button" class="archive-lock-dismiss" id="archive-lock-dismiss">✕ Đóng</button>
+      </div>
+    </section>
+  </div>
+<div id="filmstrip-modal" class="modal filmstrip-modal" aria-hidden="true" inert hidden role="dialog" aria-labelledby="modal-stage-title">
+    <div class="modal-backdrop" id="modal-filmstrip-backdrop"></div>
+    <div class="modal-dialog filmstrip-dialog">
+      
+      <!-- Film Perforation Border Top -->
+      <div class="film-holes film-holes-top">
+        <div class="holes-track"></div>
+      </div>
+
+      <div class="filmstrip-modal-header">
+        <div class="modal-title-group">
+          <span class="modal-tag">🎞️ CUỘN PHIM LƯU TRỮ HOÀN CHỈNH</span>
+          <h2 class="modal-stage-title" id="modal-stage-title">Giai đoạn...</h2>
+          <p class="modal-stage-subtitle" id="modal-stage-subtitle">Kho lưu trữ gồm 0 khoảnh khắc</p>
+        </div>
+        <button class="modal-close-btn" id="btn-close-filmstrip" aria-label="Đóng cuộn phim">✕</button>
+      </div>
+
+      <!-- Month Filter Bar inside Modal -->
+      <div class="modal-month-filter">
+        <div class="month-filter-label">Lọc theo tháng:</div>
+        <div class="month-filter-chips" id="modal-month-chips">
+          <!-- Dynamic month chips (Tất cả, T1 -> T12, Tuổi thơ / Khác) -->
+        </div>
+      </div>
+
+      <!-- Filmstrip Grid Body -->
+      <div class="filmstrip-grid-body">
+        <div class="filmstrip-grid" id="modal-filmstrip-grid">
+          <!-- Dynamic film items (#01, #02...) -->
+        </div>
+        <div class="empty-filter-state" id="modal-empty-state" style="display: none;">
+          <p>Không có khoảnh khắc nào trong khoảng thời gian này.</p>
+        </div>
+      </div>
+
+      <!-- Film Perforation Border Bottom -->
+      <div class="film-holes film-holes-bottom">
+        <div class="holes-track"></div>
+      </div>
+
+    </div>
+  </div>
+<div id="lightbox-modal" class="lightbox-modal" aria-hidden="true" inert hidden role="dialog">
+    <div class="lightbox-backdrop" id="lightbox-backdrop"></div>
+    
+    <div class="lightbox-container">
+      <!-- Lightbox Header / Controls -->
+      <div class="lightbox-header">
+        <div class="lightbox-counter" id="lightbox-counter">1 / 1</div>
+        <div class="lightbox-actions">
+          <button class="lightbox-btn" id="lightbox-btn-zoom" title="Thu phóng" aria-label="Thu phóng">🔍</button>
+          <button class="lightbox-btn" id="lightbox-btn-close" title="Đóng (Esc)" aria-label="Đóng">✕</button>
+        </div>
+      </div>
+
+      <!-- Main Image View -->
+      <div class="lightbox-stage">
+        <button class="lightbox-nav lightbox-prev" id="lightbox-btn-prev" aria-label="Ảnh trước">‹</button>
+        
+        <div class="lightbox-img-wrapper" id="lightbox-img-wrapper">
+          <img id="lightbox-img" src="" alt="Kỷ niệm phóng to" width="1600" height="1200" loading="lazy" decoding="async">
+          <video id="lightbox-video" controls playsinline preload="metadata" hidden></video>
+        </div>
+
+        <button class="lightbox-nav lightbox-next" id="lightbox-btn-next" aria-label="Ảnh sau">›</button>
+      </div>
+
+      <!-- Lightbox Caption -->
+      <div class="lightbox-caption-box">
+        <div class="lightbox-badge" id="lightbox-tag">Kỷ niệm</div>
+        <h3 class="lightbox-title" id="lightbox-title">Tiêu đề kỷ niệm</h3>
+        <p class="lightbox-desc" id="lightbox-desc">Ghi chú kỷ niệm...</p>
+        <div class="lightbox-time" id="lightbox-time">Thời gian</div>
+        <button type="button" class="memory-like-button lightbox-memory-like" id="lightbox-memory-like" aria-pressed="false">
+          <span class="memory-like-icon" aria-hidden="true">💠</span>
+          <span class="memory-like-label">Tặng Linh Thạch (<span class="memory-like-count">0</span>)</span>
+        </button>
+        <p class="memory-like-status" id="lightbox-memory-like-status" role="status" aria-live="polite"></p>
+      </div>
+
+      <!-- Thumbnails Strip (if multi-image) -->
+      <div class="lightbox-thumbs-bar" id="lightbox-thumbs">
+        <!-- Thumbnails -->
+      </div>
+    </div>
+  </div>
+<div id="cinema-modal" class="cinema-modal" aria-hidden="true" inert hidden role="dialog" aria-labelledby="cinema-sub-title">
+    <div class="cinema-backdrop"></div>
+
+    <!-- Story Segmented Progress Bar (Top) -->
+    <div class="cinema-progress-row" id="cinema-progress-row">
+      <!-- Dynamic segments -->
+    </div>
+
+    <!-- Top Cinema Header Controls -->
+    <div class="cinema-top-header">
+      <div class="cinema-title-badge">
+        <span class="cinema-icon-pulse">🎬</span>
+        <span class="cinema-badge-text" id="cinema-badge-mode">CHIẾU PHIM TOÀN HÀNH TRÌNH</span>
+      </div>
+
+      <div class="cinema-controls-group">
+        <button class="cinema-ctrl-btn" id="cinema-btn-pause" title="Tạm dừng / Tiếp tục" aria-label="Tạm dừng">
+          <span id="cinema-pause-icon">⏸</span>
+        </button>
+        <button class="cinema-ctrl-btn" id="cinema-btn-audio" title="Bật / Tắt âm thanh" aria-label="Âm thanh">
+          <span id="cinema-audio-icon">🔊</span>
+        </button>
+        <button class="cinema-ctrl-btn cinema-close-btn" id="cinema-btn-close" title="Thoát rạp chiếu (Esc)" aria-label="Đóng">
+          ✕
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Screen Stage -->
+    <div class="cinema-screen" id="cinema-screen">
+      <!-- Click navigation tap zones (Left for prev, Right for next) -->
+      <div class="cinema-tap-zone zone-left" id="cinema-zone-prev" title="Kỷ niệm trước"></div>
+      <div class="cinema-tap-zone zone-right" id="cinema-zone-next" title="Kỷ niệm sau"></div>
+
+      <!-- Arrow Nav Buttons -->
+      <button class="cinema-arrow cinema-arrow-prev" id="cinema-arrow-prev" aria-label="Kỷ niệm trước">‹</button>
+      <button class="cinema-arrow cinema-arrow-next" id="cinema-arrow-next" aria-label="Kỷ niệm sau">›</button>
+
+      <!-- Slides Container -->
+      <div class="cinema-slides-viewport" id="cinema-slides-viewport">
+        <!-- Rendered dynamically -->
+      </div>
+    </div>
+
+    <!-- Bottom Cinematic Subtitle Bar -->
+    <div class="cinema-subtitle-bar">
+      <div class="cinema-sub-meta">
+        <span class="cinema-sub-stage" id="cinema-sub-stage">GIAI ĐOẠN...</span>
+        <span class="cinema-sub-divider">&bull;</span>
+        <span class="cinema-sub-time" id="cinema-sub-time">THỜI GIAN...</span>
+      </div>
+      <h2 class="cinema-sub-title" id="cinema-sub-title">Tiêu đề khoảnh khắc</h2>
+      <p class="cinema-sub-desc" id="cinema-sub-desc">Ghi chú...</p>
+    </div>
+
+    <!-- Hidden Dedicated Cinema Audio Element -->
+    <audio id="cinema-audio" preload="auto"></audio>
+  </div>
+<div id="milestoneCommentsModal" class="feature-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="milestone-comments-modal-title" hidden>
+    <div class="feature-modal-backdrop" data-modal-close="milestoneCommentsModal"></div>
+    <section class="feature-modal-dialog milestone-comments-dialog" tabindex="-1">
+      <header class="feature-modal-header">
+        <div>
+          <span class="admin-modal-kicker">LINH PHÙ TRUYỀN ÂM</span>
+          <h2 id="milestone-comments-modal-title">🗣️ Tường Truyền Âm</h2>
+          <p id="milestone-comments-modal-stage"></p>
+        </div>
+        <button type="button" class="admin-modal-close" data-modal-close="milestoneCommentsModal" aria-label="Đóng Tường Truyền Âm">✕</button>
+      </header>
+      <section class="milestone-comments milestone-comments-modal-content" id="milestone-comments-modal-content" data-stage-id="">
+        <ol class="milestone-comment-list" aria-live="polite">
+          <li class="milestone-comments-empty">Đang mở linh phù truyền âm…</li>
+        </ol>
+        <p class="milestone-comments-status" role="status" aria-live="polite"></p>
+        <form class="milestone-comment-form" id="milestone-comment-modal-form">
+          <label class="sr-only" for="milestone-comment-modal-input">Lời nhắn truyền âm</label>
+          <textarea id="milestone-comment-modal-input" name="content" maxlength="220" rows="3" required placeholder="Gửi một lời truyền âm, tối đa 220 ký tự…"></textarea>
+          <div class="milestone-comment-form-footer">
+            <span class="milestone-comment-count">0/220</span>
+            <button type="submit" class="milestone-comment-submit">Gửi</button>
+          </div>
+        </form>
+      </section>
+    </section>
+  </div>
+<aside id="floating-bg-player" class="floating-bg-player playing" aria-label="Trình phát nhạc nền">
+    <button id="bg-music-toggle-btn" class="bg-music-disk-btn" title="Tạm dừng nhạc nền">
+      <span class="bg-disk-icon" id="bg-disk-icon">🎵</span>
+    </button>
+    <div class="bg-music-info">
+      <span class="bg-music-tag">NHẠC NỀN TỔNG (SHUFFLE)</span>
+      <span class="bg-music-title" id="bg-music-current-title">Đang phát ngẫu nhiên...</span>
+    </div>
+    <button id="bg-music-next-btn" class="bg-music-skip-btn" title="Chuyển ngẫu nhiên bài kế tiếp">
+      ⏭️
+    </button>
+    <button type="button" id="bg-music-collapse-btn" class="bg-music-collapse-btn" aria-label="Thu nhỏ trình phát nhạc">⌄</button>
+  </aside>
+<div id="auth-modal" class="admin-modal auth-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" hidden>
+    <div class="admin-modal-backdrop" id="auth-modal-backdrop"></div>
+    <section class="admin-modal-dialog">
+      <header class="admin-modal-header">
+        <div>
+          <span class="admin-modal-kicker">NGỌC BỘI ĐẠO HỮU</span>
+          <h2 id="auth-modal-title">Cổng Đạo Hữu</h2>
+        </div>
+        <button type="button" class="admin-modal-close" id="auth-modal-close" aria-label="Đóng cửa sổ tài khoản">✕</button>
+      </header>
+
+      <div class="admin-modal-content">
+        <div class="auth-tabs" id="auth-tabs" role="tablist" aria-label="Chọn đăng nhập hoặc đăng ký">
+          <button type="button" class="auth-tab active" id="auth-tab-login" role="tab" aria-selected="true" aria-controls="auth-login-form">Đăng nhập</button>
+          <button type="button" class="auth-tab" id="auth-tab-signup" role="tab" aria-selected="false" aria-controls="auth-signup-form">Đăng ký</button>
+        </div>
+        <form id="auth-login-form" class="admin-form auth-form" autocomplete="on">
+          <p class="admin-form-intro">Đăng nhập để khai mở các pháp bảo tương tác của bảo tàng.</p>
+          <label for="auth-login-email">Email</label>
+          <input id="auth-login-email" name="email" type="email" autocomplete="username" required>
+          <label for="auth-login-password">Mật khẩu</label>
+          <input id="auth-login-password" name="password" type="password" autocomplete="current-password" required>
+          <button type="submit" class="admin-primary-button">Đăng nhập</button>
+        </form>
+        <form id="auth-signup-form" class="admin-form auth-form" autocomplete="on" novalidate hidden>
+          <p class="admin-form-intro">Lập danh tính Đạo Hữu để cùng lưu giữ những mảnh ký ức.</p>
+          <label for="auth-signup-name">Đạo Hiệu</label>
+          <input id="auth-signup-name" name="display_name" type="text" minlength="2" maxlength="25" autocomplete="nickname" required>
+          <label for="auth-signup-email">Email</label>
+          <input id="auth-signup-email" name="email" type="email" autocomplete="email" required>
+          <label for="auth-signup-password">Mật khẩu (ít nhất 6 ký tự)</label>
+          <input id="auth-signup-password" name="password" type="password" minlength="6" autocomplete="new-password" required>
+          <button type="submit" class="admin-primary-button">Tạo Tài Khoản Đạo Hữu</button>
+        </form>
+        <button type="button" class="admin-secondary-button auth-google-button" id="auth-google-sign-in">Tiếp tục với Google</button>
+        <p id="auth-status" class="admin-status" role="status" aria-live="polite"></p>
+
+        <section id="auth-account-panel" hidden>
+          <div class="admin-dashboard-heading">
+            <p id="auth-user-label"></p>
+            <button type="button" id="auth-sign-out" class="admin-secondary-button">Đăng xuất</button>
+          </div>
+          <section id="auth-cultivation-card" class="auth-cultivation-card" hidden aria-labelledby="auth-cultivation-title">
+            <div class="cultivation-card-heading">
+              <span class="admin-modal-kicker">TU VI ĐẠO HỮU</span>
+              <strong id="auth-cultivation-rank">Phàm Nhân Nhập Môn</strong>
+            </div>
+            <p class="cultivation-total">Tổng tu vi: <strong id="auth-cultivation-total">0</strong></p>
+            <div class="cultivation-streak-row">
+              <span class="cultivation-streak-badge" id="auth-cultivation-streak">🔥 Chuỗi 0 ngày</span>
+            </div>
+            <div class="cultivation-progress-wrap">
+              <progress id="auth-cultivation-progress" max="100" value="0" aria-label="Tiến độ cảnh giới"></progress>
+              <span id="auth-cultivation-progress-label">0 / 50 Tu Vi</span>
+            </div>
+            <p id="auth-cultivation-status" class="cultivation-status" role="status" aria-live="polite"></p>
+            <h3 id="auth-cultivation-title">Nhiệm vụ khai mở tu vi</h3>
+            <ul class="cultivation-mission-list">
+              <li>Điểm danh hằng ngày <strong>+10 · +20 từ 3 ngày · +35 từ 7 ngày</strong></li>
+              <li>Tặng Linh Thạch <strong>+10</strong> (tối đa 50/ngày)</li>
+              <li>In Vé Lưu Niệm <strong>+15</strong></li>
+              <li>Gửi lời nhắn Sổ Lưu Bút <strong>+20</strong></li>
+              <li>Trả lời đúng Đoán Năm <strong>+5/câu</strong></li>
+              <li>Rút Quẻ Lời Răn Của Lão Tổ <strong>+5/ngày</strong></li>
+            </ul>
+            <button type="button" class="btn btn-invite cultivation-invite-button" data-invite-friends>
+              <span>🔗 Mời Đạo Hữu</span>
+            </button>
+          </section>
+          <div id="auth-member-panel" class="auth-member-panel" hidden>
+            <span class="admin-modal-kicker">THẺ ĐẠO HỮU</span>
+            <p>Email đang đăng nhập: <strong id="auth-member-email"></strong></p>
+          </div>
+          
+        </section>
+
+      </div>
+    </section>
+  </div>
+<footer class="museum-footer">
+    <div class="container footer-container">
+      <div class="footer-brand">
+        <h3>✦ THIÊN MỆNH CHI THÀNH • HẢI THÀNH LÃO TỔ ✦</h3>
+        <p>Truyền âm nhập mật hoặc kết giao đạo hữu với Thành Chủ tại hạ giới qua các linh phù bên dưới:</p>
+      </div>
+      <nav class="footer-contact-links" aria-label="Kết giao với Hải Thành Lão Tổ">
+        <a class="footer-contact-link" id="footer-zalo-link" href="https://zalo.me/0988305473" target="_blank" rel="noopener noreferrer">💬 Zalo: 0988305473</a>
+        <a class="footer-contact-link" href="https://www.tiktok.com/@haithanh.05" target="_blank" rel="noopener noreferrer">🎵 TikTok: @haithanh.05</a>
+        <a class="footer-contact-link" href="https://www.instagram.com/haithanh.05" target="_blank" rel="noopener noreferrer">📸 Instagram: @haithanh.05</a>
+        <a class="footer-contact-link" href="https://www.facebook.com/haithanh2505" target="_blank" rel="noopener noreferrer">🌐 Facebook: haithanh2505</a>
+      </nav>
+      <div class="footer-bottom">
+        <div class="footer-actions">
+          <button type="button" class="btn btn-invite footer-invite-button" id="btn-invite-friends" data-invite-friends>🔗 Mời Đạo Hữu</button>
+          <a href="index.html" class="back-to-top">← Quay lại Đại Điện</a>
+        </div>
+        <p class="footer-copyright">© 2026 Thiên Mệnh Chi Thành • Chế tác bởi Kiếm Tốc Lập Code</p>
+      </div>
+    </div>
+  </footer>
+<script defer src="js/memories.js?v=72"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="js/app.js?v=72"></script>
+</body>
+</html>

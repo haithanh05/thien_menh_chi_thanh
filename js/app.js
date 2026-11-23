@@ -10,9 +10,11 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_QNd2mBQcvG4Ay3TXFscC-g_2tucdI69';
   const ADMIN_EMAIL = 'phamnguyenhaithanh4@gmail.com';
   const SITE_NAME = 'Thiên Mệnh Chi Thành';
+  const pageName = document.documentElement.dataset.page || document.body.dataset.page || 'home';
+  const MUSIC_SESSION_KEY = 'thien-menh-chi-thanh:background-music';
   const GENESIS_PREFACE = '"Nơi lưu giữ toàn bộ quá trình độ kiếp từ một phàm nhân hay ngủ nướng thành Kiến Trúc Sư Gõ Phím tuổi 21. Đạo hữu ghé thăm xin nhẹ tay tặng chút Linh Thạch, chớ dại trêu chọc Thành Chủ kẻo bị tế lên Thiên Kiêu Bảng!"';
   const HERO_INTRO = '"Chào mừng đạo hữu hạ phàm ghé thăm thánh địa của Thành Chủ Hải Thành! Nơi đây phong ấn toàn bộ huyết lệ từ thuở luyện khí còn sợ bug đến khi độ kiếp thành chiến thần gõ phím Lv.21. Đã lỡ chân bước vào thì đừng vội quay xe — hãy dâng chút Linh Thạch lấy hên rồi cùng khám phá thiên cơ!"';
-  const INVITE_URL = 'https://haithanh05.github.io/thien_menh_chi_thanh';
+  const INVITE_URL = 'https://kyniem.ht05.id.vn/';
   const INVITE_MESSAGE = `Mời đạo hữu ghé thăm Thiên Mệnh Chi Thành – nơi Thành Chủ Hải Thành lưu giữ hành trình độ kiếp từ phàm nhân sợ bug đến chiến thần gõ phím: ${INVITE_URL}`;
   const GENESIS_IMAGE = 'images/%E1%BA%A3nh%20ch%C3%ADnh/avt.jpg';
   const CULTIVATION_PROFILE_COLUMNS = 'user_id,email,display_name,tu_vi,last_daily_claim,daily_like_xp,last_like_date,ticket_claimed,guestbook_claimed,streak_days,last_checkin_date,updated_at';
@@ -22,6 +24,7 @@
     ticket: true,
     game: true,
     audio: true,
+    autoPlayMusic: true,
     attributes: true,
     leaderboard: true,
     hideAdminFromLeaderboard: false,
@@ -88,6 +91,9 @@
   let html2CanvasPromise = null;
   let adminToastTimer = null;
   let cultivationCardControlsBound = false;
+  let adminDashboardRequest = null;
+  let adminWorkspaceInitialized = false;
+  let adminPreviewObjectUrl = '';
 
   // State Management
   const state = {
@@ -109,6 +115,9 @@
     hiddenMemories: new Set(),
     deletedMemories: [],
     adminMemoryFilter: 'all',
+    adminGuestbookRows: [],
+    adminCommentRows: [],
+    adminGameRows: [],
     archive: {
       memories: [],
       renderedCount: 0,
@@ -139,7 +148,11 @@
       audio: new Audio(),
       startTimeApplied: false,
       isPlaying: false,
-      isUserMuted: true
+      isUserMuted: true,
+      savedPlaybackState: null,
+      resumeTime: 0,
+      autoplayAwaitingGesture: false,
+      autoplayGestureHandler: null
     },
     lightbox: {
       images: [],
@@ -669,7 +682,7 @@
     try {
       const { data, error } = await supabaseClient.from('site_settings')
         .select('key,value')
-        .in('key', ['cultivation_overrides', 'custom_attributes', 'visitor_config', 'hidden_memories']);
+        .in('key', ['cultivation_overrides', 'custom_attributes', 'visitor_config', 'hidden_memories', 'announcement_config']);
       if (error) throw error;
 
       (data || []).forEach(row => {
@@ -681,6 +694,12 @@
         ? state.siteSettings.hidden_memories.map(String)
         : []);
       applyHiddenMemories();
+      renderSiteAnnouncement();
+      const announcement = state.siteSettings.announcement_config || {};
+      const announcementEnabled = document.getElementById('admin-announcement-enabled');
+      const announcementText = document.getElementById('admin-announcement-text');
+      if (announcementEnabled) announcementEnabled.checked = announcement.enabled === true;
+      if (announcementText) announcementText.value = String(announcement.text || '');
       const visitorConfig = state.siteSettings.visitor_config || {};
       state.visitor.visible = visitorConfig.visible === true;
       refreshCultivationStageCards();
@@ -788,7 +807,8 @@
       });
     };
     setVisibility('#nav-thien-co-btn', toggles.oracle);
-    setVisibility('#nav-ticket-btn', toggles.ticket);
+    setVisibility('#nav-tongmon-link', toggles.ticket || toggles.game);
+    setVisibility('#ticket-station', toggles.ticket);
     setVisibility('#btn-nav-game', toggles.game);
     setVisibility('#global-audio-toggle, #floating-bg-player', toggles.audio);
     setVisibility('.rpg-card', toggles.attributes);
@@ -1602,36 +1622,70 @@
         stage.memories.filter(memory => !memory.isDynamic)
       ]));
 
+      const homePage = pageName === 'home';
+      const galleryPage = pageName === 'gallery';
+      const adminPage = pageName === 'admin';
+      const tongmonPage = pageName === 'tongmon';
+
       initHeroSection();
-      initStickyNav();
+      if (homePage || galleryPage) initStickyNav();
       applyGlobalThemeSettings(state.themeSettings);
       applyFeatureToggles();
-      renderStages();
-      initHomeCultivationCard();
+      if (homePage || galleryPage) renderStages();
+      initOffscreenPerformance();
+      if (homePage) initHomeCultivationCard();
+      initHeaderOffset();
       initCultivationBackground();
       initXianxiaCanvas();
       initSpiritParticlesCanvas();
-      initAchievements();
-      initTimeCapsule();
-      initTicketStation();
+      if (homePage) {
+        initAchievements();
+        initTimeCapsule();
+      }
+
+      if (tongmonPage) initTicketStation();
       initBackgroundMusic();
       bindGlobalEvents();
       initModalNavbarSync();
-      initUtilityPanels();
+      if (homePage) initUtilityPanels();
       initAuthPortal();
-      initArchiveLockModal();
-      initCultivationOracle();
+      initPageAccessControls();
+      if (galleryPage) initArchiveLockModal();
+      if (homePage) initCultivationOracle();
       initFeatureModals();
-      initLeaderboardTabs();
-      void loadDynamicMemories();
+      if (homePage || tongmonPage) initLeaderboardTabs();
+      if (galleryPage || tongmonPage || adminPage) {
+        void loadDynamicMemories().then(() => {
+          if (adminPage && isAdminUser()) renderAdminMetrics();
+        });
+      }
       void Promise.all([loadSiteSettings(), loadGlobalSiteConfig()])
-        .then(() => initVisitorCounter());
-      void loadTongChuDecrees();
+        .then(() => {
+          startConfiguredBackgroundMusic();
+          if (homePage) initVisitorCounter();
+          if (adminPage && isAdminUser()) void renderAdminMetrics();
+        });
+      if (homePage || adminPage) void loadTongChuDecrees();
       initGlobalSiteRealtime();
-      void loadLeaderboard();
+      if (homePage || tongmonPage) void loadLeaderboard();
     } catch (e) {
       console.error('Không thể khởi tạo trang:', e);
     }
+  }
+
+  function initOffscreenPerformance() {
+    if (!('IntersectionObserver' in window)) return;
+    const targets = document.querySelectorAll(
+      '.stage-section, .achievement-card, .time-capsule-section, ' +
+      '.home-cultivation-section, .page-route-card, #public-leaderboard, .public-leaderboard-card'
+    );
+    if (!targets.length) return;
+    const observer = new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        entry.target.classList.toggle('is-offscreen-perf', !entry.isIntersecting);
+      });
+    }, { rootMargin: '160px 0px' });
+    targets.forEach(target => observer.observe(target));
   }
 
   function findStageForMemoryRow(row) {
@@ -1932,7 +1986,10 @@
 
     if (user) {
       fillAuthenticatedForms(user);
-      if (admin) renderAdminMemoryList();
+      if (admin) {
+        renderAdminMemoryList();
+        void loadAdminDashboardData();
+      }
       syncAdminSettingsForm();
     }
   }
@@ -1969,6 +2026,7 @@
     const wasAuthenticated = Boolean(authenticatedUser);
     authenticatedUser = user || null;
     renderAuthState(authenticatedUser);
+    syncPageAccess();
     refreshVisibleMemoryLikes();
     initMilestoneComments();
     if (authenticatedUser) {
@@ -1994,6 +2052,72 @@
       pendingAuthAction = null;
       closeProtectedFeatures();
     }
+  }
+
+  function syncPageAccess() {
+    const isAdmin = isAdminUser();
+    const adminLink = document.getElementById('nav-admin-link');
+    const homeAdminLink = document.getElementById('home-admin-route');
+    if (adminLink) adminLink.hidden = !isAdmin;
+    if (homeAdminLink) homeAdminLink.hidden = !isAdmin;
+
+    if (pageName === 'tongmon') {
+      const lock = document.getElementById('tongmon-access-lock');
+      const content = document.getElementById('tongmon-content');
+      const ticketStation = document.getElementById('ticket-station');
+      const isAuthenticated = Boolean(authenticatedUser);
+      if (lock) lock.hidden = isAuthenticated;
+      if (lock && lock.parentElement) lock.parentElement.hidden = isAuthenticated;
+      if (content) content.hidden = !isAuthenticated;
+      if (ticketStation) ticketStation.hidden = !isAuthenticated || !state.featureToggles.ticket;
+    }
+
+    if (pageName === 'admin') {
+      const lock = document.getElementById('admin-access-denied');
+      const dashboard = document.getElementById('admin-dashboard');
+      const message = document.getElementById('admin-lock-message');
+      if (lock) lock.hidden = isAdmin;
+      if (lock && lock.parentElement) lock.parentElement.hidden = isAdmin;
+      if (dashboard) dashboard.hidden = !isAdmin;
+      if (message && authenticatedUser && !isAdmin) {
+        message.textContent = 'Tài khoản hiện tại không có quyền Tông Chủ. Hãy đăng nhập bằng tài khoản quản trị để mở Nội Các.';
+      }
+    }
+  }
+
+  function renderSiteAnnouncement() {
+    const banner = document.getElementById('site-announcement');
+    if (!banner) return;
+    const config = state.siteSettings.announcement_config || {};
+    const title = document.getElementById('site-announcement-title');
+    const text = document.getElementById('site-announcement-text');
+    const content = String(config.text || '').trim();
+    banner.hidden = config.enabled !== true || !content;
+    if (title) title.textContent = String(config.title || 'Thông báo Tông Môn');
+    if (text) text.textContent = content;
+  }
+
+  function initHeaderOffset() {
+    const header = document.getElementById('sticky-header');
+    if (!header) return;
+    const updateHeight = () => {
+      document.documentElement.style.setProperty('--header-height', `${Math.ceil(header.getBoundingClientRect().height)}px`);
+    };
+    updateHeight();
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(updateHeight).observe(header);
+    } else {
+      window.addEventListener('resize', updateHeight, { passive: true });
+    }
+  }
+
+  function initPageAccessControls() {
+    const loginButtons = [
+      document.getElementById('tongmon-login-btn'),
+      document.getElementById('admin-login-btn')
+    ].filter(Boolean);
+    loginButtons.forEach(button => button.addEventListener('click', () => openAuthModal()));
+    syncPageAccess();
   }
 
   function closeProtectedFeatures() {
@@ -2213,6 +2337,354 @@
     }
   }
 
+  function activateAdminConfigPanel(panelId) {
+    document.querySelectorAll('.admin-config-panel').forEach(panel => {
+      panel.hidden = panel.id !== panelId;
+    });
+    document.querySelectorAll('[data-admin-config-target]').forEach(button => {
+      const selected = button.dataset.adminConfigTarget === panelId;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-selected', String(selected));
+    });
+    if (panelId === 'admin-panel-attributes' && isAdminUser()) {
+      void loadAdminCultivationProfiles();
+    }
+  }
+
+  function initAdminWorkspace() {
+    const configContainer = document.getElementById('admin-config-panels');
+    if (configContainer) {
+      ['admin-panel-features', 'admin-panel-theme', 'admin-panel-attributes'].forEach(id => {
+        const panel = document.getElementById(id);
+        if (panel) {
+          panel.hidden = true;
+          configContainer.appendChild(panel);
+        }
+      });
+    }
+    activateAdminConfigPanel('admin-panel-features');
+
+    const announcement = state.siteSettings.announcement_config || {};
+    const enabled = document.getElementById('admin-announcement-enabled');
+    const text = document.getElementById('admin-announcement-text');
+    if (enabled) enabled.checked = announcement.enabled === true;
+    if (text) text.value = String(announcement.text || '');
+
+    const announcementForm = document.getElementById('admin-announcement-form');
+    if (announcementForm) {
+      announcementForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const status = document.getElementById('admin-announcement-status');
+        const saveButton = announcementForm.querySelector('button[type="submit"]');
+        const next = {
+          enabled: Boolean(enabled && enabled.checked),
+          text: String(text && text.value || '').trim()
+        };
+        if (next.enabled && !next.text) {
+          if (status) status.textContent = 'Hãy nhập nội dung trước khi bật dải thông báo.';
+          return;
+        }
+        if (saveButton) saveButton.disabled = true;
+        if (status) status.textContent = 'Đang lưu thông báo…';
+        try {
+          await saveSiteSetting('announcement_config', next);
+          renderSiteAnnouncement();
+          if (status) status.textContent = 'Đã lưu và áp dụng thông báo trên trang chủ.';
+        } catch (error) {
+          if (status) status.textContent = `Không thể lưu thông báo: ${error.message || 'Lỗi kết nối.'}`;
+        } finally {
+          if (saveButton) saveButton.disabled = false;
+        }
+      });
+    }
+
+    const memorySearch = document.getElementById('admin-memory-search');
+    if (memorySearch) memorySearch.addEventListener('input', renderAdminMemoryList);
+    const metricsRefresh = document.getElementById('admin-metrics-refresh');
+    if (metricsRefresh) metricsRefresh.addEventListener('click', () => {
+      adminDashboardRequest = null;
+      void loadAdminDashboardData();
+    });
+    const backupButton = document.getElementById('admin-export-backup');
+    if (backupButton) backupButton.addEventListener('click', () => void exportAdminBackup(backupButton));
+
+    ['admin-guestbook-search', 'admin-comment-search', 'admin-game-search'].forEach(id => {
+      const input = document.getElementById(id);
+      if (input) input.addEventListener('input', () => {
+        if (id === 'admin-guestbook-search') renderAdminGuestbookList();
+        else if (id === 'admin-comment-search') renderAdminCommentsList();
+        else renderAdminGameScores();
+      });
+    });
+    const dashboard = document.getElementById('admin-dashboard');
+    if (dashboard) {
+      dashboard.addEventListener('click', event => {
+        const target = event.target instanceof Element ? event.target : null;
+        const configTab = target && target.closest('[data-admin-config-target]');
+        if (configTab) {
+          activateAdminConfigPanel(configTab.dataset.adminConfigTarget);
+          return;
+        }
+        const deleteButton = target && target.closest('[data-admin-delete-table]');
+        if (deleteButton) void deleteAdminRecord(deleteButton);
+      });
+    }
+    initAdminMemoryPreview();
+  }
+
+  function initAdminMemoryPreview() {
+    const fileInput = document.getElementById('admin-memory-image');
+    const urlInput = document.getElementById('admin-memory-image-url');
+    const preview = document.getElementById('admin-memory-image-preview');
+    if (!preview) return;
+    const revokePreviewUrl = () => {
+      if (adminPreviewObjectUrl) URL.revokeObjectURL(adminPreviewObjectUrl);
+      adminPreviewObjectUrl = '';
+    };
+    const displayUrl = value => {
+      revokePreviewUrl();
+      const url = String(value || '').trim();
+      if (!url) {
+        preview.removeAttribute('src');
+        preview.hidden = true;
+        return;
+      }
+      try {
+        const parsed = new URL(url, window.location.href);
+        if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('URL ảnh không hợp lệ.');
+        preview.src = parsed.href;
+        preview.hidden = false;
+      } catch (error) {
+        preview.removeAttribute('src');
+        preview.hidden = true;
+      }
+    };
+    if (fileInput) {
+      fileInput.addEventListener('change', () => {
+        revokePreviewUrl();
+        const file = fileInput.files && fileInput.files[0];
+        if (!file || !file.type.startsWith('image/')) {
+          displayUrl(urlInput && urlInput.value);
+          return;
+        }
+        adminPreviewObjectUrl = URL.createObjectURL(file);
+        preview.src = adminPreviewObjectUrl;
+        preview.hidden = false;
+      });
+    }
+    if (urlInput) urlInput.addEventListener('input', () => {
+      if (!(fileInput && fileInput.files && fileInput.files.length)) displayUrl(urlInput.value);
+    });
+    preview.addEventListener('error', () => {
+      preview.hidden = true;
+    });
+  }
+
+  async function loadAdminDashboardData() {
+    if (!isAdminUser() || !supabaseClient || adminDashboardRequest) return adminDashboardRequest;
+    adminDashboardRequest = (async () => {
+      await Promise.all([renderAdminMetrics(), loadAdminReviewData(), loadAdminGameScoresData()]);
+    })();
+    try {
+      await adminDashboardRequest;
+    } catch (error) {
+      const status = document.getElementById('admin-review-status');
+      if (status) status.textContent = `Không thể tải dữ liệu Nội Các: ${error.message || 'Lỗi kết nối Supabase.'}`;
+    } finally {
+      adminDashboardRequest = null;
+    }
+  }
+
+  async function renderAdminMetrics() {
+    const visitorMetric = document.getElementById('admin-metric-visitors');
+    const memoryMetric = document.getElementById('admin-metric-memories');
+    const guestbookMetric = document.getElementById('admin-metric-guestbook');
+    const commentsMetric = document.getElementById('admin-metric-comments');
+    if (!visitorMetric || !supabaseClient) return;
+    const countMemories = () => (state.data && state.data.stages || [])
+      .reduce((total, stage) => total + stage.memories.length, 0);
+    visitorMetric.textContent = String(getVisitorCount(state.siteConfig.visitor_count) ?? state.visitor.count ?? 0);
+    memoryMetric.textContent = String(countMemories());
+    const [guestbookResult, commentsResult] = await Promise.all([
+      supabaseClient.from('guestbook').select('message', { count: 'exact', head: true }),
+      supabaseClient.from('milestone_comments').select('stage_id', { count: 'exact', head: true })
+    ]);
+    guestbookMetric.textContent = guestbookResult.error ? '—' : String(guestbookResult.count || 0);
+    commentsMetric.textContent = commentsResult.error ? '—' : String(commentsResult.count || 0);
+    const errors = [guestbookResult.error, commentsResult.error].filter(Boolean);
+    const status = document.getElementById('admin-review-status');
+    if (status && errors.length) {
+      status.textContent = `Không tải đủ số liệu: ${errors.map(error => error.message || 'Lỗi truy vấn').join(' · ')}`;
+    }
+  }
+
+  async function loadAdminReviewData() {
+    const status = document.getElementById('admin-review-status');
+    if (!supabaseClient || !isAdminUser()) return;
+    if (status) status.textContent = 'Đang tải lưu bút và bình luận…';
+    const [guestbookResult, commentsResult] = await Promise.all([
+      supabaseClient.from('guestbook').select('*').order('unlock_date', { ascending: false }).limit(500),
+      supabaseClient.from('milestone_comments').select('*').order('created_at', { ascending: false }).limit(500)
+    ]);
+    state.adminGuestbookRows = guestbookResult.error ? [] : guestbookResult.data || [];
+    state.adminCommentRows = commentsResult.error ? [] : commentsResult.data || [];
+    renderAdminGuestbookList();
+    renderAdminCommentsList();
+    const errors = [
+      guestbookResult.error && `Lưu bút: ${guestbookResult.error.message || 'lỗi truy vấn'}`,
+      commentsResult.error && `Bình luận: ${commentsResult.error.message || 'lỗi truy vấn'}`
+    ].filter(Boolean);
+    if (status) status.textContent = errors.length
+      ? `Không tải được dữ liệu: ${errors.join(' · ')}`
+      : `Đã tải ${state.adminGuestbookRows.length} lưu bút và ${state.adminCommentRows.length} bình luận.`;
+  }
+
+  function renderAdminGuestbookList() {
+    const list = document.getElementById('admin-guestbook-list');
+    if (!list) return;
+    const query = String(document.getElementById('admin-guestbook-search')?.value || '').trim().toLocaleLowerCase('vi');
+    const rows = (state.adminGuestbookRows || []).filter(row =>
+      `${row.sender_name || ''} ${row.message || ''} ${row.unlock_date || ''} ${row.created_at || ''}`
+        .toLocaleLowerCase('vi').includes(query));
+    list.replaceChildren();
+    appendAdminReviewRows(list, rows, row =>
+      `${row.sender_name || 'Người bạn ẩn danh'} · ${row.unlock_date || row.created_at || ''}`,
+      row => String(row.message || ''),
+      'guestbook');
+  }
+
+  function renderAdminCommentsList() {
+    const list = document.getElementById('admin-comment-list');
+    if (!list) return;
+    const query = String(document.getElementById('admin-comment-search')?.value || '').trim().toLocaleLowerCase('vi');
+    const rows = (state.adminCommentRows || []).filter(row =>
+      `${row.stage_id || ''} ${row.content || ''} ${row.created_at || ''} ${row.user_id || ''}`
+        .toLocaleLowerCase('vi').includes(query));
+    list.replaceChildren();
+    appendAdminReviewRows(list, rows, row =>
+      `Mốc ${row.stage_id || '—'} · ${row.created_at || ''}`,
+      row => String(row.content || ''),
+      'milestone_comments');
+  }
+
+  function appendAdminReviewRows(list, rows, titleFor, messageFor, table) {
+    if (!rows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'admin-memory-empty';
+      empty.textContent = 'Không có nội dung phù hợp.';
+      list.appendChild(empty);
+      return;
+    }
+    rows.forEach(row => {
+      const item = document.createElement('article');
+      item.className = 'admin-review-item';
+      const heading = document.createElement('strong');
+      heading.textContent = titleFor(row);
+      const content = document.createElement('p');
+      content.textContent = messageFor(row);
+      item.append(heading, content);
+      if (row.id != null) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'admin-delete-button';
+        remove.dataset.adminDeleteTable = table;
+        remove.dataset.adminDeleteId = String(row.id);
+        remove.textContent = 'Xóa';
+        item.appendChild(remove);
+      }
+      list.appendChild(item);
+    });
+  }
+
+  async function loadAdminGameScoresData() {
+    const status = document.getElementById('admin-game-status');
+    if (!status || !supabaseClient || !isAdminUser()) return;
+    status.textContent = 'Đang tải bảng Độ Kiếp…';
+    const { data, error } = await supabaseClient.from('leaderboard')
+      .select('user_id,display_name,best_score,best_streak,updated_at')
+      .order('best_score', { ascending: false })
+      .limit(500);
+    state.adminGameRows = error ? [] : data || [];
+    renderAdminGameScores();
+    status.textContent = error
+      ? `Không tải được bảng Độ Kiếp: ${error.message || 'Lỗi truy vấn.'}`
+      : `Đã tải ${state.adminGameRows.length} đạo hữu.`;
+  }
+
+  function renderAdminGameScores() {
+    const list = document.getElementById('admin-game-score-list');
+    if (!list) return;
+    const query = String(document.getElementById('admin-game-search')?.value || '').trim().toLocaleLowerCase('vi');
+    const rows = (state.adminGameRows || []).filter(row =>
+      `${row.display_name || ''} ${row.user_id || ''} ${row.best_score || ''}`
+        .toLocaleLowerCase('vi').includes(query));
+    list.replaceChildren();
+    rows.forEach((row, index) => {
+      const item = document.createElement('article');
+      item.className = 'admin-review-item';
+      const heading = document.createElement('strong');
+      heading.textContent = `${index + 1}. ${row.display_name || 'Đạo hữu'} · ${row.best_score || 0} điểm`;
+      const content = document.createElement('p');
+      content.textContent = `Chuỗi đúng: ${row.best_streak || 0} · Cập nhật: ${row.updated_at || '—'} · ID: ${row.user_id || '—'}`;
+      item.append(heading, content);
+      list.appendChild(item);
+    });
+  }
+
+  async function deleteAdminRecord(button) {
+    const table = button.dataset.adminDeleteTable;
+    const id = button.dataset.adminDeleteId;
+    if (!isAdminUser() || !supabaseClient || !['guestbook', 'milestone_comments'].includes(table) || !id) return;
+    const label = table === 'guestbook' ? 'lưu bút' : 'bình luận';
+    if (!window.confirm(`Xóa ${label} này khỏi Supabase? Thao tác không thể hoàn tác.`)) return;
+    button.disabled = true;
+    try {
+      const { error } = await supabaseClient.from(table).delete().eq('id', id);
+      if (error) throw error;
+      adminDashboardRequest = null;
+      await loadAdminDashboardData();
+    } catch (error) {
+      const status = document.getElementById('admin-review-status');
+      if (status) status.textContent = `Không thể xóa ${label}: ${error.message || 'Lỗi cập nhật dữ liệu.'}`;
+      button.disabled = false;
+    }
+  }
+
+  async function exportAdminBackup(button) {
+    const status = document.getElementById('admin-backup-status');
+    if (!isAdminUser() || !supabaseClient) {
+      if (status) status.textContent = 'Chỉ Tông Chủ đã xác thực mới được xuất dữ liệu.';
+      return;
+    }
+    button.disabled = true;
+    if (status) status.textContent = 'Đang lấy dữ liệu sao lưu…';
+    const tables = ['site_config', 'site_settings', 'memories', 'guestbook', 'milestone_comments', 'leaderboard'];
+    try {
+      const results = await Promise.all(tables.map(async table => {
+        const { data, error } = await supabaseClient.from(table).select('*');
+        if (error) throw new Error(`${table}: ${error.message || 'Lỗi truy vấn.'}`);
+        return [table, data || []];
+      }));
+      const backup = {
+        exportedAt: new Date().toISOString(),
+        site: SITE_NAME,
+        data: Object.fromEntries(results)
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `thien-menh-chi-thanh-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      if (status) status.textContent = 'Đã xuất tệp sao lưu JSON.';
+    } catch (error) {
+      if (status) status.textContent = `Không thể xuất sao lưu đầy đủ: ${error.message || 'Lỗi truy vấn.'}`;
+    } finally {
+      button.disabled = false;
+    }
+  }
+
   function syncAdminSettingsForm() {
     const visitorToggle = document.getElementById('admin-visitor-visible');
     if (visitorToggle) visitorToggle.checked = state.visitor.visible;
@@ -2230,6 +2702,10 @@
   }
 
   function initAdminSettingsControls() {
+    if (!adminWorkspaceInitialized) {
+      initAdminWorkspace();
+      adminWorkspaceInitialized = true;
+    }
     const dashboardTabs = Array.from(document.querySelectorAll('[data-admin-panel-target]'));
     const initialDashboardTab = dashboardTabs.find(tab => tab.getAttribute('aria-selected') === 'true') || dashboardTabs[0];
     if (initialDashboardTab) activateAdminPanel(initialDashboardTab.dataset.adminPanelTarget);
@@ -2238,7 +2714,10 @@
       if (!clicked || !clicked.closest('#admin-dashboard')) return;
       const dashboardTab = clicked.closest('.admin-dashboard-tab[data-admin-panel-target]');
       if (dashboardTab) {
-        activateAdminPanel(dashboardTab.dataset.adminPanelTarget);
+        const panelId = dashboardTab.dataset.adminPanelTarget;
+        activateAdminPanel(panelId);
+        if (panelId === 'admin-panel-reviews') void loadAdminReviewData();
+        if (panelId === 'admin-panel-game') void loadAdminGameScoresData();
         return;
       }
       const memoryTab = clicked.closest('.admin-memory-subtab[data-memory-panel-target]');
@@ -2470,6 +2949,12 @@
         });
         state.featureToggles = next;
         applyFeatureToggles();
+        if (key === 'autoPlayMusic' && input.checked) {
+          void startConfiguredBackgroundMusic(true);
+        } else if (key === 'autoPlayMusic') {
+          state.bgMusic.autoplayAwaitingGesture = false;
+          removeAutoplayGestureListeners();
+        }
         renderCultivationCard();
         void loadCultivationLeaderboard();
         try {
@@ -2479,6 +2964,10 @@
         } catch (error) {
           state.featureToggles = previous;
           applyFeatureToggles();
+          if (key === 'autoPlayMusic' && previous.autoPlayMusic === false) {
+            state.bgMusic.autoplayAwaitingGesture = false;
+            removeAutoplayGestureListeners();
+          }
           renderCultivationCard();
           void loadCultivationLeaderboard();
           setAdminToolStatus('admin-feature-status', `Không thể lưu công tắc: ${error.message || 'Lỗi kết nối.'}`, true);
@@ -2597,6 +3086,7 @@
           form.scrollIntoView({ behavior: 'smooth', block: 'center' });
           return;
         }
+        if (action === 'delete' && !window.confirm(`Xóa chiếu thư “${decree.title}” khỏi Tông Môn?`)) return;
         target.disabled = true;
         try {
           const query = supabaseClient.from('tong_chu_decrees');
@@ -2785,8 +3275,7 @@
     const headerButton = document.getElementById('btn-header-auth');
     const loginForm = document.getElementById('auth-login-form');
     const signupForm = document.getElementById('auth-signup-form');
-    const memoryForm = document.getElementById('admin-memory-form');
-    if (!modal || !loginForm || !signupForm || !memoryForm) return;
+    if (!modal || !loginForm || !signupForm) return;
 
     renderAuthState(authenticatedUser);
     if (headerButton) {
@@ -2823,6 +3312,28 @@
     if (loginTab) loginTab.addEventListener('click', () => setAuthMode('login'));
     if (signupTab) signupTab.addEventListener('click', () => setAuthMode('signup'));
     initAdminSettingsControls();
+
+    const googleButton = document.getElementById('auth-google-sign-in');
+    if (googleButton) {
+      googleButton.addEventListener('click', async () => {
+        if (!supabaseClient) {
+          setAdminStatus('Dịch vụ tài khoản chưa sẵn sàng. Vui lòng kiểm tra kết nối mạng.', true);
+          return;
+        }
+        googleButton.disabled = true;
+        setAdminStatus('Đang mở cổng ghi danh Google…');
+        try {
+          const { error } = await supabaseClient.auth.signInWithOAuth({
+            provider: 'google',
+            options: { redirectTo: window.location.href }
+          });
+          if (error) throw error;
+        } catch (error) {
+          setAdminStatus(`Không thể đăng nhập bằng Google: ${error.message || 'Lỗi xác thực.'}`, true);
+          googleButton.disabled = false;
+        }
+      });
+    }
 
     loginForm.addEventListener('submit', async event => {
       event.preventDefault();
@@ -3242,6 +3753,8 @@
     if (!list || !state.data) return;
     list.replaceChildren();
     const filter = state.adminMemoryFilter || 'all';
+    const search = String(document.getElementById('admin-memory-search')?.value || '')
+      .trim().toLocaleLowerCase('vi');
     document.querySelectorAll('[data-admin-memory-filter]').forEach(button => {
       const active = button.dataset.adminMemoryFilter === filter;
       button.classList.toggle('active', active);
@@ -3257,11 +3770,16 @@
       const originalMemories = (state.originalMemoriesByStage.get(stage.id) || [])
         .map(memory => ({ stage, memory, isOriginal: true }));
       return [...dynamicMemories, ...originalMemories];
-    });
+    })
+      .filter(({ stage, memory }) => !search ||
+        `${stage.period} ${stage.title} ${memory.title} ${memory.time} ${memory.description || ''}`
+          .toLocaleLowerCase('vi').includes(search));
     if (!memories.length) {
       const empty = document.createElement('p');
       empty.className = 'admin-memory-empty';
-      empty.textContent = filter === 'all'
+      empty.textContent = search
+        ? 'Không tìm thấy ảnh hoặc kỷ niệm phù hợp.'
+        : filter === 'all'
         ? 'Chưa có kỷ niệm nào trong kho lưu trữ.'
         : 'Giai đoạn này chưa có ảnh hoặc kỷ niệm.';
       list.appendChild(empty);
@@ -3493,6 +4011,7 @@
     document.getElementById('admin-memory-type').value = memory.type || (memory.tag === 'Tâm sự' ? 'story' : 'photo');
     document.getElementById('admin-memory-image-url').value = memory.image && memory.image[0] || '';
     imageInput.value = '';
+    document.getElementById('admin-memory-image-url').dispatchEvent(new Event('input', { bubbles: true }));
     imageInput.required = false;
     if (title) title.textContent = 'Sửa Kỷ Niệm';
     if (submitButton) submitButton.textContent = 'Lưu thay đổi';
@@ -3508,6 +4027,13 @@
     const cancelButton = document.getElementById('admin-memory-cancel-edit');
     if (form) form.reset();
     if (imageInput) imageInput.required = false;
+    if (adminPreviewObjectUrl) URL.revokeObjectURL(adminPreviewObjectUrl);
+    adminPreviewObjectUrl = '';
+    const preview = document.getElementById('admin-memory-image-preview');
+    if (preview) {
+      preview.removeAttribute('src');
+      preview.hidden = true;
+    }
     if (title) title.textContent = 'Thêm Kỷ Niệm Mới';
     if (submitButton) submitButton.textContent = '💾 Lưu Kỷ Niệm';
     if (cancelButton) cancelButton.hidden = true;
@@ -4306,16 +4832,18 @@
 
           <!-- Bottom CTA: View Full Stage Archive -->
           <div class="stage-archive-row">
-            <button class="btn-open-archive" data-stage-id="${stage.id}">
-              <span class="archive-icon" aria-hidden="true">
-                <svg viewBox="0 0 32 32" focusable="false">
-                  <path d="M7 5.5h15a3 3 0 0 1 3 3v15a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-15a3 3 0 0 1 3-3Z" fill="none" stroke="currentColor" stroke-width="1.6"/>
-                  <path d="M8 9h13M8 13h13M8 17h13M8 21h8M22 4v23M25 8l3 2-3 2m0 7 3 2-3 2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
-                  <path d="M6 6.5 3.8 4.3m0 0v3m0-3h3" fill="none" stroke="#f8dfa0" stroke-linecap="round" stroke-width="1.2"/>
-                </svg>
-              </span>
-              <span>Khai Ấn Ngọc Giản: Ký Ức ${stage.period} (${stage.memories.length} mảnh tàn hồn)</span>
-            </button>
+            ${pageName === 'home'
+              ? `<a class="btn-open-gallery" href="gallery.html"><span class="archive-icon" aria-hidden="true"><svg viewBox="0 0 32 32" focusable="false"><path d="M7 5.5h15a3 3 0 0 1 3 3v15a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-15a3 3 0 0 1 3-3Z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 9h13M8 13h13M8 17h13M8 21h8M22 4v23M25 8l3 2-3 2m0 7 3 2-3 2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/><path d="M6 6.5 3.8 4.3m0 0v3m0-3h3" fill="none" stroke="#f8dfa0" stroke-linecap="round" stroke-width="1.2"/></svg></span><span>Xem toàn bộ ảnh &amp; ký ức tại Tàng Kinh Các</span></a>`
+              : `<button class="btn-open-archive" data-stage-id="${stage.id}">
+                  <span class="archive-icon" aria-hidden="true">
+                    <svg viewBox="0 0 32 32" focusable="false">
+                      <path d="M7 5.5h15a3 3 0 0 1 3 3v15a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-15a3 3 0 0 1 3-3Z" fill="none" stroke="currentColor" stroke-width="1.6"/>
+                      <path d="M8 9h13M8 13h13M8 17h13M8 21h8M22 4v23M25 8l3 2-3 2m0 7 3 2-3 2" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+                      <path d="M6 6.5 3.8 4.3m0 0v3m0-3h3" fill="none" stroke="#f8dfa0" stroke-linecap="round" stroke-width="1.2"/>
+                    </svg>
+                  </span>
+                  <span>Khai Ấn Ngọc Giản: Ký Ức ${stage.period} (${stage.memories.length} mảnh tàn hồn)</span>
+                </button>`}
           </div>
 
           <button type="button" class="milestone-comments-open btn btn-glass" data-stage-id="${escapeHtml(stage.id)}" aria-haspopup="dialog" aria-controls="milestoneCommentsModal">
@@ -5335,6 +5863,7 @@
 
     // Show Modal
     if (modal) {
+      modal.hidden = false;
       modal.classList.add('active');
       modal.setAttribute('aria-hidden', 'false');
       modal.inert = false;
@@ -5364,6 +5893,7 @@
             state.archive.memories = [];
             state.archive.renderedCount = 0;
             modal.classList.remove('active', 'is-closing');
+            modal.hidden = true;
             state.archive.closeTimer = null;
           });
         }, 160);
@@ -5597,6 +6127,7 @@
 
     const modal = document.getElementById('lightbox-modal');
     if (modal) {
+      modal.hidden = false;
       modal.classList.add('active');
       modal.setAttribute('aria-hidden', 'false');
       modal.inert = false;
@@ -5693,6 +6224,7 @@
       modal.classList.remove('active');
       modal.setAttribute('aria-hidden', 'true');
       modal.inert = true;
+      modal.hidden = true;
     }
     const wrapper = document.getElementById('lightbox-img-wrapper');
     if (wrapper) wrapper.classList.remove('zoomed');
@@ -5808,6 +6340,7 @@
     // Show Game Modal
     const modal = document.getElementById('game-modal');
     if (modal) {
+      modal.hidden = false;
       modal.classList.add('active');
       modal.setAttribute('aria-hidden', 'false');
       modal.inert = false;
@@ -5824,10 +6357,12 @@
       modal.classList.remove('active');
       modal.setAttribute('aria-hidden', 'true');
       modal.inert = true;
+      modal.hidden = true;
     }
     const filmModal = document.getElementById('filmstrip-modal');
     const lightboxModal = document.getElementById('lightbox-modal');
-    if (!filmModal.classList.contains('active') && !lightboxModal.classList.contains('active')) {
+    if ((!filmModal || !filmModal.classList.contains('active')) &&
+        (!lightboxModal || !lightboxModal.classList.contains('active'))) {
       document.body.style.overflow = '';
     }
   }
@@ -6432,6 +6967,7 @@
     // 5. Open Cinema Modal
     const modal = document.getElementById('cinema-modal');
     if (modal) {
+      modal.hidden = false;
       modal.classList.add('active');
       modal.setAttribute('aria-hidden', 'false');
       modal.inert = false;
@@ -6593,6 +7129,7 @@
       modal.classList.remove('active');
       modal.setAttribute('aria-hidden', 'true');
       modal.inert = true;
+      modal.hidden = true;
     }
 
     const filmModal = document.getElementById('filmstrip-modal');
@@ -6734,13 +7271,17 @@
 
     // Zoom Toggle in Lightbox
     const zoomBtn = document.getElementById('lightbox-btn-zoom');
-    zoomBtn.addEventListener('click', () => {
-      const wrapper = document.getElementById('lightbox-img-wrapper');
-      state.lightbox.isZoomed = !state.lightbox.isZoomed;
-      wrapper.classList.toggle('zoomed', state.lightbox.isZoomed);
-      setLightboxTransform(state.lightbox.isZoomed ? 2.5 : 1, 0, 0);
-    });
-    bindLightboxPan(document.getElementById('lightbox-img-wrapper'));
+    if (zoomBtn) {
+      zoomBtn.addEventListener('click', () => {
+        const wrapper = document.getElementById('lightbox-img-wrapper');
+        if (!wrapper) return;
+        state.lightbox.isZoomed = !state.lightbox.isZoomed;
+        wrapper.classList.toggle('zoomed', state.lightbox.isZoomed);
+        setLightboxTransform(state.lightbox.isZoomed ? 2.5 : 1, 0, 0);
+      });
+    }
+    const lightboxWrapper = document.getElementById('lightbox-img-wrapper');
+    if (lightboxWrapper) bindLightboxPan(lightboxWrapper);
 
     // Global Audio Toggle Button (Sticky Nav)
     const globalAudioToggle = document.getElementById('global-audio-toggle');
@@ -7241,6 +7782,16 @@
     state.bgMusic.audio.preload = 'none';
     state.bgMusic.isUserMuted = true;
     state.bgMusic.isPlaying = false;
+    state.bgMusic.savedPlaybackState = readBackgroundMusicState();
+    if (state.bgMusic.savedPlaybackState) {
+      const savedSource = normalizeMusicSource(state.bgMusic.savedPlaybackState.src);
+      const savedIndex = shuffled.findIndex(track => normalizeMusicSource(track.src) === savedSource);
+      if (savedIndex >= 0) {
+        state.bgMusic.resumeTime = Math.max(0, Number(state.bgMusic.savedPlaybackState.currentTime) || 0);
+        loadBgMusicTrack(savedIndex);
+        restoreBackgroundMusicPosition();
+      }
+    }
 
     // Hết bài → chuyển ngẫu nhiên bài khác (tránh lặp bài vừa phát)
     state.bgMusic.audio.addEventListener('ended', () => {
@@ -7296,6 +7847,127 @@
         nextBgMusicTrack();
       });
     }
+
+    registerBackgroundMusicPersistence();
+  }
+
+  function normalizeMusicSource(source) {
+    if (!source) return '';
+    try {
+      return new URL(source, window.location.href).href;
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function readBackgroundMusicState() {
+    try {
+      const saved = JSON.parse(window.sessionStorage.getItem(MUSIC_SESSION_KEY) || 'null');
+      if (!saved || typeof saved !== 'object') return null;
+      return {
+        isPlaying: saved.isPlaying === true,
+        currentTime: Number.isFinite(Number(saved.currentTime)) ? Math.max(0, Number(saved.currentTime)) : 0,
+        src: typeof saved.src === 'string' ? saved.src : ''
+      };
+    } catch (error) {
+      console.warn('Không thể khôi phục trạng thái nhạc giữa các trang:', error);
+      return null;
+    }
+  }
+
+  function persistBackgroundMusicState() {
+    const audio = state.bgMusic.audio;
+    const src = audio.currentSrc || audio.src ||
+      (state.bgMusic.playlist[state.bgMusic.currentIndex] || {}).src || '';
+    try {
+      window.sessionStorage.setItem(MUSIC_SESSION_KEY, JSON.stringify({
+        isPlaying: Boolean(
+          state.bgMusic.autoplayAwaitingGesture ||
+          (state.bgMusic.isPlaying && !state.bgMusic.isUserMuted && !audio.paused)
+        ),
+        currentTime: Number.isFinite(audio.currentTime) ? audio.currentTime : 0,
+        src
+      }));
+    } catch (error) {
+      console.warn('Không thể lưu trạng thái nhạc giữa các trang:', error);
+    }
+  }
+
+  function registerBackgroundMusicPersistence() {
+    window.addEventListener('pagehide', persistBackgroundMusicState);
+    document.addEventListener('click', event => {
+      const link = event.target instanceof Element ? event.target.closest('a[href]') : null;
+      if (!link || link.target === '_blank') return;
+      try {
+        const destination = new URL(link.href, window.location.href);
+        if (destination.origin === window.location.origin &&
+            destination.pathname !== window.location.pathname) {
+          persistBackgroundMusicState();
+        }
+      } catch (error) {
+        console.warn('Không thể lưu trạng thái trước khi chuyển trang:', error);
+      }
+    }, true);
+  }
+
+  function restoreBackgroundMusicPosition() {
+    const audio = state.bgMusic.audio;
+    const applyPosition = () => {
+      if (!state.bgMusic.resumeTime || !Number.isFinite(audio.duration)) return;
+      audio.currentTime = Math.min(state.bgMusic.resumeTime, Math.max(0, audio.duration - 0.1));
+      state.bgMusic.resumeTime = 0;
+    };
+    if (audio.readyState >= 1) applyPosition();
+    else audio.addEventListener('loadedmetadata', applyPosition, { once: true });
+  }
+
+  async function startConfiguredBackgroundMusic(forceAutoplay = false) {
+    const saved = state.bgMusic.savedPlaybackState;
+    const shouldResume = saved && saved.isPlaying;
+    if (!forceAutoplay && !shouldResume && !state.featureToggles.autoPlayMusic) return;
+    if (!forceAutoplay && saved && !saved.isPlaying) return;
+
+    if (!state.bgMusic.audio.src && state.bgMusic.playlist.length > 0) {
+      loadBgMusicTrack(state.bgMusic.currentIndex || 0);
+    }
+    restoreBackgroundMusicPosition();
+    state.bgMusic.isUserMuted = false;
+    state.bgMusic.autoplayAwaitingGesture = true;
+    updateBgMusicUI();
+    const played = await playBgMusic();
+    if (played) {
+      state.bgMusic.autoplayAwaitingGesture = false;
+      return;
+    }
+    installAutoplayGestureListeners();
+  }
+
+  function installAutoplayGestureListeners() {
+    if (state.bgMusic.autoplayGestureHandler) return;
+    const handler = event => {
+      if (!state.bgMusic.autoplayAwaitingGesture) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target && target.closest('#bg-music-toggle-btn, #global-audio-toggle')) return;
+      state.bgMusic.isUserMuted = false;
+      void playBgMusic().then(played => {
+        if (!played) return;
+        state.bgMusic.autoplayAwaitingGesture = false;
+        removeAutoplayGestureListeners();
+      });
+    };
+    state.bgMusic.autoplayGestureHandler = handler;
+    ['pointerdown', 'touchstart', 'click', 'keydown', 'scroll'].forEach(type => {
+      window.addEventListener(type, handler, { capture: true, passive: true });
+    });
+  }
+
+  function removeAutoplayGestureListeners() {
+    const handler = state.bgMusic.autoplayGestureHandler;
+    if (!handler) return;
+    ['pointerdown', 'touchstart', 'click', 'keydown', 'scroll'].forEach(type => {
+      window.removeEventListener(type, handler, true);
+    });
+    state.bgMusic.autoplayGestureHandler = null;
   }
 
   function loadBgMusicTrack(index) {
@@ -7316,18 +7988,21 @@
 
   function playBgMusic() {
     // Quy tắc chống đè nhạc: Chỉ 1 nguồn phát tại một thời điểm
-    if (state.currentAudio && !state.currentAudio.paused) return;
-    if (state.cinema && state.cinema.isPlaying) return;
+    if (state.currentAudio && !state.currentAudio.paused) return Promise.resolve(false);
+    if (state.cinema && state.cinema.isPlaying) return Promise.resolve(false);
 
     if (!state.bgMusic.audio.src && state.bgMusic.playlist.length > 0) {
       loadBgMusicTrack(state.bgMusic.currentIndex || 0);
     }
 
-    state.bgMusic.audio.play().then(() => {
+    return state.bgMusic.audio.play().then(() => {
       state.bgMusic.isPlaying = true;
       updateBgMusicUI();
+      persistBackgroundMusicState();
+      return true;
     }).catch(err => {
       console.warn('Không thể tự phát nhạc nền:', err);
+      return false;
     });
   }
 
@@ -7337,6 +8012,7 @@
     state.bgMusic.isPlaying = false;
     if (!temporary) {
       state.bgMusic.isUserMuted = true;
+      persistBackgroundMusicState();
     }
     updateBgMusicUI();
   }
@@ -7358,6 +8034,7 @@
       }
       playBgMusic();
     }
+    persistBackgroundMusicState();
   }
 
   function nextBgMusicTrack() {
@@ -7374,6 +8051,7 @@
     if (!state.currentAudio && (!state.cinema || !state.cinema.isPlaying)) {
       playBgMusic();
     }
+    persistBackgroundMusicState();
   }
 
   function updateBgMusicUI() {

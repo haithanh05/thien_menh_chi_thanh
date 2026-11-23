@@ -1,22 +1,21 @@
 <!DOCTYPE html>
-<html lang="vi" data-theme="xianxia" data-sky-mood="cosmic">
+<html lang="vi" data-theme="xianxia" data-sky-mood="cosmic" data-page="home">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Thiên Mệnh Chi Thành</title>
+  <title>Đại Điện • Thiên Mệnh Chi Thành</title>
   <meta name="description" content="Thiên Mệnh Chi Thành — biên niên ký lưu giữ những cột mốc trưởng thành và ký ức của Hải Thành.">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=70">
-  <link rel="stylesheet" href="css/style.css?v=70">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=72">
+  <link rel="stylesheet" href="css/style.css?v=72">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 </head>
 <body class="museum-body">
-
-  <div id="cultivation-bg" aria-hidden="true">
+<div id="cultivation-bg" aria-hidden="true">
     <canvas id="xianxia-canvas" aria-hidden="true"></canvas>
     <div class="qi-mist qi-mist-one"></div>
     <div class="qi-mist qi-mist-two"></div>
@@ -106,31 +105,12 @@
       <path d="m266 38-24 42h24l-37 47 17-39h-22z"></path>
     </svg>
   </div>
-
-  <canvas id="spiritParticlesCanvas" aria-hidden="true"></canvas>
-  <div id="authSealModal" class="archive-lock-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="archive-lock-title" hidden>
-    <section class="archive-lock-dialog">
-      <button type="button" class="archive-lock-close" id="archive-lock-close" aria-label="Đóng hộp thoại">✕</button>
-      <span class="archive-lock-seal" aria-hidden="true">🔒</span>
-      <h2 id="archive-lock-title">Kết Giới Tông Môn Đang Khóa!</h2>
-      <p>Đạo hữu chưa ghi danh nhập môn nên thiên cơ bất khả lộ — mau đăng nhập hoặc ghi danh đệ tử để phá giải phong ấn, chiêm ngưỡng toàn bộ ký ức bí truyền của Hải Thành Lão Tổ!</p>
-      <div class="archive-lock-actions">
-        <button type="button" class="btn btn-primary archive-lock-auth" id="archive-lock-auth">⚡ Ghi Danh / Đăng Nhập Ngay</button>
-        <button type="button" class="archive-lock-dismiss" id="archive-lock-dismiss">✕ Đóng</button>
-      </div>
-    </section>
-  </div>
-
-  <!-- BACKGROUND AMBIENT GLOW -->
-  <div class="ambient-glow glow-1"></div>
-  <div class="ambient-glow glow-2"></div>
-  <div class="ambient-glow glow-3"></div>
-
-  <!-- STICKY TOP NAVIGATION BAR (Visible on scroll) -->
-  <header id="sticky-header" class="sticky-nav">
+<canvas id="spiritParticlesCanvas" aria-hidden="true"></canvas>
+<div class="ambient-glow glow-1"></div><div class="ambient-glow glow-2"></div><div class="ambient-glow glow-3"></div>
+<header id="sticky-header" class="sticky-nav">
     <div class="nav-container">
       <div class="nav-brand-row">
-        <a href="#hero" class="nav-brand">
+        <a href="index.html" class="nav-brand">
           <img src="images/2026/IMG_4295_Original.JPG" alt="Hải Thành" class="brand-logo-img">
           <span class="brand-title">THIÊN MỆNH CHI THÀNH</span>
         </a>
@@ -151,27 +131,18 @@
         <span class="btn-icon">🔮</span>
         <span class="btn-text">Thiên Cơ Lão Tổ</span>
         </button>
-        <button type="button" class="nav-btn nav-btn-ticket" id="nav-ticket-btn" title="Cấp Thẻ Đệ Tử" aria-label="Cấp Thẻ Đệ Tử">
-          <span class="btn-icon">🎟️</span>
-          <span class="btn-text">Cấp Thẻ Đệ Tử</span>
-        </button>
-        <button id="btn-nav-game" class="nav-btn nav-btn-game" title="Đố Vui Độ Kiếp" aria-label="Chơi Đố Vui Độ Kiếp">
-          <span class="btn-icon">🎯</span>
-          <span class="btn-text">Đố Vui Độ Kiếp</span>
-        </button>
-        <button id="global-audio-toggle" class="nav-btn playing" title="Tạm dừng Nhạc Dưỡng Thần" aria-label="Nhạc Dưỡng Thần">
-          <span class="btn-icon">🎧</span>
-          <span class="btn-text">Nhạc Dưỡng Thần</span>
-        </button>
+        <a id="nav-tongmon-link" class="nav-btn nav-btn-game" href="tongmon.html" aria-label="Tông Môn Các: Độ Kiếp và Thẻ Đệ Tử">
+          <span class="btn-icon">⚔️</span>
+          <span class="btn-text">Tông Môn Các</span>
+        </a>
+        <a class="nav-btn nav-page-link" id="nav-home-link" href="index.html" aria-label="Quay lại Đại Điện">← Đại Điện</a>
+        <a class="nav-btn nav-page-link" href="gallery.html" aria-label="Tàng Kinh Các - xem ảnh"><span class="btn-icon">🖼️</span><span class="btn-text">Tàng Kinh Các</span></a>
+        <a class="nav-btn nav-page-link" id="nav-admin-link" href="admin.html" aria-label="Nội Các Quản Trị" hidden><span class="btn-icon">⚙️</span><span class="btn-text">Nội Các</span></a>
       </div>
     </div>
     <div class="scroll-progress-line" id="scroll-progress"></div>
   </header>
-
-  <!-- ======================================================== -->
-  <!-- HERO SECTION: SẢNH CHÍNH (TRANG TỔNG)                   -->
-  <!-- ======================================================== -->
-  <section id="hero" class="hero-section">
+<section id="hero" class="hero-section">
     <div class="hero-container">
       
       <!-- Top Museum Badge -->
@@ -180,6 +151,10 @@
           <span class="badge-dot"></span>
           <span class="badge-text">✦ THIÊN MỆNH TÔNG MÔN • ĐỘNG PHỦ CỦA HẢI THÀNH ✦</span>
         </div>
+        <aside id="site-announcement" class="site-announcement" role="status" hidden>
+          <strong id="site-announcement-title"></strong>
+          <p id="site-announcement-text"></p>
+        </aside>
       </div>
 
       <div class="hero-main-grid">
@@ -320,8 +295,7 @@
 
     </div>
   </section>
-
-  <section class="tong-chu-decree-section" id="tong-chu-decree-section" aria-labelledby="tong-chu-decree-title" hidden>
+<section class="tong-chu-decree-section" id="tong-chu-decree-section" aria-labelledby="tong-chu-decree-title" hidden>
     <article class="tong-chu-decree-card">
       <span class="decree-type-badge" id="featured-decree-type"></span>
       <p class="decree-time" id="featured-decree-time"></p>
@@ -330,264 +304,10 @@
       <button type="button" class="decree-history-open" id="open-decree-history" hidden></button>
     </article>
   </section>
-
-  <!-- ======================================================== -->
-  <!-- MAIN STAGES CONTAINER                                    -->
-  <!-- ======================================================== -->
-  <main id="stages-container" class="stages-main">
+<main id="stages-container" class="stages-main">
     <!-- Stages are rendered dynamically from window.MEMORIES_DATA -->
   </main>
-
-  <!-- ======================================================== -->
-  <!-- FILMSTRIP GRID MODAL (Cuộn phim lưu trữ toàn bộ)         -->
-  <!-- ======================================================== -->
-  <div id="filmstrip-modal" class="modal filmstrip-modal" aria-hidden="true" inert role="dialog" aria-labelledby="modal-stage-title">
-    <div class="modal-backdrop" id="modal-filmstrip-backdrop"></div>
-    <div class="modal-dialog filmstrip-dialog">
-      
-      <!-- Film Perforation Border Top -->
-      <div class="film-holes film-holes-top">
-        <div class="holes-track"></div>
-      </div>
-
-      <div class="filmstrip-modal-header">
-        <div class="modal-title-group">
-          <span class="modal-tag">🎞️ CUỘN PHIM LƯU TRỮ HOÀN CHỈNH</span>
-          <h2 class="modal-stage-title" id="modal-stage-title">Giai đoạn...</h2>
-          <p class="modal-stage-subtitle" id="modal-stage-subtitle">Kho lưu trữ gồm 0 khoảnh khắc</p>
-        </div>
-        <button class="modal-close-btn" id="btn-close-filmstrip" aria-label="Đóng cuộn phim">✕</button>
-      </div>
-
-      <!-- Month Filter Bar inside Modal -->
-      <div class="modal-month-filter">
-        <div class="month-filter-label">Lọc theo tháng:</div>
-        <div class="month-filter-chips" id="modal-month-chips">
-          <!-- Dynamic month chips (Tất cả, T1 -> T12, Tuổi thơ / Khác) -->
-        </div>
-      </div>
-
-      <!-- Filmstrip Grid Body -->
-      <div class="filmstrip-grid-body">
-        <div class="filmstrip-grid" id="modal-filmstrip-grid">
-          <!-- Dynamic film items (#01, #02...) -->
-        </div>
-        <div class="empty-filter-state" id="modal-empty-state" style="display: none;">
-          <p>Không có khoảnh khắc nào trong khoảng thời gian này.</p>
-        </div>
-      </div>
-
-      <!-- Film Perforation Border Bottom -->
-      <div class="film-holes film-holes-bottom">
-        <div class="holes-track"></div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ======================================================== -->
-  <!-- FULLSCREEN LIGHTBOX MODAL                                -->
-  <!-- ======================================================== -->
-  <div id="lightbox-modal" class="lightbox-modal" aria-hidden="true" inert role="dialog">
-    <div class="lightbox-backdrop" id="lightbox-backdrop"></div>
-    
-    <div class="lightbox-container">
-      <!-- Lightbox Header / Controls -->
-      <div class="lightbox-header">
-        <div class="lightbox-counter" id="lightbox-counter">1 / 1</div>
-        <div class="lightbox-actions">
-          <button class="lightbox-btn" id="lightbox-btn-zoom" title="Thu phóng" aria-label="Thu phóng">🔍</button>
-          <button class="lightbox-btn" id="lightbox-btn-close" title="Đóng (Esc)" aria-label="Đóng">✕</button>
-        </div>
-      </div>
-
-      <!-- Main Image View -->
-      <div class="lightbox-stage">
-        <button class="lightbox-nav lightbox-prev" id="lightbox-btn-prev" aria-label="Ảnh trước">‹</button>
-        
-        <div class="lightbox-img-wrapper" id="lightbox-img-wrapper">
-          <img id="lightbox-img" src="" alt="Kỷ niệm phóng to" width="1600" height="1200" loading="lazy" decoding="async">
-          <video id="lightbox-video" controls playsinline preload="metadata" hidden></video>
-        </div>
-
-        <button class="lightbox-nav lightbox-next" id="lightbox-btn-next" aria-label="Ảnh sau">›</button>
-      </div>
-
-      <!-- Lightbox Caption -->
-      <div class="lightbox-caption-box">
-        <div class="lightbox-badge" id="lightbox-tag">Kỷ niệm</div>
-        <h3 class="lightbox-title" id="lightbox-title">Tiêu đề kỷ niệm</h3>
-        <p class="lightbox-desc" id="lightbox-desc">Ghi chú kỷ niệm...</p>
-        <div class="lightbox-time" id="lightbox-time">Thời gian</div>
-        <button type="button" class="memory-like-button lightbox-memory-like" id="lightbox-memory-like" aria-pressed="false">
-          <span class="memory-like-icon" aria-hidden="true">💠</span>
-          <span class="memory-like-label">Tặng Linh Thạch (<span class="memory-like-count">0</span>)</span>
-        </button>
-        <p class="memory-like-status" id="lightbox-memory-like-status" role="status" aria-live="polite"></p>
-      </div>
-
-      <!-- Thumbnails Strip (if multi-image) -->
-      <div class="lightbox-thumbs-bar" id="lightbox-thumbs">
-        <!-- Thumbnails -->
-      </div>
-    </div>
-  </div>
-
-  <!-- ======================================================== -->
-  <!-- MINI-GAME MODAL: THỬ THÁCH ĐOÁN NĂM                      -->
-  <!-- ======================================================== -->
-  <div id="game-modal" class="modal game-modal year-guess-modal" aria-hidden="true" inert role="dialog" aria-labelledby="game-modal-title">
-    <div class="modal-backdrop" id="modal-game-backdrop"></div>
-    <div class="modal-dialog game-dialog year-guess-dialog">
-      
-      <!-- Game Modal Header -->
-      <div class="game-modal-header">
-        <div class="game-title-group">
-          <span class="game-tag-badge">🎮 MINI-GAME TRÍ NHỚ</span>
-          <h2 class="game-modal-title" id="game-modal-title">🎮 Thử Thách Đoán Năm</h2>
-          <span class="game-score-badge" id="game-score-badge">Điểm: 0 | Chuỗi: 0🔥</span>
-        </div>
-        <button type="button" class="modal-close-btn" id="btn-close-game" aria-label="Đóng trò chơi">×</button>
-      </div>
-
-      <!-- Game Status & Progress Bar -->
-      <div class="game-status-bar" id="game-status-bar">
-        <div class="game-status-info">
-          <span class="game-q-counter" id="game-q-counter">Câu 1 / 10</span>
-        </div>
-        <div class="game-progress-track">
-          <div class="game-progress-fill" id="game-progress-fill" style="width: 10%;"></div>
-        </div>
-      </div>
-
-      <!-- Game Playing Screen -->
-      <div class="game-body" id="game-play-screen">
-        
-        <!-- Secret Photo Box (Strictly no titles, dates, or stage hints) -->
-        <div class="game-photo-box">
-          <div class="game-photo-wrap">
-            <img id="game-current-img" src="" alt="Bức ảnh bí ẩn cần đoán năm" loading="eager" decoding="async">
-          </div>
-          <div class="game-photo-hint">❓ Bức ảnh này được chụp ở giai đoạn / năm nào?</div>
-        </div>
-
-        <!-- Nhập năm trực tiếp bằng bàn phím / Enter -->
-        <div class="game-year-input-wrap">
-          <input id="game-year-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Nhập năm (VD: 2022)..." autocomplete="off" aria-label="Nhập năm đoán">
-          <button type="button" class="btn btn-primary game-year-submit" id="game-year-submit">Kiểm tra</button>
-        </div>
-
-        <!-- Reveal Info Card (Shown after submitting an answer) -->
-        <div class="game-reveal-card" id="game-reveal-card" style="display: none;">
-          <div class="reveal-header">
-            <span class="reveal-status-icon" id="reveal-status-icon">🎉</span>
-            <span class="reveal-status-text" id="reveal-status-text">Chính xác!</span>
-          </div>
-          <div class="game-reveal-hint" id="reveal-hint" hidden></div>
-          <div class="reveal-info-body">
-            <h4 class="reveal-memory-title" id="reveal-memory-title">Tiêu đề ảnh gốc</h4>
-            <div class="reveal-memory-time" id="reveal-memory-time">📅 Thời gian: ...</div>
-            <p class="reveal-memory-desc" id="reveal-memory-desc">Ghi chú gốc...</p>
-          </div>
-          <button class="btn btn-primary game-next-btn" id="btn-game-next">
-            <span>Câu tiếp theo</span>
-            <span>→</span>
-          </button>
-        </div>
-
-      </div>
-
-      <!-- Game Result Screen (Shown after 10 questions) -->
-      <div class="game-result-screen" id="game-result-screen" style="display: none;">
-        <div class="result-trophy-box" id="result-trophy-icon">🏆</div>
-        <h3 class="result-title">KẾT QUẢ THỬ THÁCH</h3>
-        <div class="result-score-highlight" id="result-score-highlight">8 / 10</div>
-        
-        <!-- Humorous Memory Evaluation -->
-        <div class="result-badge-pill" id="result-rank-badge">Bậc Thầy Hoài Niệm</div>
-        <p class="result-commentary" id="result-commentary">
-          Bạn nhớ được hầu hết các cột mốc quan trọng trên hành trình lớn lên!
-        </p>
-
-        <div class="result-actions">
-          <button class="btn btn-primary" id="btn-game-replay">
-            <span>🔄 Chơi lại lượt mới</span>
-          </button>
-          <button class="btn btn-glass" id="btn-game-exit">
-            <span>🏛️ Quay lại Bảo Tàng</span>
-          </button>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ======================================================== -->
-  <!-- CINEMA MEMORY REEL MODAL (Chiếu Phim Tự Động)            -->
-  <!-- ======================================================== -->
-  <div id="cinema-modal" class="cinema-modal" aria-hidden="true" inert role="dialog" aria-labelledby="cinema-sub-title">
-    <div class="cinema-backdrop"></div>
-
-    <!-- Story Segmented Progress Bar (Top) -->
-    <div class="cinema-progress-row" id="cinema-progress-row">
-      <!-- Dynamic segments -->
-    </div>
-
-    <!-- Top Cinema Header Controls -->
-    <div class="cinema-top-header">
-      <div class="cinema-title-badge">
-        <span class="cinema-icon-pulse">🎬</span>
-        <span class="cinema-badge-text" id="cinema-badge-mode">CHIẾU PHIM TOÀN HÀNH TRÌNH</span>
-      </div>
-
-      <div class="cinema-controls-group">
-        <button class="cinema-ctrl-btn" id="cinema-btn-pause" title="Tạm dừng / Tiếp tục" aria-label="Tạm dừng">
-          <span id="cinema-pause-icon">⏸</span>
-        </button>
-        <button class="cinema-ctrl-btn" id="cinema-btn-audio" title="Bật / Tắt âm thanh" aria-label="Âm thanh">
-          <span id="cinema-audio-icon">🔊</span>
-        </button>
-        <button class="cinema-ctrl-btn cinema-close-btn" id="cinema-btn-close" title="Thoát rạp chiếu (Esc)" aria-label="Đóng">
-          ✕
-        </button>
-      </div>
-    </div>
-
-    <!-- Main Screen Stage -->
-    <div class="cinema-screen" id="cinema-screen">
-      <!-- Click navigation tap zones (Left for prev, Right for next) -->
-      <div class="cinema-tap-zone zone-left" id="cinema-zone-prev" title="Kỷ niệm trước"></div>
-      <div class="cinema-tap-zone zone-right" id="cinema-zone-next" title="Kỷ niệm sau"></div>
-
-      <!-- Arrow Nav Buttons -->
-      <button class="cinema-arrow cinema-arrow-prev" id="cinema-arrow-prev" aria-label="Kỷ niệm trước">‹</button>
-      <button class="cinema-arrow cinema-arrow-next" id="cinema-arrow-next" aria-label="Kỷ niệm sau">›</button>
-
-      <!-- Slides Container -->
-      <div class="cinema-slides-viewport" id="cinema-slides-viewport">
-        <!-- Rendered dynamically -->
-      </div>
-    </div>
-
-    <!-- Bottom Cinematic Subtitle Bar -->
-    <div class="cinema-subtitle-bar">
-      <div class="cinema-sub-meta">
-        <span class="cinema-sub-stage" id="cinema-sub-stage">GIAI ĐOẠN...</span>
-        <span class="cinema-sub-divider">&bull;</span>
-        <span class="cinema-sub-time" id="cinema-sub-time">THỜI GIAN...</span>
-      </div>
-      <h2 class="cinema-sub-title" id="cinema-sub-title">Tiêu đề khoảnh khắc</h2>
-      <p class="cinema-sub-desc" id="cinema-sub-desc">Ghi chú...</p>
-    </div>
-
-    <!-- Hidden Dedicated Cinema Audio Element -->
-    <audio id="cinema-audio" preload="auto"></audio>
-  </div>
-
-  <!-- ======================================================== -->
-  <!-- MỤC 1: BẢNG HUY HIỆU THÀNH TỰU (RPG ACHIEVEMENTS)         -->
-  <!-- ======================================================== -->
-  <section class="achievements-section utility-section" id="rpg-achievements" hidden>
+<section class="achievements-section utility-section" id="rpg-achievements" hidden>
     <div class="container">
       <div class="achievements-header">
         <div class="achievements-badge-tag">HỆ THỐNG THÀNH TỰU TIẾN HÓA</div>
@@ -694,11 +414,7 @@
       </div>
     </div>
   </section>
-
-  <!-- ======================================================== -->
-  <!-- MỤC 2: HỘP THỜI GIAN GỬI TUỔI 22 (TIME CAPSULE)           -->
-  <!-- ======================================================== -->
-  <section id="time-capsule" class="time-capsule-section utility-section" hidden>
+<section id="time-capsule" class="time-capsule-section utility-section" hidden>
     <div class="container capsule-container">
       
       <!-- Section Header -->
@@ -806,205 +522,7 @@
 
     </div>
   </section>
-
-  <!-- ======================================================== -->
-  <!-- SOUVENIR TICKET STATION (Quầy In Vé Lưu Niệm - Bước 4)    -->
-  <!-- ======================================================== -->
-  <section id="ticket-station" class="ticket-station-section utility-section" hidden>
-    <div class="container ticket-container">
-      
-      <!-- Section Header -->
-      <div class="ticket-section-header">
-        <span class="ticket-badge">🎟️ TRẠM DỪNG CHÂN LƯU NIỆM</span>
-        <h2 class="ticket-section-title">QUẦY IN VÉ THAM QUAN LƯU NIỆM</h2>
-        <p class="ticket-section-desc">
-          Lưu giữ một mảnh ký ức về chuyến ghé thăm bảo tàng thời gian. Hãy nhập tên và chọn giai đoạn để tạo một tấm vé mang thông điệp dành riêng cho bạn!
-        </p>
-      </div>
-
-      <!-- Ticket Interaction Box: Form + Ticket Output -->
-      <div class="ticket-station-grid">
-        
-        <!-- Input Form Area -->
-        <div class="ticket-form-card">
-          <div class="ticket-form-header">
-            <span class="ticket-form-icon">🖨️</span>
-            <div>
-              <h3 class="ticket-form-title">Đăng Ký In Vé</h3>
-              <p class="ticket-form-subtitle">Tùy biến tấm vé lưu niệm của riêng bạn</p>
-            </div>
-          </div>
-
-          <div class="ticket-form-body">
-            <!-- Visitor Name Field -->
-            <div class="ticket-form-group">
-              <label for="ticket-visitor-name" class="ticket-label">
-                <span class="label-icon">👤</span>
-                <span>Tên người tham quan:</span>
-              </label>
-              <input 
-                type="text" 
-                id="ticket-visitor-name" 
-                class="ticket-input" 
-                placeholder="Khách tham quan ẩn danh" 
-                maxlength="36"
-                autocomplete="off"
-              >
-              <span class="ticket-input-note">Để trống sẽ tự động hiển thị: <strong>Khách tham quan ẩn danh</strong></span>
-            </div>
-
-            <!-- Favorite Stage Dropdown -->
-            <div class="ticket-form-group">
-              <label for="ticket-stage-select" class="ticket-label">
-                <span class="label-icon">⏳</span>
-                <span>Giai đoạn yêu thích nhất:</span>
-              </label>
-              <div class="ticket-select-wrap">
-                <select id="ticket-stage-select" class="ticket-select">
-                  <!-- Dynamically populated from js/memories.js -->
-                </select>
-                <span class="select-arrow">▼</span>
-              </div>
-            </div>
-
-            <!-- Print Button -->
-            <button id="btn-print-ticket" class="btn-print-ticket" type="button">
-              <span class="btn-print-icon">🖨️</span>
-              <span class="btn-print-text">In Vé Lưu Niệm</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Ticket Preview + Download Area -->
-        <div class="ticket-preview-panel">
-          
-          <div class="ticket-render-container" id="ticket-render-container">
-            
-            <!-- THE VINTAGE SOUVENIR TICKET (Pure HTML & CSS - ZERO <img> elements to guarantee zero CORS/canvas errors) -->
-            <div class="souvenir-ticket" id="souvenir-ticket">
-              
-              <!-- Ornamental Outer & Inner Frame -->
-              <div class="ticket-outer-border">
-                <div class="ticket-inner-border">
-                  
-                  <!-- Main Body (Left / Center) -->
-                  <div class="ticket-main-section">
-                    
-                    <!-- Ticket Top Brand -->
-                    <div class="ticket-header-row">
-                      <div class="ticket-logo-mark">
-                        <img src="images/2026/IMG_4295_Original.JPG" alt="Logo Hải Thành" loading="lazy" decoding="async">
-                      </div>
-                      <div class="ticket-header-text">
-                        <div class="ticket-museum-brand">THIÊN MỆNH CHI THÀNH</div>
-                        <div class="ticket-category-tag">VÉ THAM QUAN ĐẶC BIỆT &bull; SOUVENIR ADMISSION PASS</div>
-                      </div>
-                      <div class="ticket-vintage-stamp">
-                        <div class="stamp-inner">
-                          <span class="stamp-star">★</span>
-                          <span class="stamp-text">ARCHIVED</span>
-                          <span class="stamp-date" id="ticket-stamp-year">2026</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Ticket Fields Grid -->
-                    <div class="ticket-data-grid">
-                      <div class="ticket-field">
-                        <span class="field-k">NGƯỜI THAM QUAN:</span>
-                        <span class="field-v visitor-name" id="ticket-disp-visitor">Khách tham quan ẩn danh</span>
-                      </div>
-                      <div class="ticket-field">
-                        <span class="field-k">GIAI ĐOẠN YÊU THÍCH:</span>
-                        <span class="field-v stage-name" id="ticket-disp-stage">Tuổi thơ hoài niệm</span>
-                      </div>
-                      <div class="ticket-field">
-                        <span class="field-k">NGÀY GIỜ GHÉ THĂM:</span>
-                        <span class="field-v time-text" id="ticket-disp-time">20/11/2026 • 17:35</span>
-                      </div>
-                      <div class="ticket-field">
-                        <span class="field-k">MÃ SỐ VÉ (SERIAL):</span>
-                        <span class="field-v serial-code" id="ticket-disp-serial">#MEM-2026-8888</span>
-                      </div>
-                    </div>
-
-                    <!-- Dedicated Message / Quote (Bốc ngẫu nhiên từ js/memories.js) -->
-                    <div class="ticket-dedication-box">
-                      <div class="dedication-label">
-                        <span class="star-icon">✨</span>
-                        <span>THÔNG ĐIỆP DÀNH RIÊNG CHO BẠN:</span>
-                      </div>
-                      <p class="dedication-quote" id="ticket-disp-quote">
-                        "Mỗi bức ảnh, mỗi dòng ghi chú ở đây đều là một mảnh ký ức thật trên hành trình lớn lên từ thuở nhỏ đến năm 2026."
-                      </p>
-                      <div class="dedication-source" id="ticket-disp-quote-source">
-                        — Trích từ Nhật ký Bảo tàng
-                      </div>
-                    </div>
-
-                  </div>
-
-                  <!-- Perforated Tear Line (Răng cưa xé vé) -->
-                  <div class="ticket-tear-divider">
-                    <div class="ticket-notch notch-top"></div>
-                    <div class="tear-dashed-line"></div>
-                    <div class="tear-scissor-mark">✂</div>
-                    <div class="ticket-notch notch-bottom"></div>
-                  </div>
-
-                  <!-- Ticket Stub (Right side / Cuống vé) -->
-                  <div class="ticket-stub-section">
-                    <div class="stub-brand">
-                      <span class="stub-icon">🏛️</span>
-                      <span class="stub-title">CUỐNG VÉ</span>
-                    </div>
-
-                    <div class="stub-meta">
-                      <div class="stub-field">
-                        <span class="stub-k">SERI:</span>
-                        <span class="stub-v serial-val" id="ticket-disp-stub-serial">#MEM-2026-8888</span>
-                      </div>
-                      <div class="stub-field">
-                        <span class="stub-k">KHÁCH:</span>
-                        <span class="stub-v" id="ticket-disp-stub-visitor">Ẩn danh</span>
-                      </div>
-                      <div class="stub-field">
-                        <span class="stub-k">NGÀY:</span>
-                        <span class="stub-v" id="ticket-disp-stub-date">20/11/2026</span>
-                      </div>
-                    </div>
-
-                    <!-- Pure CSS Barcode Strip -->
-                    <div class="stub-barcode-container">
-                      <div class="css-barcode" aria-hidden="true"></div>
-                      <div class="barcode-digits" id="ticket-disp-barcode-num">2 0 2 6 8 8 9 2 0 1 4</div>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
-          <!-- Download Action Bar -->
-          <div class="ticket-action-bar">
-            <button id="btn-download-ticket" class="btn-download-ticket" type="button">
-              <span class="btn-dl-icon">⬇️</span>
-              <span id="btn-dl-text">Tải vé về máy (.PNG)</span>
-            </button>
-            <span class="ticket-quality-badge">✨ Xuất ảnh sắc nét 2x Retina &bull; Tấm vé hoài niệm độc bản</span>
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
-  </section>
-
-  <section id="home-cultivation-section" class="home-cultivation-section" aria-labelledby="home-cultivation-title">
+<section id="home-cultivation-section" class="home-cultivation-section" aria-labelledby="home-cultivation-title">
     <article class="home-cultivation-card">
       <header class="home-cultivation-summary">
         <div class="home-cultivation-identity">
@@ -1024,8 +542,7 @@
       </div>
     </article>
   </section>
-
-  <section id="public-leaderboard" class="public-leaderboard-section" aria-labelledby="leaderboard-title">
+<section id="public-leaderboard" class="public-leaderboard-section" aria-labelledby="leaderboard-title">
     <div class="container public-leaderboard-card">
       <span class="leaderboard-kicker">BẢNG VÀNG TU TIÊN</span>
       <h2 id="leaderboard-title">🏆 THIÊN KIÊU BẢNG • DANH SÁCH CAO THỦ</h2>
@@ -1053,11 +570,7 @@
       <p id="leaderboard-save-status" class="leaderboard-status" role="status" aria-live="polite"></p>
     </div>
   </section>
-
-  <!-- ======================================================== -->
-  <!-- THANH TIỆN ÍCH CUỐI TRANG CHÍNH                         -->
-  <!-- ======================================================== -->
-  <section class="utility-launcher" id="utility-launcher" aria-label="Tiện ích bảo tàng">
+  <section class="utility-launcher" id="utility-launcher" aria-label="Tiện ích Đại Điện">
     <div class="container utility-launcher-container">
       <button type="button" class="utility-launch-btn" data-utility-target="rpg-achievements" aria-expanded="false">
         <span>🏅</span><span>Đài Phong Thần • Thành Tựu Độ Kiếp</span>
@@ -1065,318 +578,9 @@
       <button type="button" class="utility-launch-btn" data-utility-target="time-capsule" aria-expanded="false">
         <span>🏺</span><span>Hũ Rượu Thời Gian • Truyền Âm Lưu Bút</span>
       </button>
-      <button type="button" class="utility-launch-btn" data-utility-target="ticket-station" aria-expanded="false">
-        <span>🪪</span><span>Tàng Bảo Các • Đúc Lệnh Bài Nhập Môn</span>
-      </button>
     </div>
   </section>
-
-  <!-- ======================================================== -->
-  <!-- FLOATING BACKGROUND MUSIC PLAYER WIDGET                  -->
-  <!-- ======================================================== -->
-  <aside id="floating-bg-player" class="floating-bg-player playing" aria-label="Trình phát nhạc nền">
-    <button id="bg-music-toggle-btn" class="bg-music-disk-btn" title="Tạm dừng nhạc nền">
-      <span class="bg-disk-icon" id="bg-disk-icon">🎵</span>
-    </button>
-    <div class="bg-music-info">
-      <span class="bg-music-tag">NHẠC NỀN TỔNG (SHUFFLE)</span>
-      <span class="bg-music-title" id="bg-music-current-title">Đang phát ngẫu nhiên...</span>
-    </div>
-    <button id="bg-music-next-btn" class="bg-music-skip-btn" title="Chuyển ngẫu nhiên bài kế tiếp">
-      ⏭️
-    </button>
-    <button type="button" id="bg-music-collapse-btn" class="bg-music-collapse-btn" aria-label="Thu nhỏ trình phát nhạc">⌄</button>
-  </aside>
-
-  <div id="auth-modal" class="admin-modal auth-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" hidden>
-    <div class="admin-modal-backdrop" id="auth-modal-backdrop"></div>
-    <section class="admin-modal-dialog">
-      <header class="admin-modal-header">
-        <div>
-          <span class="admin-modal-kicker">NGỌC BỘI ĐẠO HỮU</span>
-          <h2 id="auth-modal-title">Cổng Đạo Hữu</h2>
-        </div>
-        <button type="button" class="admin-modal-close" id="auth-modal-close" aria-label="Đóng cửa sổ tài khoản">✕</button>
-      </header>
-
-      <div class="admin-modal-content">
-        <div class="auth-tabs" id="auth-tabs" role="tablist" aria-label="Chọn đăng nhập hoặc đăng ký">
-          <button type="button" class="auth-tab active" id="auth-tab-login" role="tab" aria-selected="true" aria-controls="auth-login-form">Đăng nhập</button>
-          <button type="button" class="auth-tab" id="auth-tab-signup" role="tab" aria-selected="false" aria-controls="auth-signup-form">Đăng ký</button>
-        </div>
-        <form id="auth-login-form" class="admin-form auth-form" autocomplete="on">
-          <p class="admin-form-intro">Đăng nhập để khai mở các pháp bảo tương tác của bảo tàng.</p>
-          <label for="auth-login-email">Email</label>
-          <input id="auth-login-email" name="email" type="email" autocomplete="username" required>
-          <label for="auth-login-password">Mật khẩu</label>
-          <input id="auth-login-password" name="password" type="password" autocomplete="current-password" required>
-          <button type="submit" class="admin-primary-button">Đăng nhập</button>
-        </form>
-        <form id="auth-signup-form" class="admin-form auth-form" autocomplete="on" novalidate hidden>
-          <p class="admin-form-intro">Lập danh tính Đạo Hữu để cùng lưu giữ những mảnh ký ức.</p>
-          <label for="auth-signup-name">Đạo Hiệu</label>
-          <input id="auth-signup-name" name="display_name" type="text" minlength="2" maxlength="25" autocomplete="nickname" required>
-          <label for="auth-signup-email">Email</label>
-          <input id="auth-signup-email" name="email" type="email" autocomplete="email" required>
-          <label for="auth-signup-password">Mật khẩu (ít nhất 6 ký tự)</label>
-          <input id="auth-signup-password" name="password" type="password" minlength="6" autocomplete="new-password" required>
-          <button type="submit" class="admin-primary-button">Tạo Tài Khoản Đạo Hữu</button>
-        </form>
-        <p id="auth-status" class="admin-status" role="status" aria-live="polite"></p>
-
-        <section id="auth-account-panel" hidden>
-          <div class="admin-dashboard-heading">
-            <p id="auth-user-label"></p>
-            <button type="button" id="auth-sign-out" class="admin-secondary-button">Đăng xuất</button>
-          </div>
-          <section id="auth-cultivation-card" class="auth-cultivation-card" hidden aria-labelledby="auth-cultivation-title">
-            <div class="cultivation-card-heading">
-              <span class="admin-modal-kicker">TU VI ĐẠO HỮU</span>
-              <strong id="auth-cultivation-rank">Phàm Nhân Nhập Môn</strong>
-            </div>
-            <p class="cultivation-total">Tổng tu vi: <strong id="auth-cultivation-total">0</strong></p>
-            <div class="cultivation-streak-row">
-              <span class="cultivation-streak-badge" id="auth-cultivation-streak">🔥 Chuỗi 0 ngày</span>
-            </div>
-            <div class="cultivation-progress-wrap">
-              <progress id="auth-cultivation-progress" max="100" value="0" aria-label="Tiến độ cảnh giới"></progress>
-              <span id="auth-cultivation-progress-label">0 / 50 Tu Vi</span>
-            </div>
-            <p id="auth-cultivation-status" class="cultivation-status" role="status" aria-live="polite"></p>
-            <h3 id="auth-cultivation-title">Nhiệm vụ khai mở tu vi</h3>
-            <ul class="cultivation-mission-list">
-              <li>Điểm danh hằng ngày <strong>+10 · +20 từ 3 ngày · +35 từ 7 ngày</strong></li>
-              <li>Tặng Linh Thạch <strong>+10</strong> (tối đa 50/ngày)</li>
-              <li>In Vé Lưu Niệm <strong>+15</strong></li>
-              <li>Gửi lời nhắn Sổ Lưu Bút <strong>+20</strong></li>
-              <li>Trả lời đúng Đoán Năm <strong>+5/câu</strong></li>
-              <li>Rút Quẻ Lời Răn Của Lão Tổ <strong>+5/ngày</strong></li>
-            </ul>
-            <button type="button" class="btn btn-invite cultivation-invite-button" data-invite-friends>
-              <span>🔗 Mời Đạo Hữu</span>
-            </button>
-          </section>
-          <div id="auth-member-panel" class="auth-member-panel" hidden>
-            <span class="admin-modal-kicker">THẺ ĐẠO HỮU</span>
-            <p>Email đang đăng nhập: <strong id="auth-member-email"></strong></p>
-          </div>
-          <section id="admin-dashboard" hidden>
-            <h3 class="auth-admin-heading">Quản Trị Tiên Giới (Admin)</h3>
-            <div class="admin-dashboard-tabs" role="tablist" aria-label="Khu vực quản trị">
-              <button type="button" class="admin-dashboard-tab active" id="admin-tab-decrees" role="tab" aria-selected="true" aria-controls="admin-panel-decrees" data-admin-panel-target="admin-panel-decrees">📜 Ban Bố Chiếu Thư</button>
-              <button type="button" class="admin-dashboard-tab" id="admin-tab-features" role="tab" aria-selected="false" aria-controls="admin-panel-features" data-admin-panel-target="admin-panel-features">🎛️ Ẩn / Hiện Chức Năng</button>
-              <button type="button" class="admin-dashboard-tab" id="admin-tab-theme" role="tab" aria-selected="false" aria-controls="admin-panel-theme" data-admin-panel-target="admin-panel-theme">🎨 Cảnh Giới &amp; Nền Trời</button>
-              <button type="button" class="admin-dashboard-tab" id="admin-tab-memory" role="tab" aria-selected="false" aria-controls="admin-panel-memory" data-admin-panel-target="admin-panel-memory">🖼️ Quản Lý Ký Ức &amp; Bí Lục</button>
-              <button type="button" class="admin-dashboard-tab" id="admin-tab-attributes" role="tab" aria-selected="false" aria-controls="admin-panel-attributes" data-admin-panel-target="admin-panel-attributes">⚡ Thuộc Tính &amp; Tu Vi</button>
-            </div>
-
-            <section class="admin-dashboard-panel" id="admin-panel-decrees" role="tabpanel" aria-labelledby="admin-tab-decrees">
-              <section class="admin-tool-card" aria-labelledby="admin-decree-heading">
-                <h4 id="admin-decree-heading">📜 Ban Bố Chiếu Thư Tông Chủ</h4>
-                <form id="admin-decree-form" class="admin-form">
-                  <label for="admin-decree-type">Danh xưng chỉ thị</label>
-                  <select id="admin-decree-type" required>
-                    <option value="phap-chi">📜 Pháp Chỉ Tông Môn</option>
-                    <option value="cao-thi">🔥 Cáo Thị Khẩn</option>
-                    <option value="tam-dac">✨ Tâm Đắc Lão Tổ</option>
-                    <option value="tin-mung">🎉 Tin Mừng Tông Môn</option>
-                  </select>
-                  <label for="admin-decree-title">Tiêu đề chiếu thư</label>
-                  <input id="admin-decree-title" type="text" maxlength="160" required>
-                  <label for="admin-decree-content">Nội dung chỉ thị</label>
-                  <textarea id="admin-decree-content" rows="4" maxlength="3000" required></textarea>
-                  <label class="admin-toggle-row" for="admin-decree-pinned">
-                    <input type="checkbox" id="admin-decree-pinned">
-                    <span>Ghim đầu trang</span>
-                  </label>
-                  <div class="admin-memory-form-actions">
-                    <button type="submit" class="admin-primary-button" id="admin-decree-submit">⚡ Ban Bố Chiếu Thư</button>
-                    <button type="button" class="admin-secondary-button" id="admin-decree-cancel-edit" hidden>Hủy sửa</button>
-                  </div>
-                </form>
-                <p id="admin-decree-status" class="admin-tool-status" role="status" aria-live="polite"></p>
-                <h4 class="admin-subsection-title">Chiếu thư đã ban</h4>
-                <div id="admin-decree-list" class="admin-decree-list" aria-live="polite"></div>
-              </section>
-            </section>
-
-            <section class="admin-dashboard-panel" id="admin-panel-features" role="tabpanel" aria-labelledby="admin-tab-features" hidden>
-              <section class="admin-tool-card" aria-labelledby="admin-feature-heading">
-                <h4 id="admin-feature-heading">🎛️ Công Tắc Hiển Thị Toàn Trang</h4>
-                <p class="admin-form-intro">Thay đổi sẽ được lưu toàn cục và áp dụng cho khách truy cập lẫn đạo hữu.</p>
-                <div class="admin-feature-toggle-list">
-                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="decrees"><span class="admin-toggle-switch" aria-hidden="true"></span><span>📜 Chiếu Thư Tông Chủ</span></label>
-                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="oracle"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🔮 Thiên Cơ Lão Tổ</span></label>
-                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="ticket"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🎟️ Cấp Thẻ Đệ Tử</span></label>
-                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="game"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🎯 Đố Vui Độ Kiếp</span></label>
-                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="audio"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🎧 Nhạc Dưỡng Thần</span></label>
-                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="attributes"><span class="admin-toggle-switch" aria-hidden="true"></span><span>💎 Bảng Thuộc Tính Tu Tiên</span></label>
-                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="leaderboard"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🏆 Bảng Vàng Tu Tiên</span></label>
-                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="hideAdminFromLeaderboard"><span class="admin-toggle-switch" aria-hidden="true"></span><span>👑 Ẩn Admin khỏi Bảng Vàng &amp; Tu Vi công khai</span></label>
-                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="comments"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🗣️ Tường Truyền Âm</span></label>
-                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="footerUtilities"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🏅 Đài Phong Thần &amp; Hũ Rượu Thời Gian</span></label>
-                </div>
-                <p id="admin-feature-status" class="admin-tool-status" role="status" aria-live="polite"></p>
-              </section>
-            </section>
-
-            <section class="admin-dashboard-panel" id="admin-panel-theme" role="tabpanel" aria-labelledby="admin-tab-theme" hidden>
-              <section class="admin-tool-card" aria-labelledby="admin-theme-heading">
-                <h4 id="admin-theme-heading">🎨 Cảnh Giới &amp; Nền Trời</h4>
-                <p class="admin-form-intro">Nền do Tông Chủ chọn sẽ đồng bộ cho mọi người khi mở trang.</p>
-                <form id="admin-theme-form" class="admin-form">
-                  <label for="admin-global-theme">Tông giao diện</label>
-                  <select id="admin-global-theme">
-                    <option value="xianxia">☯ Tiên Giới Cổ Phong</option>
-                    <option value="obsidian">🌑 Đêm Obsidian</option>
-                    <option value="sepia">📜 Giấy Cũ Hoài Niệm</option>
-                    <option value="midnight">🌌 Xanh Đêm Vũ Trụ</option>
-                    <option value="daylight">☁️ Sáng Tối Giản</option>
-                  </select>
-                  <label for="admin-global-sky">Cảnh giới bầu trời</label>
-                  <select id="admin-global-sky">
-                    <option value="cosmic">🌌 Tinh Tú Đêm</option>
-                    <option value="mountain">🏔️ Linh Sơn Sáng</option>
-                  </select>
-                  <button type="submit" class="admin-primary-button">💾 Lưu Cảnh Giới &amp; Nền Trời</button>
-                </form>
-                <p id="admin-theme-status" class="admin-tool-status" role="status" aria-live="polite"></p>
-              </section>
-            </section>
-
-            <section class="admin-dashboard-panel" id="admin-panel-memory" role="tabpanel" aria-labelledby="admin-tab-memory" hidden>
-              <div class="admin-memory-subtabs" role="tablist" aria-label="Khu vực ký ức">
-                <button type="button" class="admin-memory-subtab active" data-memory-panel-target="admin-panel-add-memory" aria-selected="true">➕ Thêm Kỷ Niệm</button>
-                <button type="button" class="admin-memory-subtab" data-memory-panel-target="admin-panel-manage-memories" aria-selected="false">🗑️ Quản Lý &amp; Xóa Ảnh</button>
-              </div>
-            </section>
-
-            <section class="admin-memory-panel" id="admin-panel-add-memory" role="tabpanel" aria-labelledby="admin-tab-memory" hidden>
-              <form id="admin-memory-form" class="admin-form">
-                <h3 id="admin-memory-form-title">Thêm Kỷ Niệm Mới</h3>
-                <label for="admin-stage">Giai đoạn</label>
-                <select id="admin-stage" name="stage" required>
-                  <option value="luc-nho">Tuổi thơ</option>
-                  <option value="2021">2021</option>
-                  <option value="2022">2022</option>
-                  <option value="2023">2023</option>
-                  <option value="2024">2024</option>
-                  <option value="2025">2025</option>
-                  <option value="2026">2026</option>
-                </select>
-                <label for="admin-memory-title">Tiêu đề</label>
-                <input id="admin-memory-title" name="title" type="text" maxlength="160" required>
-                <label for="admin-memory-time">Thời gian</label>
-                <input id="admin-memory-time" name="time" type="text" maxlength="100" required>
-                <label for="admin-memory-type">Loại kỷ niệm</label>
-                <select id="admin-memory-type" name="type">
-                  <option value="photo">📷 Ảnh Kỷ Niệm</option>
-                  <option value="story">📜 Tâm Ma Bí Lục</option>
-                </select>
-                <label for="admin-memory-description">Chú thích / Tâm Ma Bí Lục</label>
-                <textarea id="admin-memory-description" name="description" rows="4" maxlength="2000"></textarea>
-                <label for="admin-memory-image-url">Link ảnh (có thể để trống nếu chọn file)</label>
-                <input id="admin-memory-image-url" name="image_url" type="url" inputmode="url" placeholder="https://...">
-                <label for="admin-memory-image">Ảnh hoặc video kỷ niệm</label>
-                <input id="admin-memory-image" name="image" type="file" accept="image/*,video/mp4,video/webm,video/quicktime,video/ogg">
-                <div class="admin-memory-form-actions">
-                  <button type="submit" class="admin-primary-button" id="admin-memory-submit">💾 Lưu Kỷ Niệm</button>
-                  <button type="button" class="admin-secondary-button" id="admin-memory-cancel-edit" hidden>Hủy sửa</button>
-                </div>
-              </form>
-            </section>
-
-            <section class="admin-dashboard-panel" id="admin-panel-attributes" role="tabpanel" aria-labelledby="admin-tab-attributes" hidden>
-              <section class="admin-tool-card admin-cultivation-editor" aria-labelledby="admin-cultivation-title">
-                <h4 id="admin-cultivation-title">Chỉnh Sửa Bảng Thuộc Tính Tu Tiên</h4>
-                <form id="admin-cultivation-form" class="admin-form">
-                  <label for="admin-cultivation-stage">Giai đoạn</label>
-                  <select id="admin-cultivation-stage" required>
-                    <option value="luc-nho">Tuổi thơ</option>
-                    <option value="2021">2021</option>
-                    <option value="2022">2022</option>
-                    <option value="2023">2023</option>
-                    <option value="2024">2024</option>
-                    <option value="2025">2025</option>
-                    <option value="2026">2026</option>
-                  </select>
-                  <label for="admin-cultivation-level">Level</label>
-                  <input id="admin-cultivation-level" type="text" maxlength="80" required>
-                  <label for="admin-cultivation-name">Tên Cảnh Giới</label>
-                  <input id="admin-cultivation-name" type="text" maxlength="100" required>
-                  <label for="admin-cultivation-fate">Mệnh Cách</label>
-                  <textarea id="admin-cultivation-fate" rows="2" maxlength="240" required></textarea>
-                  <h5 class="admin-attribute-section-title">Linh Căn &amp; Căn Cốt Chính</h5>
-                  <div id="admin-cultivation-mainstats" class="admin-attribute-list"></div>
-                  <h5 class="admin-attribute-section-title">Thiên Phú Phụ</h5>
-                  <div id="admin-cultivation-skills" class="admin-cultivation-skills"></div>
-                  <button type="submit" class="admin-primary-button">💾 Lưu Thuộc Tính</button>
-                </form>
-                <p id="admin-cultivation-status" class="admin-tool-status" role="status" aria-live="polite"></p>
-              </section>
-              <section class="admin-tool-card admin-user-cultivation-editor" aria-labelledby="admin-user-cultivation-heading">
-                <h4 id="admin-user-cultivation-heading">⚡ Điều Chỉnh Tu Vi Đạo Hữu</h4>
-                <form id="admin-user-cultivation-form" class="admin-form">
-                  <label for="admin-user-cultivation-id">📧 Gmail Đạo Hữu</label>
-                  <input id="admin-user-cultivation-id" type="email" placeholder="nhapemail@gmail.com" autocomplete="email" required>
-                  <label for="admin-user-cultivation-points">Tu Vi mới</label>
-                  <input id="admin-user-cultivation-points" type="number" min="0" step="1" required>
-                  <button type="submit" class="admin-primary-button">💾 Lưu Tu Vi Đạo Hữu</button>
-                </form>
-                <p id="admin-user-cultivation-status" class="admin-tool-status" role="status" aria-live="polite"></p>
-                <button type="button" class="admin-secondary-button admin-cultivation-refresh" id="admin-cultivation-users-refresh">↻ Tải danh sách Đạo Hữu</button>
-                <div id="admin-cultivation-users-list" class="admin-cultivation-users-list" aria-live="polite"></div>
-              </section>
-            </section>
-
-            <section class="admin-memory-panel" id="admin-panel-manage-memories" role="tabpanel" aria-labelledby="admin-tab-memory" hidden>
-              <section class="admin-tool-card" aria-labelledby="admin-visitor-title">
-                <h4 id="admin-visitor-title">Bộ Đếm Đạo Hữu Lỡ Bước Nhập Môn</h4>
-                <label class="admin-toggle-row" for="admin-visitor-visible">
-                  <input type="checkbox" id="admin-visitor-visible">
-                  <span class="admin-toggle-switch" aria-hidden="true"></span>
-                  <span>Hiển thị bộ đếm ở Sảnh Chính</span>
-                </label>
-                <form id="admin-visitor-count-form" class="admin-form admin-visitor-count-form">
-                  <label for="admin-visitor-count">Số đếm đạo hữu hiện tại</label>
-                  <div class="admin-visitor-count-controls">
-                    <input id="admin-visitor-count" type="number" min="0" step="1" inputmode="numeric" required>
-                    <button type="submit" class="admin-primary-button">💾 Cập Nhật Bộ Đếm</button>
-                  </div>
-                </form>
-                <p id="admin-visitor-status" class="admin-tool-status" role="status" aria-live="polite"></p>
-              </section>
-              <div class="admin-memory-manager">
-                <h3>Kỷ niệm động và ảnh gốc</h3>
-                <div class="admin-memory-filters" role="group" aria-label="Lọc kỷ niệm theo giai đoạn">
-                  <button type="button" class="admin-memory-filter active" data-admin-memory-filter="all" aria-pressed="true">Tất cả</button>
-                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="luc-nho" aria-pressed="false">Tuổi thơ</button>
-                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="2021" aria-pressed="false">2021</button>
-                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="2022" aria-pressed="false">2022</button>
-                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="2023" aria-pressed="false">2023</button>
-                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="2024" aria-pressed="false">2024</button>
-                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="2025" aria-pressed="false">2025</button>
-                  <button type="button" class="admin-memory-filter" data-admin-memory-filter="2026" aria-pressed="false">2026</button>
-                </div>
-                <div id="admin-memory-list" class="admin-memory-list"></div>
-                <section class="admin-tool-card admin-deleted-memory-manager" aria-labelledby="admin-deleted-memory-heading">
-                  <h4 id="admin-deleted-memory-heading">♻️ Khôi Phục Ảnh &amp; Ký Ức Đã Xóa</h4>
-                  <div id="admin-deleted-memory-list" class="admin-deleted-memory-list" aria-live="polite"></div>
-                </section>
-                <section class="admin-tool-card admin-managed-decrees" aria-labelledby="admin-managed-decrees-heading">
-                  <h4 id="admin-managed-decrees-heading">📜 Quản Lý Chiếu Thư Tông Chủ</h4>
-                  <div id="admin-decree-list-memory" class="admin-decree-list" aria-live="polite"></div>
-                </section>
-              </div>
-            </section>
-          </section>
-        </section>
-
-      </div>
-    </section>
-  </div>
-
-  <div id="milestoneCommentsModal" class="feature-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="milestone-comments-modal-title" hidden>
+<div id="milestoneCommentsModal" class="feature-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="milestone-comments-modal-title" hidden>
     <div class="feature-modal-backdrop" data-modal-close="milestoneCommentsModal"></div>
     <section class="feature-modal-dialog milestone-comments-dialog" tabindex="-1">
       <header class="feature-modal-header">
@@ -1403,8 +607,7 @@
       </section>
     </section>
   </div>
-
-  <div id="thienCoModal" class="feature-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="thien-co-modal-title" hidden>
+<div id="thienCoModal" class="feature-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="thien-co-modal-title" hidden>
     <div class="feature-modal-backdrop" data-modal-close="thienCoModal"></div>
     <section class="feature-modal-dialog thien-co-dialog" tabindex="-1">
       <header class="feature-modal-header">
@@ -1450,8 +653,7 @@
       </div>
     </section>
   </div>
-
-  <div id="decreeHistoryModal" class="feature-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="decree-history-title" hidden>
+<div id="decreeHistoryModal" class="feature-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="decree-history-title" hidden>
     <div class="feature-modal-backdrop" data-modal-close="decreeHistoryModal"></div>
     <section class="feature-modal-dialog decree-history-dialog" tabindex="-1">
       <header class="feature-modal-header">
@@ -1464,11 +666,99 @@
       <div class="feature-modal-content decree-history-list" id="decree-history-list"></div>
     </section>
   </div>
+<aside id="floating-bg-player" class="floating-bg-player playing" aria-label="Trình phát nhạc nền">
+    <button id="bg-music-toggle-btn" class="bg-music-disk-btn" title="Tạm dừng nhạc nền">
+      <span class="bg-disk-icon" id="bg-disk-icon">🎵</span>
+    </button>
+    <div class="bg-music-info">
+      <span class="bg-music-tag">NHẠC NỀN TỔNG (SHUFFLE)</span>
+      <span class="bg-music-title" id="bg-music-current-title">Đang phát ngẫu nhiên...</span>
+    </div>
+    <button id="bg-music-next-btn" class="bg-music-skip-btn" title="Chuyển ngẫu nhiên bài kế tiếp">
+      ⏭️
+    </button>
+    <button type="button" id="bg-music-collapse-btn" class="bg-music-collapse-btn" aria-label="Thu nhỏ trình phát nhạc">⌄</button>
+  </aside>
+<div id="auth-modal" class="admin-modal auth-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title" hidden>
+    <div class="admin-modal-backdrop" id="auth-modal-backdrop"></div>
+    <section class="admin-modal-dialog">
+      <header class="admin-modal-header">
+        <div>
+          <span class="admin-modal-kicker">NGỌC BỘI ĐẠO HỮU</span>
+          <h2 id="auth-modal-title">Cổng Đạo Hữu</h2>
+        </div>
+        <button type="button" class="admin-modal-close" id="auth-modal-close" aria-label="Đóng cửa sổ tài khoản">✕</button>
+      </header>
 
-  <!-- ======================================================== -->
-  <!-- FOOTER                                                   -->
-  <!-- ======================================================== -->
-  <footer class="museum-footer">
+      <div class="admin-modal-content">
+        <div class="auth-tabs" id="auth-tabs" role="tablist" aria-label="Chọn đăng nhập hoặc đăng ký">
+          <button type="button" class="auth-tab active" id="auth-tab-login" role="tab" aria-selected="true" aria-controls="auth-login-form">Đăng nhập</button>
+          <button type="button" class="auth-tab" id="auth-tab-signup" role="tab" aria-selected="false" aria-controls="auth-signup-form">Đăng ký</button>
+        </div>
+        <form id="auth-login-form" class="admin-form auth-form" autocomplete="on">
+          <p class="admin-form-intro">Đăng nhập để khai mở các pháp bảo tương tác của bảo tàng.</p>
+          <label for="auth-login-email">Email</label>
+          <input id="auth-login-email" name="email" type="email" autocomplete="username" required>
+          <label for="auth-login-password">Mật khẩu</label>
+          <input id="auth-login-password" name="password" type="password" autocomplete="current-password" required>
+          <button type="submit" class="admin-primary-button">Đăng nhập</button>
+        </form>
+        <form id="auth-signup-form" class="admin-form auth-form" autocomplete="on" novalidate hidden>
+          <p class="admin-form-intro">Lập danh tính Đạo Hữu để cùng lưu giữ những mảnh ký ức.</p>
+          <label for="auth-signup-name">Đạo Hiệu</label>
+          <input id="auth-signup-name" name="display_name" type="text" minlength="2" maxlength="25" autocomplete="nickname" required>
+          <label for="auth-signup-email">Email</label>
+          <input id="auth-signup-email" name="email" type="email" autocomplete="email" required>
+          <label for="auth-signup-password">Mật khẩu (ít nhất 6 ký tự)</label>
+          <input id="auth-signup-password" name="password" type="password" minlength="6" autocomplete="new-password" required>
+          <button type="submit" class="admin-primary-button">Tạo Tài Khoản Đạo Hữu</button>
+        </form>
+        <button type="button" class="admin-secondary-button auth-google-button" id="auth-google-sign-in">Tiếp tục với Google</button>
+        <p id="auth-status" class="admin-status" role="status" aria-live="polite"></p>
+
+        <section id="auth-account-panel" hidden>
+          <div class="admin-dashboard-heading">
+            <p id="auth-user-label"></p>
+            <button type="button" id="auth-sign-out" class="admin-secondary-button">Đăng xuất</button>
+          </div>
+          <section id="auth-cultivation-card" class="auth-cultivation-card" hidden aria-labelledby="auth-cultivation-title">
+            <div class="cultivation-card-heading">
+              <span class="admin-modal-kicker">TU VI ĐẠO HỮU</span>
+              <strong id="auth-cultivation-rank">Phàm Nhân Nhập Môn</strong>
+            </div>
+            <p class="cultivation-total">Tổng tu vi: <strong id="auth-cultivation-total">0</strong></p>
+            <div class="cultivation-streak-row">
+              <span class="cultivation-streak-badge" id="auth-cultivation-streak">🔥 Chuỗi 0 ngày</span>
+            </div>
+            <div class="cultivation-progress-wrap">
+              <progress id="auth-cultivation-progress" max="100" value="0" aria-label="Tiến độ cảnh giới"></progress>
+              <span id="auth-cultivation-progress-label">0 / 50 Tu Vi</span>
+            </div>
+            <p id="auth-cultivation-status" class="cultivation-status" role="status" aria-live="polite"></p>
+            <h3 id="auth-cultivation-title">Nhiệm vụ khai mở tu vi</h3>
+            <ul class="cultivation-mission-list">
+              <li>Điểm danh hằng ngày <strong>+10 · +20 từ 3 ngày · +35 từ 7 ngày</strong></li>
+              <li>Tặng Linh Thạch <strong>+10</strong> (tối đa 50/ngày)</li>
+              <li>In Vé Lưu Niệm <strong>+15</strong></li>
+              <li>Gửi lời nhắn Sổ Lưu Bút <strong>+20</strong></li>
+              <li>Trả lời đúng Đoán Năm <strong>+5/câu</strong></li>
+              <li>Rút Quẻ Lời Răn Của Lão Tổ <strong>+5/ngày</strong></li>
+            </ul>
+            <button type="button" class="btn btn-invite cultivation-invite-button" data-invite-friends>
+              <span>🔗 Mời Đạo Hữu</span>
+            </button>
+          </section>
+          <div id="auth-member-panel" class="auth-member-panel" hidden>
+            <span class="admin-modal-kicker">THẺ ĐẠO HỮU</span>
+            <p>Email đang đăng nhập: <strong id="auth-member-email"></strong></p>
+          </div>
+          
+        </section>
+
+      </div>
+    </section>
+  </div>
+<footer class="museum-footer">
     <div class="container footer-container">
       <div class="footer-brand">
         <h3>✦ THIÊN MỆNH CHI THÀNH • HẢI THÀNH LÃO TỔ ✦</h3>
@@ -1489,10 +779,8 @@
       </div>
     </div>
   </footer>
-
-  <!-- SCRIPTS -->
-   <script src="js/memories.js?v=70"></script>
-   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-   <script src="js/app.js?v=70"></script>
+<script defer src="js/memories-home.js?v=72"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script defer src="js/app.js?v=72"></script>
 </body>
 </html>
