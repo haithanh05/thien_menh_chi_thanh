@@ -8,8 +8,8 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=73">
-  <link rel="stylesheet" href="css/style.css?v=73">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=74">
+  <link rel="stylesheet" href="css/style.css?v=74">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -571,6 +571,21 @@
       <p id="leaderboard-save-status" class="leaderboard-status" role="status" aria-live="polite"></p>
     </div>
   </section>
+  <section id="sect-discussion" class="sect-discussion-section container" aria-labelledby="sect-discussion-title">
+    <header class="sect-discussion-heading">
+      <span class="leaderboard-kicker">ĐÀM ĐẠO CÁC</span>
+      <h2 id="sect-discussion-title">💬 Đàm Đạo Các • Tâm Sự Tông Môn</h2>
+      <p>Chia sẻ đôi lời cùng các đạo hữu; bình luận được ghim sẽ hiển thị trước.</p>
+    </header>
+    <form id="sect-comment-form" class="sect-comment-form">
+      <label class="sr-only" for="sect-comment-input">Nội dung bình luận</label>
+      <textarea id="sect-comment-input" maxlength="800" rows="3" placeholder="Đăng nhập để lưu lại lời đàm đạo..." required></textarea>
+      <div class="sect-comment-form-footer"><span id="sect-comment-replying" hidden></span><button id="sect-comment-cancel-reply" type="button" class="admin-secondary-button" hidden>Hủy trả lời</button><button type="submit" class="admin-primary-button">Gửi lời đàm đạo</button></div>
+      <p id="sect-comment-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+    </form>
+    <ol id="sect-comment-list" class="sect-comment-list" aria-live="polite"><li class="admin-memory-empty">Đang mở Đàm Đạo Các…</li></ol>
+    <button id="sect-comment-load-more" type="button" class="admin-secondary-button">Xem thêm bình luận</button>
+  </section>
   <section class="utility-launcher" id="utility-launcher" aria-label="Tiện ích Đại Điện">
     <div class="container utility-launcher-container">
       <button type="button" class="utility-launch-btn" data-utility-target="rpg-achievements" aria-expanded="false">
@@ -698,23 +713,24 @@
         </div>
         <form id="auth-login-form" class="admin-form auth-form" autocomplete="on">
           <p class="admin-form-intro">Đăng nhập để khai mở các pháp bảo tương tác của bảo tàng.</p>
-          <label for="auth-login-email">Email</label>
-          <input id="auth-login-email" name="email" type="email" autocomplete="username" required>
+          <label for="auth-login-email">Tên đăng nhập hoặc Email</label>
+          <input id="auth-login-email" name="username" type="text" autocomplete="username" required>
           <label for="auth-login-password">Mật khẩu</label>
           <input id="auth-login-password" name="password" type="password" autocomplete="current-password" required>
           <button type="submit" class="admin-primary-button">Đăng nhập</button>
         </form>
         <form id="auth-signup-form" class="admin-form auth-form" autocomplete="on" novalidate hidden>
           <p class="admin-form-intro">Lập danh tính Đạo Hữu để cùng lưu giữ những mảnh ký ức.</p>
-          <label for="auth-signup-name">Đạo Hiệu</label>
-          <input id="auth-signup-name" name="display_name" type="text" minlength="2" maxlength="25" autocomplete="nickname" required>
+          <label for="auth-signup-username">Tên đăng nhập (Đạo hiệu)</label>
+          <input id="auth-signup-username" name="username" type="text" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" required>
           <label for="auth-signup-email">Email</label>
           <input id="auth-signup-email" name="email" type="email" autocomplete="email" required>
           <label for="auth-signup-password">Mật khẩu (ít nhất 6 ký tự)</label>
           <input id="auth-signup-password" name="password" type="password" minlength="6" autocomplete="new-password" required>
           <button type="submit" class="admin-primary-button">Tạo Tài Khoản Đạo Hữu</button>
         </form>
-        <button type="button" class="admin-secondary-button auth-google-button" id="auth-google-sign-in">Tiếp tục với Google</button>
+        <p class="auth-provider-divider">— Hoặc ghi danh nhanh —</p>
+        <button type="button" class="admin-secondary-button auth-google-button" id="auth-google-sign-in"><span class="google-g-icon" aria-hidden="true">G</span>Tiếp tục với Google</button>
         <p id="auth-status" class="admin-status" role="status" aria-live="polite"></p>
 
         <section id="auth-account-panel" hidden>
@@ -780,9 +796,9 @@
       </div>
     </div>
   </footer>
-<script defer src="js/memories-home.js?v=73"></script>
+<script defer src="js/memories-home.js?v=74"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="js/premium-effects.js?v=73"></script>
-<script defer src="js/app.js?v=73"></script>
+<script defer src="js/premium-effects.js?v=74"></script>
+<script defer src="js/app.js?v=74"></script>
 </body>
 </html>

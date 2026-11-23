@@ -8,8 +8,8 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=73">
-  <link rel="stylesheet" href="css/style.css?v=73">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=74">
+  <link rel="stylesheet" href="css/style.css?v=74">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -167,6 +167,14 @@
     <section class="tongmon-feature-actions"><button type="button" class="nav-btn nav-btn-game" id="btn-nav-game"><span class="btn-icon">🎯</span><span class="btn-text">Đố Vui Độ Kiếp</span></button><a class="nav-btn nav-btn-ticket" href="#ticket-station"><span class="btn-icon">🎟️</span><span class="btn-text">Cấp Thẻ Đệ Tử</span></a></section>
     <section id="ticket-station" class="ticket-station-section utility-section">
     <div class="container ticket-container">
+      <section id="disciple-profile-tools" class="disciple-profile-tools" hidden aria-labelledby="disciple-profile-title">
+        <div class="disciple-profile-heading"><h2 id="disciple-profile-title">🪷 Đạo Hiệu &amp; Pháp Bảo Cá Nhân</h2><strong id="spirit-stones-balance">💎 0 Linh Thạch</strong></div>
+        <div id="disciple-avatar-picker" class="disciple-avatar-picker" aria-label="Chọn avatar tu tiên"></div>
+        <label class="avatar-upload-label" for="disciple-avatar-upload">Tải avatar riêng (ảnh vuông sẽ tự cắt và nén)</label>
+        <input id="disciple-avatar-upload" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+        <p id="disciple-avatar-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+        <div id="disciple-frame-shop" class="disciple-frame-shop"></div>
+      </section>
       
       <!-- Section Header -->
       <div class="ticket-section-header">
@@ -266,6 +274,7 @@
                     <!-- Ticket Fields Grid -->
                     <div class="ticket-data-grid">
                       <div class="ticket-field">
+                        <img id="ticket-disp-avatar" class="ticket-disciple-avatar" alt="" width="56" height="56" hidden>
                         <span class="field-k">NGƯỜI THAM QUAN:</span>
                         <span class="field-v visitor-name" id="ticket-disp-visitor">Khách tham quan ẩn danh</span>
                         <span class="discipleship-title" id="ticket-disp-sect-title"></span>
@@ -527,23 +536,24 @@
         </div>
         <form id="auth-login-form" class="admin-form auth-form" autocomplete="on">
           <p class="admin-form-intro">Đăng nhập để khai mở các pháp bảo tương tác của bảo tàng.</p>
-          <label for="auth-login-email">Email</label>
-          <input id="auth-login-email" name="email" type="email" autocomplete="username" required>
+          <label for="auth-login-email">Tên đăng nhập hoặc Email</label>
+          <input id="auth-login-email" name="username" type="text" autocomplete="username" required>
           <label for="auth-login-password">Mật khẩu</label>
           <input id="auth-login-password" name="password" type="password" autocomplete="current-password" required>
           <button type="submit" class="admin-primary-button">Đăng nhập</button>
         </form>
         <form id="auth-signup-form" class="admin-form auth-form" autocomplete="on" novalidate hidden>
           <p class="admin-form-intro">Lập danh tính Đạo Hữu để cùng lưu giữ những mảnh ký ức.</p>
-          <label for="auth-signup-name">Đạo Hiệu</label>
-          <input id="auth-signup-name" name="display_name" type="text" minlength="2" maxlength="25" autocomplete="nickname" required>
+          <label for="auth-signup-username">Tên đăng nhập (Đạo hiệu)</label>
+          <input id="auth-signup-username" name="username" type="text" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" required>
           <label for="auth-signup-email">Email</label>
           <input id="auth-signup-email" name="email" type="email" autocomplete="email" required>
           <label for="auth-signup-password">Mật khẩu (ít nhất 6 ký tự)</label>
           <input id="auth-signup-password" name="password" type="password" minlength="6" autocomplete="new-password" required>
           <button type="submit" class="admin-primary-button">Tạo Tài Khoản Đạo Hữu</button>
         </form>
-        <button type="button" class="admin-secondary-button auth-google-button" id="auth-google-sign-in">Tiếp tục với Google</button>
+        <p class="auth-provider-divider">— Hoặc ghi danh nhanh —</p>
+        <button type="button" class="admin-secondary-button auth-google-button" id="auth-google-sign-in"><span class="google-g-icon" aria-hidden="true">G</span>Tiếp tục với Google</button>
         <p id="auth-status" class="admin-status" role="status" aria-live="polite"></p>
 
         <section id="auth-account-panel" hidden>
@@ -609,9 +619,9 @@
       </div>
     </div>
   </footer>
-<script defer src="js/memories.js?v=73"></script>
+<script defer src="js/memories.js?v=74"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="js/premium-effects.js?v=73"></script>
-<script defer src="js/app.js?v=73"></script>
+<script defer src="js/premium-effects.js?v=74"></script>
+<script defer src="js/app.js?v=74"></script>
 </body>
 </html>

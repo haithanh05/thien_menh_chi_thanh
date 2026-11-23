@@ -155,11 +155,28 @@
     }
   }
 
+  function initSpiritualPath() {
+    const path = document.createElement('div');
+    path.className = 'qi-spiritual-path';
+    path.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(path);
+    let restTimer = 0;
+    window.addEventListener('scroll', () => {
+      path.classList.add('is-flowing');
+      window.clearTimeout(restTimer);
+      restTimer = window.setTimeout(() => path.classList.remove('is-flowing'), 260);
+    }, { passive: true });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) path.classList.remove('is-flowing');
+    });
+  }
+
   function start() {
     initCursorTrail();
     initPageTransitions();
     initScrollReveal();
     initTilt();
+    initSpiritualPath();
   }
 
   if (document.readyState === 'loading') {

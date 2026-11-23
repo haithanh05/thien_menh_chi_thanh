@@ -100,6 +100,17 @@
   let presenceJoinTime = new Date().toISOString();
   let onlinePresenceState = {};
   let disciplesLoadPromise = null;
+  let sectMessagesChannel = null;
+  let sectCommentsChannel = null;
+  let sectChatState = { messages: [], conversations: [], selectedUserId: '', loading: false };
+  let sectCommentState = { offset: 0, hasMore: true, replyTo: null, rows: [] };
+  const DISCIPLE_FRAMES = [
+    { id: 'jade', name: 'Ngọc Bích Mặc Định', cost: 0 },
+    { id: 'dragon', name: 'Thanh Long Vân Văn', cost: 30 },
+    { id: 'phoenix', name: 'Hỏa Phượng Lưu Quang', cost: 60 },
+    { id: 'thunder', name: 'Tử Lôi Kiếp Hỏa', cost: 100 },
+    { id: 'lotus', name: 'Hỗn Độn Kim Liên', cost: 180 }
+  ];
 
   // State Management
   const state = {
@@ -196,7 +207,8 @@
       timerId: null,
       powerups: { fifty: false, hint: false, freeze: false },
       usedPowerups: new Set(),
-      choices: []
+      choices: [],
+      sessionId: ''
     },
     cinema: {
       slides: [],
@@ -1670,6 +1682,9 @@
       initModalNavbarSync();
       if (homePage || tongmonPage) initUtilityPanels();
       initAuthPortal();
+      initSectMessages();
+      if (homePage) initSectComments();
+      if (tongmonPage) initDiscipleProfileTools();
       initPageAccessControls();
       if (galleryPage) initArchiveLockModal();
       if (homePage) initCultivationOracle();
@@ -1960,7 +1975,7 @@
 
   function getMemberFullName(user) {
     const metadata = user && user.user_metadata || {};
-    return String(metadata.full_name || metadata.name || metadata.display_name ||
+    return String(metadata.full_name || metadata.name || metadata.display_name || metadata.username ||
       user && user.email && user.email.split('@')[0] || 'Đạo Hữu').trim();
   }
 
@@ -1968,6 +1983,12 @@
     const metadata = user && user.user_metadata || {};
     const value = String(metadata.avatar_url || metadata.picture || '').trim();
     return /^https:\/\//i.test(value) ? value : '';
+  }
+
+  function isDisplayableAvatar(value) {
+    const url = String(value || '').trim();
+    return /^https:\/\//i.test(url) ||
+      /^data:image\/(?:webp|jpeg|png|svg\+xml)(?:;[^,]*)?,/i.test(url);
   }
 
   async function syncDiscipleForUser(user) {
@@ -1990,10 +2011,17 @@
         user_id: user.id,
         email: String(user.email || ''),
         full_name: getMemberFullName(user),
+        username: String(user.user_metadata && user.user_metadata.username ||
+          existing && existing.username || ''),
         avatar_url: getMemberAvatar(user) || String(existing && existing.avatar_url || ''),
         sect_title: String(existing && existing.sect_title || 'Ngoại Môn Đệ Tử'),
         is_banned: Boolean(existing && existing.is_banned),
         visit_count: Math.max(0, Number(existing && existing.visit_count) || 0) + (isNewVisit ? 1 : 0),
+        spirit_stones: Math.max(0, Number(existing && existing.spirit_stones) ||
+          (!existing ? Number(user.user_metadata && user.user_metadata.starting_spirit_stones) || 0 : 0)),
+        unlocked_frames: Array.isArray(existing && existing.unlocked_frames)
+          ? existing.unlocked_frames : ['jade'],
+        active_frame: String(existing && existing.active_frame || 'jade'),
         last_seen: new Date().toISOString()
       };
       const { data, error } = await supabaseClient.from('disciples')
@@ -2005,6 +2033,7 @@
       state.discipleStatusReady = true;
       initDiscipleRealtime(user);
       refreshDiscipleshipUI();
+      renderDiscipleProfileTools();
       updatePresence();
       void loadGameLeaderboard();
       if (isAdminUser()) void loadAdminDisciples();
@@ -2014,14 +2043,19 @@
         user_id: user.id,
         email: String(user.email || ''),
         full_name: getMemberFullName(user),
+        username: String(user.user_metadata && user.user_metadata.username || ''),
         avatar_url: getMemberAvatar(user),
         sect_title: 'Ngoại Môn Đệ Tử',
         is_banned: false,
-        visit_count: 0
+        visit_count: 0,
+        spirit_stones: Number(user.user_metadata && user.user_metadata.starting_spirit_stones) || 0,
+        unlocked_frames: ['jade'],
+        active_frame: 'jade'
       };
       state.discipleStatusReady = false;
       console.warn('Không thể đồng bộ Sổ Môn Đồ:', error);
       refreshDiscipleshipUI();
+      renderDiscipleProfileTools();
       updatePresence();
     }
   }
@@ -2059,6 +2093,8 @@
     if (isDiscipleBanned()) {
       document.querySelectorAll('.milestone-comment-form textarea, .milestone-comment-form button[type="submit"]')
         .forEach(element => { element.disabled = true; });
+      document.querySelectorAll('#sect-comment-form textarea, #sect-comment-form button[type="submit"], #sect-chat-member-form textarea, #sect-chat-member-form button[type="submit"]')
+        .forEach(element => { element.disabled = true; });
       const gameModal = document.getElementById('game-modal');
       if (gameModal && gameModal.classList.contains('active')) closeGameModal();
       const ticketStation = document.getElementById('ticket-station');
@@ -2066,9 +2102,804 @@
         ticketStation.hidden = true;
         ticketStation.classList.remove('open');
       }
+      const profileTools = document.getElementById('disciple-profile-tools');
+      if (profileTools) profileTools.hidden = true;
     } else {
       document.querySelectorAll('.milestone-comment-form textarea, .milestone-comment-form button[type="submit"]')
         .forEach(element => { element.disabled = false; });
+      document.querySelectorAll('#sect-comment-form textarea, #sect-comment-form button[type="submit"], #sect-chat-member-form textarea, #sect-chat-member-form button[type="submit"]')
+        .forEach(element => { element.disabled = false; });
+    }
+    renderDiscipleProfileTools();
+  }
+
+  function openCommunityAuthGate(feature) {
+    openAuthModal(`Kết giới tông môn đang phong ấn! Đạo hữu cần đăng nhập mới có thể ${feature}.`);
+    const title = document.getElementById('auth-modal-title');
+    if (title) title.textContent = 'Kết Giới Tông Môn Đang Khóa';
+  }
+
+  function makeXianxiaAvatar(index) {
+    const palettes = [
+      ['#e9f4f2', '#668f91', '#d2b778'], ['#dff6ff', '#5896ba', '#f4d2ec'],
+      ['#a8c3ad', '#304d46', '#c5a76c'], ['#f5d6a5', '#9c5e3a', '#f0a85e'],
+      ['#f4d9f2', '#8e5b91', '#d9a7ee'], ['#d4e5ff', '#5556a6', '#9c90ff'],
+      ['#dcf6e5', '#458a66', '#e7ca82'], ['#d7e8f4', '#536c90', '#d0b1f4'],
+      ['#ffe2c6', '#9c3e37', '#eeb857'], ['#dbcfe9', '#45405d', '#a783ce'],
+      ['#f1e8ce', '#8f7658', '#d4c38e'], ['#d3eee3', '#3e7567', '#d0a967']
+    ];
+    const names = ['Kiếm Tiên Bạch Y', 'Băng Tâm Tiên Tử', 'Huyền Vũ Đạo Nhân', 'Luyện Đan Sư',
+      'Cửu Vĩ Linh Hồ', 'Tử Lôi Kiếm Tôn', 'Thanh Liên Thánh Nữ', 'Thiên Cơ Thuật Sĩ',
+      'Hỏa Phượng Chân Quân', 'U Minh Quỷ Vương', 'Ngọc Hư Chân Nhân', 'Tiêu Dao Tán Tu'];
+    const ornaments = [
+      '<path d="M37 145l61-61 7 7-61 61-12 5z" fill="#d9c17b"/><path d="M82 89l10 10" stroke="#fff0bd" stroke-width="4"/>',
+      '<path d="M126 13v28m-14-14h28m-24-10 20 20m0-20-20 20" stroke="#e9fbff" stroke-width="3"/>',
+      '<path d="M40 118c-7 13-7 28 0 42m176-42c7 13 7 28 0 42" fill="none" stroke="#c3a56e" stroke-width="7"/>',
+      '<circle cx="128" cy="24" r="13" fill="#fff0bd"/><path d="M128 5c-10-10 9-11 0-19m15 26c-4-10 12-13 9-22" fill="none" stroke="#fff0bd" stroke-width="3"/>',
+      '<path d="M94 61 74 28l33 18m45 15 20-33-33 18" fill="#b879b6" stroke="#f4d8ff" stroke-width="4"/><path d="M85 169c-27 4-28 30-7 34m93-34c27 4 28 30 7 34" fill="none" stroke="#e9b9ee" stroke-width="7"/>',
+      '<path d="M179 22l-24 39h19l-15 31 39-48h-20l15-22z" fill="#d4c2ff"/>',
+      '<path d="M128 14c-23 23-25 43 0 58 25-15 23-35 0-58zm0 12v34m-17-17h34" fill="none" stroke="#e7d28d" stroke-width="4"/>',
+      '<path d="M128 10l5 13 14 1-11 9 4 14-12-8-12 8 4-14-11-9 14-1z" fill="#f3e5ff"/>',
+      '<path d="M128 8c-17 20-17 31 0 39 17-8 17-19 0-39zm-20 24c-10 12-10 20 0 25 10-5 10-13 0-25m40 0c-10 12-10 20 0 25 10-5 10-13 0-25" fill="#ffb452"/>',
+      '<path d="M128 10a24 24 0 1 0 22 35 21 21 0 1 1-22-35z" fill="#d5c7ee"/><path d="M78 48h100" stroke="#a78bd0" stroke-width="3"/>',
+      '<path d="M102 27l9 15 17-21 17 21 9-15 8 31H94z" fill="#e9d39b" stroke="#fff0bd" stroke-width="3"/>',
+      '<path d="M45 53c15-18 29-18 43 0m80 0c15-18 29-18 43 0M69 30c12-12 23-12 34 0m50 0c12-12 23-12 34 0" fill="none" stroke="#d7f0e2" stroke-width="5"/>'
+    ];
+    const colors = palettes[index % palettes.length];
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="${colors[0]}"/><stop offset="1" stop-color="${colors[1]}"/></linearGradient><linearGradient id="robe" x2="0" y2="1"><stop stop-color="${colors[1]}"/><stop offset="1" stop-color="#172b30"/></linearGradient></defs><rect width="256" height="256" rx="128" fill="url(#bg)"/><circle cx="128" cy="118" r="95" fill="none" stroke="${colors[2]}" stroke-opacity=".68" stroke-width="4"/><path d="M47 246c8-57 34-82 81-82s73 25 81 82" fill="url(#robe)" stroke="${colors[2]}" stroke-width="5"/><path d="M91 125c0-45 15-70 37-70s37 25 37 70c0 34-18 50-37 50s-37-16-37-50" fill="#f3d9bd"/><path d="M86 111c3-54 21-77 43-77s42 22 44 77c-16-22-29-35-44-35s-28 13-43 35" fill="#202830"/>${ornaments[index]}<path d="M78 246c10-42 28-68 50-68s40 26 50 68" fill="none" stroke="${colors[2]}" stroke-width="6"/><path d="M61 91h134M76 72h104" stroke="${colors[2]}" stroke-opacity=".55" stroke-width="3"/><circle cx="128" cy="27" r="7" fill="${colors[2]}"/></svg>`;
+    return { name: names[index], src: `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` };
+  }
+
+  function frameClass(frame) {
+    const allowed = DISCIPLE_FRAMES.some(item => item.id === frame);
+    return `frame-${allowed ? frame : 'jade'}`;
+  }
+
+  function renderDiscipleProfileTools() {
+    const section = document.getElementById('disciple-profile-tools');
+    if (!section) return;
+    section.hidden = !authenticatedUser || !state.discipleStatusReady || isDiscipleBanned();
+    if (section.hidden) return;
+    const balance = document.getElementById('spirit-stones-balance');
+    if (balance) balance.textContent = `💎 ${Math.max(0, Number(state.disciple && state.disciple.spirit_stones) || 0)} Linh Thạch`;
+    const picker = document.getElementById('disciple-avatar-picker');
+    if (picker && !picker.dataset.initialized) {
+      picker.dataset.initialized = 'true';
+      picker.replaceChildren();
+      Array.from({ length: 12 }, (_, index) => makeXianxiaAvatar(index)).forEach((avatar, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'disciple-avatar-option';
+        button.dataset.avatarIndex = String(index);
+        button.setAttribute('aria-label', `Chọn avatar ${avatar.name}`);
+        const image = document.createElement('img');
+        image.src = avatar.src;
+        image.alt = '';
+        image.loading = 'lazy';
+        image.decoding = 'async';
+        const label = document.createElement('span');
+        label.textContent = avatar.name;
+        button.append(image, label);
+        picker.appendChild(button);
+      });
+    }
+    const shop = document.getElementById('disciple-frame-shop');
+    if (shop) {
+      const unlocked = new Set(Array.isArray(state.disciple.unlocked_frames)
+        ? state.disciple.unlocked_frames : ['jade']);
+      shop.replaceChildren();
+      DISCIPLE_FRAMES.forEach(frame => {
+        const card = document.createElement('article');
+        card.className = `frame-shop-card ${frameClass(frame.id)}`;
+        const title = document.createElement('strong');
+        title.textContent = frame.name;
+        const cost = document.createElement('span');
+        cost.textContent = frame.cost ? `💎 ${frame.cost}` : 'Miễn phí';
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'admin-secondary-button';
+        button.dataset.frameId = frame.id;
+        if (state.disciple.active_frame === frame.id) {
+          button.textContent = 'Đang trang bị';
+          button.disabled = true;
+        } else {
+          button.textContent = unlocked.has(frame.id) ? 'Trang bị' : 'Mở khóa';
+        }
+        card.append(title, cost, button);
+        shop.appendChild(card);
+      });
+    }
+    const ticketAvatar = document.getElementById('ticket-disp-avatar');
+    if (ticketAvatar) {
+      ticketAvatar.src = String(state.disciple.avatar_url || getMemberAvatar(authenticatedUser) || makeXianxiaAvatar(0).src);
+      ticketAvatar.className = `ticket-disciple-avatar ${frameClass(state.disciple.active_frame)}`;
+      ticketAvatar.hidden = false;
+    }
+    const ticket = document.getElementById('souvenir-ticket');
+    if (ticket) {
+      DISCIPLE_FRAMES.forEach(frame => ticket.classList.remove(`frame-${frame.id}`));
+      ticket.classList.add(frameClass(state.disciple.active_frame));
+    }
+  }
+
+  async function saveDiscipleChanges(patch, statusId = 'disciple-avatar-status') {
+    const status = document.getElementById(statusId);
+    if (!authenticatedUser || !state.discipleStatusReady || !supabaseClient) return false;
+    try {
+      const { data, error } = await supabaseClient.from('disciples').update(patch)
+        .eq('user_id', authenticatedUser.id).select('*').single();
+      if (error) throw error;
+      state.disciple = data;
+      refreshDiscipleshipUI();
+      renderDiscipleProfileTools();
+      if (status) status.textContent = 'Đã lưu hồ sơ đạo hữu.';
+      return true;
+    } catch (error) {
+      const message = `Không thể lưu hồ sơ: ${error.message || 'Lỗi Supabase.'}`;
+      if (status) status.textContent = message;
+      console.error(message, error);
+      return false;
+    }
+  }
+
+  async function awardDiscipleSpiritStones(amount, claimKey) {
+    if (!authenticatedUser || !state.discipleStatusReady || isDiscipleBanned() || !supabaseClient) return;
+    try {
+      const { error } = await supabaseClient.rpc('earn_quiz_spirit_stones', {
+        p_amount: amount,
+        p_claim_key: claimKey
+      });
+      if (error) throw error;
+      const { data, error: readError } = await supabaseClient.from('disciples').select('*')
+        .eq('user_id', authenticatedUser.id).single();
+      if (readError) throw readError;
+      state.disciple = data;
+      renderDiscipleProfileTools();
+    } catch (error) {
+      console.warn('Không thể cộng Linh Thạch sau Đố Vui Độ Kiếp:', error);
+      const status = document.getElementById('disciple-avatar-status');
+      if (status) status.textContent = `Chưa thể cộng Linh Thạch: ${error.message || 'hãy kiểm tra cột spirit_stones trong Supabase.'}`;
+    }
+  }
+
+  function initDiscipleProfileTools() {
+    const picker = document.getElementById('disciple-avatar-picker');
+    const upload = document.getElementById('disciple-avatar-upload');
+    const shop = document.getElementById('disciple-frame-shop');
+    if (picker) picker.addEventListener('click', event => {
+      const button = event.target.closest('[data-avatar-index]');
+      if (!button || !authenticatedUser) return;
+      if (!hasDiscipleFeatureAccess()) return;
+      const avatar = makeXianxiaAvatar(Number(button.dataset.avatarIndex));
+      void saveDiscipleChanges({ avatar_url: avatar.src });
+    });
+    if (upload) upload.addEventListener('change', async () => {
+      const file = upload.files && upload.files[0];
+      upload.value = '';
+      if (!file) return;
+      if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 12 * 1024 * 1024) {
+        const status = document.getElementById('disciple-avatar-status');
+        if (status) status.textContent = 'Chỉ nhận ảnh JPEG, PNG hoặc WebP, dung lượng tối đa 12 MB.';
+        return;
+      }
+      if (!hasDiscipleFeatureAccess()) return;
+      const status = document.getElementById('disciple-avatar-status');
+      let source = '';
+      try {
+        const image = new Image();
+        source = URL.createObjectURL(file);
+        image.src = source;
+        await new Promise((resolve, reject) => {
+          image.onload = resolve;
+          image.onerror = () => reject(new Error('Không thể đọc ảnh đã chọn.'));
+        });
+        const side = Math.min(image.naturalWidth, image.naturalHeight);
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Trình duyệt không hỗ trợ xử lý ảnh.');
+        context.drawImage(image, (image.naturalWidth - side) / 2, (image.naturalHeight - side) / 2, side, side, 0, 0, 256, 256);
+        URL.revokeObjectURL(source);
+        source = '';
+        let mime = 'image/webp';
+        let quality = 0.78;
+        let dataUrl = canvas.toDataURL(mime, quality);
+        if (!dataUrl.startsWith('data:image/webp')) mime = 'image/jpeg';
+        for (let attempt = 0; attempt < 8 && Math.ceil(dataUrl.length * 0.75) > 35000; attempt += 1) {
+          quality = Math.max(0.35, quality - 0.06);
+          dataUrl = canvas.toDataURL(mime, quality);
+        }
+        if (Math.ceil(dataUrl.length * 0.75) > 35000) throw new Error('Ảnh chưa thể nén xuống dưới 35 KB. Vui lòng chọn ảnh khác.');
+        await saveDiscipleChanges({ avatar_url: dataUrl });
+      } catch (error) {
+        if (source) URL.revokeObjectURL(source);
+        if (status) status.textContent = error.message || 'Không thể xử lý ảnh.';
+      }
+    });
+    if (shop) shop.addEventListener('click', async event => {
+      const button = event.target.closest('[data-frame-id]');
+      if (!button || !authenticatedUser || !hasDiscipleFeatureAccess()) return;
+      const frame = DISCIPLE_FRAMES.find(item => item.id === button.dataset.frameId);
+      if (!frame) return;
+      const unlocked = new Set(Array.isArray(state.disciple.unlocked_frames)
+        ? state.disciple.unlocked_frames : ['jade']);
+      if (!unlocked.has(frame.id)) {
+        const balance = Number(state.disciple.spirit_stones) || 0;
+        if (balance < frame.cost) {
+          const status = document.getElementById('disciple-avatar-status');
+          if (status) status.textContent = `Cần ${frame.cost} Linh Thạch để mở khóa ${frame.name}.`;
+          return;
+        }
+        const { error } = await supabaseClient.rpc('purchase_disciple_frame', { p_frame: frame.id });
+        if (error) {
+          const status = document.getElementById('disciple-avatar-status');
+          if (status) status.textContent = `Không thể mở khung viền: ${error.message || 'hãy kiểm tra cấu hình Supabase.'}`;
+          return;
+        }
+        const { data, error: readError } = await supabaseClient.from('disciples').select('*')
+          .eq('user_id', authenticatedUser.id).single();
+        if (readError) throw readError;
+        state.disciple = data;
+        refreshDiscipleshipUI();
+      } else {
+        const { error } = await supabaseClient.rpc('equip_disciple_frame', { p_frame: frame.id });
+        if (error) {
+          const status = document.getElementById('disciple-avatar-status');
+          if (status) status.textContent = `Không thể trang bị khung viền: ${error.message || 'hãy kiểm tra cấu hình Supabase.'}`;
+          return;
+        }
+        const { data, error: readError } = await supabaseClient.from('disciples').select('*')
+          .eq('user_id', authenticatedUser.id).single();
+        if (readError) throw readError;
+        state.disciple = data;
+        refreshDiscipleshipUI();
+      }
+    });
+  }
+
+  function initSectMessages() {
+    if (document.getElementById('sect-chat-widget')) return;
+    const widget = document.createElement('aside');
+    widget.id = 'sect-chat-widget';
+    widget.className = 'sect-chat-widget';
+    widget.innerHTML = '<button type="button" id="sect-chat-toggle" class="sect-chat-toggle" aria-label="Mở Mật Thất Truyền Âm">💬<span id="sect-chat-unread" class="sect-chat-unread" hidden>0</span></button><section id="sect-chat-panel" class="sect-chat-panel" aria-label="Mật Thất Truyền Âm" hidden><header class="sect-chat-header"><div><strong>🕯️ Mật Thất Truyền Âm</strong><span id="sect-chat-subtitle">Trò chuyện riêng với Tông Chủ</span></div><button type="button" id="sect-chat-close" aria-label="Đóng">✕</button></header><div id="sect-chat-admin-layout" class="sect-chat-admin-layout" hidden><aside id="sect-chat-conversations" class="sect-chat-conversations"></aside><div class="sect-chat-room"><div id="sect-chat-messages" class="sect-chat-messages" aria-live="polite"></div><form id="sect-chat-form" class="sect-chat-form"><textarea id="sect-chat-input" rows="2" maxlength="1200" placeholder="Nhập lời truyền âm..." required></textarea><button type="submit" class="admin-primary-button">Gửi</button></form></div></div><div id="sect-chat-member-layout" class="sect-chat-member-layout"><div id="sect-chat-member-messages" class="sect-chat-messages" aria-live="polite"></div><form id="sect-chat-member-form" class="sect-chat-form"><textarea id="sect-chat-member-input" rows="2" maxlength="1200" placeholder="Gửi lời nhắn riêng tới Tông Chủ..." required></textarea><button type="submit" class="admin-primary-button">Gửi</button></form></div><p id="sect-chat-status" class="sect-chat-status" role="status" aria-live="polite"></p></section></aside>';
+    document.body.appendChild(widget);
+    const panel = document.getElementById('sect-chat-panel');
+    document.getElementById('sect-chat-toggle').addEventListener('click', () => {
+      if (!authenticatedUser) {
+        openCommunityAuthGate('trò chuyện riêng trong Mật Thất Truyền Âm');
+        return;
+      }
+      panel.hidden = !panel.hidden;
+      if (!panel.hidden) void loadSectMessages();
+    });
+    document.getElementById('sect-chat-close').addEventListener('click', () => { panel.hidden = true; });
+    document.getElementById('admin-open-sect-messages')?.addEventListener('click', () => {
+      panel.hidden = false;
+      void loadSectMessages();
+    });
+    const list = document.getElementById('sect-chat-conversations');
+    list.addEventListener('click', event => {
+      const button = event.target.closest('[data-chat-user]');
+      if (!button) return;
+      sectChatState.selectedUserId = button.dataset.chatUser;
+      void loadSectMessages();
+    });
+    document.getElementById('sect-chat-messages').addEventListener('click', event => {
+      const button = event.target.closest('[data-chat-delete]');
+      if (button && isAdminUser()) void deleteSectMessage(button.dataset.chatDelete);
+    });
+    const memberForm = document.getElementById('sect-chat-member-form');
+    const adminForm = document.getElementById('sect-chat-form');
+    memberForm.addEventListener('submit', event => {
+      event.preventDefault();
+      void sendSectMessage(document.getElementById('sect-chat-member-input').value, memberForm);
+    });
+    adminForm.addEventListener('submit', event => {
+      event.preventDefault();
+      void sendSectMessage(document.getElementById('sect-chat-input').value, adminForm);
+    });
+    refreshSectMessaging();
+  }
+
+  function refreshSectMessaging() {
+    if (!document.getElementById('sect-chat-widget')) return;
+    if (sectMessagesChannel && supabaseClient) {
+      void supabaseClient.removeChannel(sectMessagesChannel);
+      sectMessagesChannel = null;
+    }
+    const adminLayout = document.getElementById('sect-chat-admin-layout');
+    const memberLayout = document.getElementById('sect-chat-member-layout');
+    if (adminLayout) adminLayout.hidden = !isAdminUser();
+    if (memberLayout) memberLayout.hidden = isAdminUser();
+    if (!authenticatedUser || !supabaseClient || !supabaseClient.channel) {
+      sectChatState.messages = [];
+      sectChatState.conversations = [];
+      sectChatState.selectedUserId = '';
+      renderSectChatMessages();
+      renderSectChatConversations();
+      document.getElementById('sect-chat-unread').hidden = true;
+      return;
+    }
+    const config = { event: '*', schema: 'public', table: 'sect_messages' };
+    if (!isAdminUser()) config.filter = `user_id=eq.${authenticatedUser.id}`;
+    sectMessagesChannel = supabaseClient.channel(`sect-messages:${authenticatedUser.id}`)
+      .on('postgres_changes', config, () => {
+        if (!document.getElementById('sect-chat-panel').hidden || isAdminUser()) void loadSectMessages();
+        else void refreshSectUnread();
+      })
+      .subscribe(status => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          setSectChatStatus('Không thể kết nối Mật Thất. Hãy kiểm tra bảng sect_messages và quyền Realtime.', true);
+        }
+      });
+    void refreshSectUnread();
+  }
+
+  function setSectChatStatus(message, isError = false) {
+    const status = document.getElementById('sect-chat-status');
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle('is-error', isError);
+  }
+
+  async function refreshSectUnread() {
+    if (!isAdminUser() || !supabaseClient) return;
+    try {
+      const { count, error } = await supabaseClient.from('sect_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('sender_role', 'disciple').eq('is_read', false);
+      if (error) throw error;
+      const badge = document.getElementById('sect-chat-unread');
+      if (!badge) return;
+      badge.textContent = String(count || 0);
+      badge.hidden = !(count > 0);
+    } catch (error) {
+      setSectChatStatus(`Không thể tải số tin chưa đọc: ${error.message || 'Lỗi Supabase.'}`, true);
+    }
+  }
+
+  async function loadSectMessages() {
+    if (!authenticatedUser || !supabaseClient || sectChatState.loading) return;
+    sectChatState.loading = true;
+    setSectChatStatus('Đang mở linh phù truyền âm…');
+    try {
+      if (isAdminUser()) {
+        const { data, error } = await supabaseClient.from('sect_messages').select('*')
+          .order('created_at', { ascending: false }).limit(500);
+        if (error) throw error;
+        const grouped = new Map();
+        (data || []).forEach(message => {
+          const key = String(message.user_id || message.user_email || '');
+          if (!key) return;
+          const conversation = grouped.get(key) || {
+            user_id: String(message.user_id || ''),
+            user_email: String(message.user_email || ''),
+            full_name: String(message.full_name || message.user_email || 'Đạo Hữu'),
+            unread: 0,
+            latest: message.created_at
+          };
+          if (message.sender_role === 'disciple' && message.is_read !== true) conversation.unread += 1;
+          grouped.set(key, conversation);
+        });
+        sectChatState.conversations = Array.from(grouped.values());
+        const selected = sectChatState.conversations.find(item => item.user_id === sectChatState.selectedUserId) ||
+          sectChatState.conversations[0];
+        sectChatState.selectedUserId = selected ? selected.user_id : '';
+        renderSectChatConversations();
+        sectChatState.messages = selected
+          ? (data || []).filter(message => String(message.user_id || '') === selected.user_id)
+            .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+          : [];
+        if (selected) {
+          const { error: readError } = await supabaseClient.from('sect_messages').update({ is_read: true })
+            .eq('user_id', selected.user_id).eq('sender_role', 'disciple').eq('is_read', false);
+          if (readError) throw readError;
+        }
+      } else {
+        const { data, error } = await supabaseClient.from('sect_messages').select('*')
+          .eq('user_id', authenticatedUser.id).order('created_at', { ascending: true }).limit(100);
+        if (error) throw error;
+        sectChatState.messages = data || [];
+      }
+      renderSectChatMessages();
+      void refreshSectUnread();
+      setSectChatStatus('');
+    } catch (error) {
+      setSectChatStatus(`Không thể tải hội thoại: ${error.message || 'Lỗi Supabase.'}`, true);
+      console.error('Không thể tải Mật Thất Truyền Âm:', error);
+    } finally {
+      sectChatState.loading = false;
+    }
+  }
+
+  function renderSectChatConversations() {
+    const list = document.getElementById('sect-chat-conversations');
+    if (!list) return;
+    list.replaceChildren();
+    if (!sectChatState.conversations.length) {
+      list.textContent = 'Chưa có đạo hữu gửi truyền âm.';
+      return;
+    }
+    sectChatState.conversations.forEach(conversation => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `sect-chat-conversation${conversation.user_id === sectChatState.selectedUserId ? ' active' : ''}`;
+      button.dataset.chatUser = conversation.user_id;
+      const name = document.createElement('strong');
+      name.textContent = conversation.full_name;
+      const email = document.createElement('span');
+      email.textContent = conversation.user_email;
+      button.append(name, email);
+      if (conversation.unread) {
+        const unread = document.createElement('b');
+        unread.textContent = String(conversation.unread);
+        button.appendChild(unread);
+      }
+      list.appendChild(button);
+    });
+  }
+
+  function renderSectChatMessages() {
+    const containers = [
+      document.getElementById('sect-chat-messages'),
+      document.getElementById('sect-chat-member-messages')
+    ].filter(Boolean);
+    containers.forEach(container => {
+      container.replaceChildren();
+      sectChatState.messages.forEach(message => {
+        const item = document.createElement('article');
+        item.className = `sect-chat-message${message.sender_role === 'owner' ? ' is-owner' : ''}`;
+        const text = document.createElement('p');
+        text.textContent = String(message.content || '');
+        const meta = document.createElement('small');
+        meta.textContent = `${message.sender_role === 'owner' ? 'Tông Chủ' : String(message.full_name || 'Đạo Hữu')} · ${message.created_at ? new Date(message.created_at).toLocaleString('vi-VN') : ''}`;
+        item.append(meta, text);
+        if (isAdminUser()) {
+          const remove = document.createElement('button');
+          remove.type = 'button';
+          remove.dataset.chatDelete = String(message.id);
+          remove.textContent = 'Xóa';
+          remove.setAttribute('aria-label', 'Xóa tin nhắn');
+          item.appendChild(remove);
+        }
+        container.appendChild(item);
+      });
+      container.scrollTop = container.scrollHeight;
+    });
+  }
+
+  async function sendSectMessage(value, form) {
+    const content = String(value || '').trim();
+    if (!content) return;
+    if (!authenticatedUser) {
+      openCommunityAuthGate('gửi truyền âm riêng');
+      return;
+    }
+    if (!isAdminUser() && isDiscipleBanned()) {
+      setSectChatStatus('⚠️ Tài khoản của đạo hữu đã bị Tông Môn Phong Ấn!', true);
+      return;
+    }
+    const selected = sectChatState.conversations.find(item => item.user_id === sectChatState.selectedUserId);
+    if (isAdminUser() && !selected) {
+      setSectChatStatus('Hãy chọn một hội thoại để hồi âm.', true);
+      return;
+    }
+    const input = form.querySelector('textarea');
+    const button = form.querySelector('button[type="submit"]');
+    if (button) button.disabled = true;
+    try {
+      const payload = {
+        user_id: isAdminUser() ? selected.user_id : authenticatedUser.id,
+        user_email: isAdminUser() ? selected.user_email : String(authenticatedUser.email || ''),
+        full_name: isAdminUser() ? 'Tông Chủ' : String(state.disciple && state.disciple.full_name || getMemberFullName(authenticatedUser)),
+        sender_role: isAdminUser() ? 'owner' : 'disciple',
+        content,
+        is_read: false
+      };
+      const { error } = await supabaseClient.from('sect_messages').insert(payload);
+      if (error) throw error;
+      if (input) input.value = '';
+      setSectChatStatus('Truyền âm đã gửi.');
+      await loadSectMessages();
+    } catch (error) {
+      setSectChatStatus(`Không thể gửi truyền âm: ${error.message || 'Lỗi Supabase.'}`, true);
+      console.error('Không thể gửi Mật Thất Truyền Âm:', error);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
+  async function deleteSectMessage(id) {
+    if (!isAdminUser() || !window.confirm('Xóa tin nhắn này khỏi Mật Thất?')) return;
+    try {
+      const { error } = await supabaseClient.from('sect_messages').delete().eq('id', id);
+      if (error) throw error;
+      await loadSectMessages();
+    } catch (error) {
+      setSectChatStatus(`Không thể xóa tin nhắn: ${error.message || 'Lỗi Supabase.'}`, true);
+    }
+  }
+
+  function initSectComments() {
+    const form = document.getElementById('sect-comment-form');
+    const list = document.getElementById('sect-comment-list');
+    if (!form || !list || form.dataset.initialized) return;
+    form.dataset.initialized = 'true';
+    form.addEventListener('submit', event => {
+      event.preventDefault();
+      void submitSectComment();
+    });
+    document.getElementById('sect-comment-load-more').addEventListener('click', () => {
+      void loadSectComments(true);
+    });
+    document.getElementById('sect-comment-cancel-reply').addEventListener('click', () => {
+      sectCommentState.replyTo = null;
+      updateSectCommentReplyLabel();
+    });
+    list.addEventListener('click', event => {
+      const button = event.target.closest('[data-sect-action]');
+      if (!button) return;
+      const row = sectCommentState.rows.find(comment => String(comment.id) === button.dataset.commentId);
+      if (!row) return;
+      const action = button.dataset.sectAction;
+      if (action === 'reply') {
+        sectCommentState.replyTo = row;
+        updateSectCommentReplyLabel();
+        document.getElementById('sect-comment-input').focus();
+      } else if (action === 'pin' && isAdminUser()) {
+        void moderateSectComment(row, { is_pinned: !row.is_pinned });
+      } else if (action === 'delete' && isAdminUser()) {
+        void deleteSectComment(row);
+      } else if (action === 'reward' && isAdminUser()) {
+        void rewardSectComment(row, Number(button.dataset.amount));
+      }
+    });
+    void loadSectComments(false);
+    if (supabaseClient && supabaseClient.channel) {
+      sectCommentsChannel = supabaseClient.channel('sect-comments-live')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'sect_comments' }, () => {
+          void loadSectComments(false);
+        })
+        .subscribe(status => {
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            setSectCommentStatus('Bình luận chưa kết nối được Realtime.', true);
+          }
+        });
+    }
+  }
+
+  function setSectCommentStatus(message, isError = false) {
+    const status = document.getElementById('sect-comment-status');
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle('is-error', isError);
+  }
+
+  function updateSectCommentReplyLabel() {
+    const label = document.getElementById('sect-comment-replying');
+    const cancel = document.getElementById('sect-comment-cancel-reply');
+    const input = document.getElementById('sect-comment-input');
+    if (!label || !cancel || !input) return;
+    const parent = sectCommentState.replyTo;
+    label.hidden = !parent;
+    cancel.hidden = !parent;
+    label.textContent = parent ? `Đang trả lời ${parent.full_name || 'Đạo Hữu'}` : '';
+    input.placeholder = parent ? 'Viết phản hồi...' : 'Đăng nhập để lưu lại lời đàm đạo...';
+  }
+
+  async function loadSectComments(append = false) {
+    if (!supabaseClient || !document.getElementById('sect-comment-list')) return;
+    if (sectCommentState.loading) return;
+    if (!append) {
+      sectCommentState.offset = 0;
+      sectCommentState.rows = [];
+    }
+    sectCommentState.loading = true;
+    setSectCommentStatus('Đang tải lời đàm đạo…');
+    try {
+      let query = supabaseClient.from('sect_comments').select('*')
+        .is('parent_id', null)
+        .order('is_pinned', { ascending: false })
+        .order('created_at', { ascending: false })
+        .range(sectCommentState.offset, sectCommentState.offset + 9);
+      const { data: roots, error } = await query;
+      if (error) throw error;
+      const rootRows = roots || [];
+      sectCommentState.hasMore = rootRows.length === 10;
+      sectCommentState.offset += rootRows.length;
+      const rootIds = rootRows.map(item => item.id);
+      let replies = [];
+      if (rootIds.length) {
+        const { data, error: replyError } = await supabaseClient.from('sect_comments').select('*')
+          .in('parent_id', rootIds).order('created_at', { ascending: true }).limit(100);
+        if (replyError) throw replyError;
+        replies = data || [];
+      }
+      const incoming = [...rootRows, ...replies];
+      const byId = new Map(sectCommentState.rows.map(item => [String(item.id), item]));
+      incoming.forEach(item => byId.set(String(item.id), item));
+      sectCommentState.rows = Array.from(byId.values());
+      const userIds = Array.from(new Set(incoming.map(item => String(item.user_id || '')).filter(Boolean)));
+      const profiles = new Map();
+      if (userIds.length) {
+        const { data: members, error: profileError } = await supabaseClient.from('sect_public_disciples')
+          .select('user_id,full_name,sect_title,avatar_url,active_frame,is_owner')
+          .in('user_id', userIds);
+        if (!profileError) (members || []).forEach(member => profiles.set(String(member.user_id), member));
+      }
+      sectCommentState.rows.forEach(comment => {
+        comment.profile = profiles.get(String(comment.user_id)) || comment.profile || {};
+      });
+      renderSectComments(append);
+      document.getElementById('sect-comment-load-more').hidden = !sectCommentState.hasMore;
+      setSectCommentStatus('');
+    } catch (error) {
+      setSectCommentStatus(`Không thể tải Đàm Đạo Các: ${error.message || 'Hãy kiểm tra bảng sect_comments và quyền đọc.'}`, true);
+      console.error('Không thể tải Đàm Đạo Các:', error);
+    } finally {
+      sectCommentState.loading = false;
+    }
+  }
+
+  function renderSectComments(append) {
+    const list = document.getElementById('sect-comment-list');
+    if (!list) return;
+    const roots = sectCommentState.rows.filter(item => !item.parent_id);
+    if (!append) list.replaceChildren();
+    if (!roots.length && !append) {
+      const empty = document.createElement('li');
+      empty.className = 'admin-memory-empty';
+      empty.textContent = 'Chưa có lời đàm đạo. Hãy khai bút đầu tiên!';
+      list.appendChild(empty);
+      return;
+    }
+    roots.forEach(comment => {
+      if (Array.from(list.children).some(item => item.dataset.rootComment === String(comment.id))) return;
+      const item = document.createElement('li');
+      item.dataset.rootComment = String(comment.id);
+      const article = renderSectCommentCard(comment, false);
+      const replies = sectCommentState.rows.filter(child => String(child.parent_id) === String(comment.id));
+      const replyWrap = document.createElement('div');
+      replyWrap.className = 'sect-comment-replies';
+      replies.forEach(reply => replyWrap.appendChild(renderSectCommentCard(reply, true)));
+      item.append(article, replyWrap);
+      list.appendChild(item);
+    });
+  }
+
+  function renderSectCommentCard(comment, isReply) {
+    const card = document.createElement('article');
+    card.className = `sect-comment-card${isReply ? ' is-reply' : ''}${comment.is_pinned ? ' is-pinned' : ''}`;
+    const profile = comment.profile || {};
+    const avatar = document.createElement('img');
+    avatar.className = `sect-comment-avatar ${frameClass(profile.active_frame)}`;
+    avatar.alt = '';
+    avatar.loading = 'lazy';
+    avatar.decoding = 'async';
+    avatar.src = String(profile.avatar_url || makeXianxiaAvatar(0).src);
+    avatar.addEventListener('error', () => { avatar.src = makeXianxiaAvatar(0).src; }, { once: true });
+    const body = document.createElement('div');
+    body.className = 'sect-comment-body';
+    const header = document.createElement('header');
+    const name = document.createElement('strong');
+    name.textContent = String(profile.full_name || comment.full_name || 'Đạo Hữu');
+    header.appendChild(name);
+    const role = document.createElement('span');
+    role.className = 'sect-comment-title';
+    role.textContent = String(profile.sect_title || comment.sect_title || 'Đạo Hữu');
+    header.appendChild(role);
+    if (comment.is_owner === true) {
+      const badge = document.createElement('b');
+      badge.className = 'sect-owner-badge';
+      badge.textContent = '👑 Tông Chủ';
+      header.appendChild(badge);
+    }
+    if (Number(comment.rewarded_stones) > 0) {
+      const reward = document.createElement('b');
+      reward.className = 'sect-reward-badge';
+      reward.textContent = `💎 Được Tông Chủ ban thưởng +${Number(comment.rewarded_stones)} Linh Thạch`;
+      header.appendChild(reward);
+    }
+    const text = document.createElement('p');
+    text.textContent = String(comment.content || '');
+    const meta = document.createElement('small');
+    meta.textContent = comment.created_at ? new Date(comment.created_at).toLocaleString('vi-VN') : '';
+    const actions = document.createElement('div');
+    actions.className = 'sect-comment-actions';
+    if (!isReply) addSectCommentAction(actions, 'reply', comment, '↩ Phản hồi');
+    if (isAdminUser() && String(comment.user_id) !== String(authenticatedUser && authenticatedUser.id)) {
+      [10, 30, 50, 100].forEach(amount => addSectCommentAction(actions, 'reward', comment, `💎 +${amount}`, amount));
+      addSectCommentAction(actions, 'pin', comment, comment.is_pinned ? '📌 Bỏ ghim' : '📌 Ghim');
+      addSectCommentAction(actions, 'delete', comment, '🗑️ Xóa');
+    }
+    body.append(header, text, meta, actions);
+    card.append(avatar, body);
+    return card;
+  }
+
+  function addSectCommentAction(container, action, comment, label, amount) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'sect-comment-action';
+    button.dataset.sectAction = action;
+    button.dataset.commentId = String(comment.id);
+    if (amount) button.dataset.amount = String(amount);
+    button.textContent = label;
+    container.appendChild(button);
+  }
+
+  async function submitSectComment() {
+    const input = document.getElementById('sect-comment-input');
+    const content = String(input && input.value || '').trim();
+    if (!content) return;
+    if (!authenticatedUser) {
+      openCommunityAuthGate('đăng lời đàm đạo');
+      return;
+    }
+    if (!state.discipleStatusReady) {
+      setSectCommentStatus('Đang xác minh tư cách môn đồ…');
+      return;
+    }
+    if (isDiscipleBanned()) {
+      setSectCommentStatus('⚠️ Tài khoản của đạo hữu đã bị Tông Môn Phong Ấn!', true);
+      return;
+    }
+    try {
+      const { error } = await supabaseClient.from('sect_comments').insert({
+        user_id: authenticatedUser.id,
+        full_name: String(state.disciple.full_name || getMemberFullName(authenticatedUser)),
+        sect_title: String(state.disciple.sect_title || 'Ngoại Môn Đệ Tử'),
+        content,
+        parent_id: sectCommentState.replyTo ? sectCommentState.replyTo.id : null
+      });
+      if (error) throw error;
+      input.value = '';
+      sectCommentState.replyTo = null;
+      updateSectCommentReplyLabel();
+      setSectCommentStatus('Lời đàm đạo đã được ghi lại.');
+      await loadSectComments(false);
+    } catch (error) {
+      setSectCommentStatus(`Không thể gửi bình luận: ${error.message || 'Lỗi Supabase.'}`, true);
+    }
+  }
+
+  async function moderateSectComment(comment, patch) {
+    try {
+      const { error } = await supabaseClient.from('sect_comments').update(patch).eq('id', comment.id);
+      if (error) throw error;
+      await loadSectComments(false);
+    } catch (error) {
+      setSectCommentStatus(`Không thể cập nhật bình luận: ${error.message || 'Lỗi Supabase.'}`, true);
+    }
+  }
+
+  async function deleteSectComment(comment) {
+    if (!window.confirm('Xóa bình luận này và các phản hồi thuộc bình luận?')) return;
+    try {
+      const { error } = await supabaseClient.from('sect_comments').delete().eq('id', comment.id);
+      if (error) throw error;
+      await loadSectComments(false);
+    } catch (error) {
+      setSectCommentStatus(`Không thể xóa bình luận: ${error.message || 'Lỗi Supabase.'}`, true);
+    }
+  }
+
+  async function rewardSectComment(comment, amount) {
+    if (![10, 30, 50, 100].includes(amount)) return;
+    try {
+      const { error } = await supabaseClient.rpc('admin_reward_sect_comment', {
+        p_comment_id: comment.id,
+        p_amount: amount
+      });
+      if (error) throw error;
+      setSectCommentStatus(`💎 Đã ban thưởng +${amount} Linh Thạch.`);
+      document.getElementById('sect-comment-list')?.classList.add('is-rewarded');
+      window.setTimeout(() => document.getElementById('sect-comment-list')?.classList.remove('is-rewarded'), 1100);
+      await loadSectComments(false);
+    } catch (error) {
+      setSectCommentStatus(`Không thể tặng Linh Thạch: ${error.message || 'Cần cấu hình RPC admin_reward_sect_comment trong Supabase.'}`, true);
     }
   }
 
@@ -2079,12 +2910,6 @@
       tongmon: 'Tông Môn Các',
       admin: 'Nội Các'
     }[pageName] || 'Đại Điện';
-  }
-
-  function getMaskedEmail(email) {
-    const [name, domain] = String(email || '').split('@');
-    if (!name || !domain) return '';
-    return `${name.slice(0, 1)}***@${domain}`;
   }
 
   function currentPresencePayload() {
@@ -2099,7 +2924,7 @@
       full_name: user
         ? String(state.disciple && state.disciple.full_name || getMemberFullName(user))
         : anonymousName,
-      email: user ? getMaskedEmail(user.email) : '',
+      email: '',
       avatar_url: user
         ? String(state.disciple && state.disciple.avatar_url || getMemberAvatar(user))
         : '',
@@ -2175,7 +3000,7 @@
       avatar.alt = '';
       avatar.loading = 'lazy';
       avatar.decoding = 'async';
-      if (visitor.avatar_url && /^https:\/\//i.test(visitor.avatar_url)) avatar.src = visitor.avatar_url;
+      if (isDisplayableAvatar(visitor.avatar_url)) avatar.src = visitor.avatar_url;
       else avatar.hidden = true;
       const identity = document.createElement('div');
       identity.className = 'admin-online-identity';
@@ -2342,6 +3167,9 @@
     updatePresence();
     refreshVisibleMemoryLikes();
     initMilestoneComments();
+    refreshSectMessaging();
+    if (pageName === 'home') void loadSectComments(false);
+    renderDiscipleProfileTools();
     if (authenticatedUser) {
       void syncCultivationForUser(authenticatedUser);
       void loadLeaderboard();
@@ -2470,7 +3298,7 @@
     const message = String(error && error.message || '');
     const normalized = message.toLowerCase();
     if (/invalid login credentials|invalid credentials|email or password/.test(normalized)) {
-      return 'Email hoặc mật khẩu không chính xác.';
+      return 'Tên đăng nhập/Email hoặc mật khẩu không chính xác.';
     }
     if (/already registered|already exists|user already|email.*taken/.test(normalized)) {
       return 'Email này đã được đăng ký. Đạo hữu hãy đăng nhập nhé.';
@@ -3059,9 +3887,9 @@
       avatar.alt = '';
       avatar.loading = 'lazy';
       avatar.decoding = 'async';
-      avatar.src = /^https:\/\//i.test(String(member.avatar_url || ''))
+      avatar.src = isDisplayableAvatar(member.avatar_url)
         ? member.avatar_url
-        : 'images/default-avatar.svg';
+        : makeXianxiaAvatar(0).src;
       avatar.addEventListener('error', () => { avatar.hidden = true; }, { once: true });
 
       const identity = document.createElement('div');
@@ -3893,6 +4721,13 @@
     if (!modal || !loginForm || !signupForm) return;
 
     renderAuthState(authenticatedUser);
+    const oauthError = new URLSearchParams(window.location.search).get('error_description');
+    if (oauthError) {
+      const providerDisabled = /provider.*(not enabled|disabled)|unsupported provider|google.*provider/i.test(oauthError);
+      setAdminStatus(providerDisabled
+        ? 'Đăng nhập Google chưa được bật trong cấu hình Supabase. Tông Chủ cần bật Google Provider và khai báo URL chuyển hướng của trang.'
+        : `Đăng nhập Google thất bại: ${oauthError}`, true);
+    }
     if (headerButton) {
       headerButton.addEventListener('click', () => {
         openAuthModal();
@@ -3940,11 +4775,15 @@
         try {
           const { error } = await supabaseClient.auth.signInWithOAuth({
             provider: 'google',
-            options: { redirectTo: window.location.href }
+            options: { redirectTo: `${window.location.origin}${window.location.pathname}` }
           });
           if (error) throw error;
         } catch (error) {
-          setAdminStatus(`Không thể đăng nhập bằng Google: ${error.message || 'Lỗi xác thực.'}`, true);
+          const detail = String(error && error.message || '');
+          const providerDisabled = /provider.*(not enabled|disabled)|unsupported provider|google.*provider/i.test(detail);
+          setAdminStatus(providerDisabled
+            ? 'Đăng nhập Google chưa được bật trong cấu hình Supabase. Tông Chủ cần bật Google Provider và khai báo URL chuyển hướng của trang.'
+            : `Không thể đăng nhập bằng Google: ${detail || 'Lỗi xác thực.'}`, true);
           googleButton.disabled = false;
         }
       });
@@ -3961,8 +4800,20 @@
       if (submitButton) submitButton.disabled = true;
       setAdminStatus('Đang xác thực Đạo Hữu…');
       try {
+        const loginName = document.getElementById('auth-login-email').value.trim();
+        let email = loginName;
+        if (!loginName.includes('@')) {
+          const { data: memberEmail, error: lookupError } = await supabaseClient.rpc(
+            'lookup_disciple_login_email', { p_username: loginName }
+          );
+          if (lookupError) {
+            throw new Error(`Chưa thể tra cứu đạo hiệu trong Supabase: ${lookupError.message || 'hãy áp dụng cập nhật cơ sở dữ liệu.'}`);
+          }
+          email = String(memberEmail || '');
+          if (!email) throw new Error('Không tìm thấy tên đăng nhập này. Hãy kiểm tra lại hoặc đăng ký tài khoản mới.');
+        }
         const { data, error } = await supabaseClient.auth.signInWithPassword({
-          email: document.getElementById('auth-login-email').value.trim(),
+          email,
           password: document.getElementById('auth-login-password').value
         });
         if (error) throw error;
@@ -3983,15 +4834,20 @@
         return;
       }
 
-      const nameInput = document.getElementById('auth-signup-name');
+      const usernameInput = document.getElementById('auth-signup-username');
       const emailInput = document.getElementById('auth-signup-email');
-      const name = nameInput.value.trim().replace(/\s+/g, ' ');
+      const username = usernameInput.value.trim().toLowerCase();
       const email = emailInput.value.trim();
       const password = document.getElementById('auth-signup-password').value;
-      const nameError = validateSignupName(name);
-      if (nameError) {
-        setAdminStatus(nameError, true);
-        nameInput.focus();
+      if (!/^[a-z0-9_]{3,20}$/.test(username)) {
+        setAdminStatus('Tên đăng nhập cần dài 3–20 ký tự, chỉ gồm chữ không dấu, số và dấu gạch dưới; không có khoảng trắng.', true);
+        usernameInput.focus();
+        return;
+      }
+      const usernameError = validateSignupName(username.replace(/_/g, ' '));
+      if (usernameError) {
+        setAdminStatus(usernameError, true);
+        usernameInput.focus();
         return;
       }
       const emailError = validateSignupEmail(email);
@@ -4009,7 +4865,19 @@
       if (submitButton) submitButton.disabled = true;
       setAdminStatus('Đang lập danh tính Đạo Hữu…');
       try {
-        const options = { data: { display_name: name } };
+        const { data: usernameAvailable, error: usernameError } = await supabaseClient.rpc(
+          'is_disciple_username_available', { p_username: username }
+        );
+        if (usernameError) throw new Error(`Chưa thể kiểm tra đạo hiệu: ${usernameError.message || 'hãy áp dụng cập nhật Supabase.'}`);
+        if (usernameAvailable !== true) throw new Error('Tên đăng nhập này đã được sử dụng. Hãy chọn đạo hiệu khác.');
+        const options = {
+          data: {
+            username,
+            display_name: username,
+            full_name: username,
+            starting_spirit_stones: 20
+          }
+        };
         const { data, error } = await supabaseClient.auth.signUp({ email, password, options });
         if (error) throw error;
         signupForm.reset();
@@ -7011,6 +7879,9 @@
     state.game.resultSaved = false;
     state.game.hasAnswered = false;
     state.game.usedPowerups = new Set();
+    state.game.sessionId = window.crypto && window.crypto.randomUUID
+      ? window.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     state.game.powerups = { fifty: false, hint: false, freeze: false };
     setLeaderboardStatus('leaderboard-save-status', '');
 
@@ -7229,6 +8100,7 @@
         void awardCultivation(5, 'Trả lời đúng Đoán Năm', {
           sourceElement: document.getElementById('game-year-submit')
         });
+        void awardDiscipleSpiritStones(5, `${state.game.sessionId}:${state.game.currentIndex}`);
       }
       revealCard.classList.add('is-correct');
       revealHeader.className = 'reveal-header is-correct';
@@ -7374,7 +8246,7 @@
 
     rows.forEach((row, index) => {
       const item = document.createElement('li');
-      item.className = 'game-leaderboard-row';
+      item.className = `game-leaderboard-row ${frameClass(row.active_frame)}`;
       const place = document.createElement('span');
       place.className = 'leaderboard-place';
       place.textContent = `Hạng ${index + 1}`;
@@ -7452,24 +8324,13 @@
     const statusId = 'game-leaderboard-status';
     setLeaderboardStatus(statusId, 'Đang triệu hồi Cao Thủ Đoán Niên Hiệu...');
     try {
-      if (!authenticatedUser || !state.discipleStatusReady) {
-        const { data: legacyRows, error: legacyError } = await supabaseClient.from('leaderboard')
-          .select('user_id,display_name,best_score,best_streak')
-          .order('best_score', { ascending: false })
-          .order('best_streak', { ascending: false })
-          .limit(10);
-        if (legacyError) throw legacyError;
-        renderGameLeaderboard(legacyRows || []);
-        setLeaderboardStatus(statusId, '');
-        return;
-      }
-      const { data, error } = await supabaseClient.from('disciples')
-        .select('user_id,full_name,sect_title,quiz_best_score,quiz_max_combo')
+      const { data, error } = await supabaseClient.from('sect_public_disciples')
+        .select('user_id,full_name,sect_title,quiz_best_score,quiz_max_combo,active_frame,is_owner')
         .order('quiz_best_score', { ascending: false })
         .order('quiz_max_combo', { ascending: false })
         .limit(10);
       if (error) {
-        console.warn('Chưa thể đọc Bảng Phong Thần từ Sổ Môn Đồ; thử bảng tương thích:', error);
+        console.warn('Chưa thể đọc Bảng Phong Thần công khai; thử bảng tương thích:', error);
         const { data: legacyRows, error: legacyError } = await supabaseClient.from('leaderboard')
           .select('user_id,display_name,best_score,best_streak')
           .order('best_score', { ascending: false })
@@ -7477,7 +8338,7 @@
           .limit(10);
         if (legacyError) throw legacyError;
         renderGameLeaderboard(legacyRows || []);
-        setLeaderboardStatus(statusId, 'Bảng đang hiển thị dữ liệu tương thích; cấp quyền đọc công khai cho Bảng Phong Thần để đồng bộ điểm từ disciples.');
+        setLeaderboardStatus(statusId, 'Bảng đang hiển thị dữ liệu tương thích; hãy áp dụng migration để đồng bộ chức vụ và khung viền.');
         return;
       }
       renderGameLeaderboard((data || []).filter(row =>
