@@ -16799,3 +16799,10 @@ body.user-profile-modal-open { overflow: hidden; }
     flex-basis: 46px !important;
   }
 }
+
+html.is-document-hidden #cultivation-bg,
+html.is-document-hidden #cultivation-bg::before,
+html.is-document-hidden #cultivation-bg *,
+html.is-document-hidden .ambient-glow {
+  animation-play-state: paused !important;
+}

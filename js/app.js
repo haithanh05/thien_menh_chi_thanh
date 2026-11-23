@@ -18,12 +18,37 @@
   const DISCIPLE_PROFILE_CACHE_PREFIX = 'thien-menh-chi-thanh:disciple-profile:';
   const DEVICE_ID_KEY = 'tm_device_id';
   const FEATURE_TOGGLES_STORAGE_KEY = 'thien-menh-chi-thanh:feature-toggles';
+  const STATIC_DATA_CACHE_PREFIX = 'thien-menh-chi-thanh:static-cache:';
+  const STATIC_DATA_CACHE_TTL = 60 * 1000;
   const DEFAULT_DISCIPLE_AVATAR = 'images/avt/avt3.webp';
+  const OPTIMIZED_LOCAL_IMAGES = Object.freeze({
+    'images/ảnh chính/avt.jpg': {
+      src: 'images/ảnh chính/avt.webp', fallback: 'images/ảnh chính/avt.jpg', width: 400, height: 400
+    },
+    'images/2026/IMG_4295_Original.JPG': {
+      src: 'images/2026/IMG_4295_Original.webp', fallback: 'images/2026/IMG_4295_Original.JPG', width: 220, height: 374
+    },
+    'images/Lúc nhỏ/IMG_0025_Original.JPG': {
+      src: 'images/Lúc nhỏ/IMG_0025_Original.webp', fallback: 'images/Lúc nhỏ/IMG_0025_Original.JPG', width: 260, height: 346
+    },
+    'images/2022/FB_IMG_1664453443312_Original_Original.JPG': {
+      src: 'images/2022/FB_IMG_1664453443312_Original_Original.webp',
+      fallback: 'images/2022/FB_IMG_1664453443312_Original_Original.JPG',
+      width: 260,
+      height: 462
+    },
+    'images/2021/ADA80A3E-B242-4935-81F3-51BB0EC1115A_Original.JPG': {
+      src: 'images/2021/ADA80A3E-B242-4935-81F3-51BB0EC1115A_Original.webp',
+      fallback: 'images/2021/ADA80A3E-B242-4935-81F3-51BB0EC1115A_Original.JPG',
+      width: 260,
+      height: 462
+    }
+  });
   const GENESIS_PREFACE = '"Nơi lưu giữ toàn bộ quá trình độ kiếp từ một phàm nhân hay ngủ nướng thành Kiến Trúc Sư Gõ Phím tuổi 21. Đạo hữu ghé thăm xin nhẹ tay tặng chút Linh Thạch, chớ dại trêu chọc Thành Chủ kẻo bị tế lên Thiên Kiêu Bảng!"';
   const HERO_INTRO = '"Chào mừng đạo hữu hạ phàm ghé thăm thánh địa của Thành Chủ Hải Thành! Nơi đây phong ấn toàn bộ huyết lệ từ thuở luyện khí còn sợ bug đến khi độ kiếp thành chiến thần gõ phím Lv.21. Đã lỡ chân bước vào thì đừng vội quay xe — hãy dâng chút Linh Thạch lấy hên rồi cùng khám phá thiên cơ!"';
   const INVITE_URL = 'https://kyniem.ht05.id.vn/';
   const INVITE_MESSAGE = `Mời đạo hữu ghé thăm Thiên Mệnh Chi Thành – nơi Thành Chủ Hải Thành lưu giữ hành trình độ kiếp từ phàm nhân sợ bug đến chiến thần gõ phím: ${INVITE_URL}`;
-  const GENESIS_IMAGE = 'images/%E1%BA%A3nh%20ch%C3%ADnh/avt.jpg';
+  const GENESIS_IMAGE = 'images/%E1%BA%A3nh%20ch%C3%ADnh/avt.webp';
   const CULTIVATION_PROFILE_COLUMNS = 'user_id,email,display_name,tu_vi,last_daily_claim,daily_like_xp,last_like_date,ticket_claimed,guestbook_claimed,streak_days,last_checkin_date,updated_at';
   const DEFAULT_FEATURE_TOGGLES = Object.freeze({
     decrees: true,
@@ -99,6 +124,7 @@
   let html2CanvasPromise = null;
   let appToastTimer = null;
   let adminToastTimer = null;
+  let miniMusicPositionFrame = 0;
   let discipleNameToastTimer = null;
   let cultivationCardControlsBound = false;
   let adminDashboardRequest = null;
@@ -115,6 +141,8 @@
   let presenceJoinTime = new Date().toISOString();
   let onlinePresenceState = {};
   let disciplesLoadPromise = null;
+  let pageContentInitialized = false;
+  const staticDataRequests = new Map();
   let sectMessagesChannel = null;
   let sectCommentsChannel = null;
   const homeDeferredScheduled = new Set();
@@ -676,6 +704,93 @@
     return date.toISOString().slice(0, 10);
   }
 
+  function readStaticDataCache(key) {
+    try {
+      const cached = JSON.parse(window.sessionStorage.getItem(`${STATIC_DATA_CACHE_PREFIX}${key}`) || 'null');
+      return cached && Object.prototype.hasOwnProperty.call(cached, 'value') &&
+        Number.isFinite(Number(cached.savedAt))
+        ? cached
+        : null;
+    } catch (error) {
+      console.warn(`Không thể đọc bộ nhớ tạm ${key}:`, error);
+      return null;
+    }
+  }
+
+  function writeStaticDataCache(key, value) {
+    try {
+      window.sessionStorage.setItem(`${STATIC_DATA_CACHE_PREFIX}${key}`, JSON.stringify({
+        savedAt: Date.now(),
+        value
+      }));
+    } catch (error) {
+      console.warn(`Không thể lưu bộ nhớ tạm ${key}:`, error);
+    }
+  }
+
+  function clearStaticDataCache(key) {
+    try {
+      window.sessionStorage.removeItem(`${STATIC_DATA_CACHE_PREFIX}${key}`);
+    } catch (error) {
+      console.warn(`Không thể xóa bộ nhớ tạm ${key}:`, error);
+    }
+  }
+
+  function fetchStaticData(key, loader) {
+    if (staticDataRequests.has(key)) return staticDataRequests.get(key);
+    const request = Promise.resolve()
+      .then(loader)
+      .then(value => {
+        writeStaticDataCache(key, value);
+        return value;
+      })
+      .finally(() => {
+        staticDataRequests.delete(key);
+      });
+    staticDataRequests.set(key, request);
+    return request;
+  }
+
+  function scheduleIdleTask(callback, options = {}) {
+    let started = false;
+    let idleId = 0;
+    let fallbackTimer = 0;
+    let observer = null;
+    let onInteraction = null;
+    const run = () => {
+      if (started) return;
+      started = true;
+      if (idleId && typeof window.cancelIdleCallback === 'function') window.cancelIdleCallback(idleId);
+      if (fallbackTimer) window.clearTimeout(fallbackTimer);
+      if (observer) observer.disconnect();
+      if (onInteraction) {
+        document.removeEventListener('click', onInteraction, true);
+        document.removeEventListener('focusin', onInteraction, true);
+      }
+      callback();
+    };
+    if (options.target && 'IntersectionObserver' in window) {
+      observer = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) run();
+      }, { rootMargin: '160px 0px' });
+      observer.observe(options.target);
+    }
+    if (options.selector) {
+      onInteraction = event => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (target && target.closest(options.selector)) run();
+      };
+      document.addEventListener('click', onInteraction, true);
+      document.addEventListener('focusin', onInteraction, true);
+    }
+    if (typeof window.requestIdleCallback === 'function') {
+      idleId = window.requestIdleCallback(run, { timeout: options.timeout || 1400 });
+    } else {
+      fallbackTimer = window.setTimeout(run, 120);
+    }
+    return run;
+  }
+
   function normalizeDateKey(value) {
     const dateKey = String(value || '').slice(0, 10);
     return /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : null;
@@ -774,37 +889,46 @@
     });
   }
 
-  async function loadSiteSettings() {
-    if (!supabaseClient) return;
-    try {
-      const { data, error } = await supabaseClient.from('site_settings')
-        .select('key,value')
-        .in('key', ['cultivation_overrides', 'custom_attributes', 'visitor_config', 'hidden_memories', 'announcement_config', 'quiz_special_questions']);
-      if (error) throw error;
+  function applySiteSettingsRows(rows) {
+    (rows || []).forEach(row => {
+      state.siteSettings[row.key] = parseSettingValue(row.value);
+    });
+    state.cultivationOverrides = normalizeCultivationOverrides(state.siteSettings.cultivation_overrides);
+    state.customAttributes = normalizeCustomAttributes(state.siteSettings.custom_attributes);
+    state.hiddenMemories = new Set(Array.isArray(state.siteSettings.hidden_memories)
+      ? state.siteSettings.hidden_memories.map(String)
+      : []);
+    applyHiddenMemories();
+    renderSiteAnnouncement();
+    const announcement = state.siteSettings.announcement_config || {};
+    const announcementEnabled = document.getElementById('admin-announcement-enabled');
+    const announcementText = document.getElementById('admin-announcement-text');
+    if (announcementEnabled) announcementEnabled.checked = announcement.enabled === true;
+    if (announcementText) announcementText.value = String(announcement.text || '');
+    const visitorConfig = state.siteSettings.visitor_config || {};
+    state.visitor.visible = visitorConfig.visible === true;
+    refreshCultivationStageCards();
+    if (pageContentInitialized) renderStages();
+    renderAdminMemoryList();
+    renderAdminSpecialQuestions();
+    updateVisitorBadge();
+    syncAdminSettingsForm();
+  }
 
-      (data || []).forEach(row => {
-        state.siteSettings[row.key] = parseSettingValue(row.value);
+  async function loadSiteSettings() {
+    const cacheKey = 'site-settings';
+    const cached = readStaticDataCache(cacheKey);
+    if (cached) applySiteSettingsRows(cached.value);
+    if (!supabaseClient || cached && Date.now() - cached.savedAt < STATIC_DATA_CACHE_TTL) return;
+    try {
+      const rows = await fetchStaticData(cacheKey, async () => {
+        const { data, error } = await supabaseClient.from('site_settings')
+          .select('key,value')
+          .in('key', ['cultivation_overrides', 'custom_attributes', 'visitor_config', 'hidden_memories', 'announcement_config', 'quiz_special_questions']);
+        if (error) throw error;
+        return data || [];
       });
-      state.cultivationOverrides = normalizeCultivationOverrides(state.siteSettings.cultivation_overrides);
-      state.customAttributes = normalizeCustomAttributes(state.siteSettings.custom_attributes);
-      state.hiddenMemories = new Set(Array.isArray(state.siteSettings.hidden_memories)
-        ? state.siteSettings.hidden_memories.map(String)
-        : []);
-      applyHiddenMemories();
-      renderSiteAnnouncement();
-      const announcement = state.siteSettings.announcement_config || {};
-      const announcementEnabled = document.getElementById('admin-announcement-enabled');
-      const announcementText = document.getElementById('admin-announcement-text');
-      if (announcementEnabled) announcementEnabled.checked = announcement.enabled === true;
-      if (announcementText) announcementText.value = String(announcement.text || '');
-      const visitorConfig = state.siteSettings.visitor_config || {};
-      state.visitor.visible = visitorConfig.visible === true;
-      refreshCultivationStageCards();
-      renderStages();
-      renderAdminMemoryList();
-      renderAdminSpecialQuestions();
-      updateVisitorBadge();
-      syncAdminSettingsForm();
+      applySiteSettingsRows(rows);
     } catch (error) {
       console.warn('Không thể tải cài đặt Tiên Giới:', error);
     }
@@ -844,12 +968,7 @@
       if (configuredCount != null) state.visitor.count = configuredCount;
       else if (count != null) state.visitor.count = count;
 
-      const { data: configRow, error: settingsError } = await supabaseClient.from('site_settings')
-        .select('value')
-        .eq('key', 'visitor_config')
-        .maybeSingle();
-      if (settingsError) throw settingsError;
-      const config = parseSettingValue(configRow && configRow.value);
+      const config = state.siteSettings.visitor_config || {};
       state.siteSettings.visitor_config = config;
       state.visitor.visible = config.visible === true;
       if (count == null) {
@@ -869,6 +988,7 @@
       .upsert({ key, value }, { onConflict: 'key' });
     if (error) throw error;
     state.siteSettings[key] = value;
+    clearStaticDataCache('site-settings');
   }
 
   function normalizeFeatureToggles(value) {
@@ -992,35 +1112,49 @@
       }
     }
     state.siteConfig[configKey] = value;
+    clearStaticDataCache('site-config');
+  }
+
+  function applyGlobalSiteConfigRows(rows) {
+    (rows || []).forEach(row => {
+      state.siteConfig[row.config_key] = parseSettingValue(row.config_value);
+    });
+    state.featureToggles = normalizeFeatureToggles(state.siteConfig.feature_toggles);
+    cacheFeatureToggles(state.featureToggles);
+    const savedVisitorCount = getVisitorCount(state.siteConfig.visitor_count);
+    if (savedVisitorCount != null) state.visitor.count = savedVisitorCount;
+    applyGlobalThemeSettings(state.siteConfig.theme_settings);
+    updateVisitorBadge();
+    applyFeatureToggles();
+    syncAdminGlobalSettingsForms();
   }
 
   async function loadGlobalSiteConfig() {
-    state.featureToggles = readFeatureTogglesCache() || state.featureToggles;
+    const cacheKey = 'site-config';
+    const cached = readStaticDataCache(cacheKey);
+    if (cached) applyGlobalSiteConfigRows(cached.value);
+    else state.featureToggles = readFeatureTogglesCache() || state.featureToggles;
     if (!supabaseClient) {
       applyFeatureToggles();
       applyGlobalThemeSettings(state.themeSettings);
       return;
     }
+    if (cached && Date.now() - cached.savedAt < STATIC_DATA_CACHE_TTL) return;
 
     try {
-      const { data, error } = await supabaseClient.from('site_config')
-        .select('config_key,config_value')
-        .in('config_key', ['theme_settings', 'feature_toggles', 'visitor_count']);
-      if (error) throw error;
-      (data || []).forEach(row => {
-        state.siteConfig[row.config_key] = parseSettingValue(row.config_value);
+      const rows = await fetchStaticData(cacheKey, async () => {
+        const { data, error } = await supabaseClient.from('site_config')
+          .select('config_key,config_value')
+          .in('config_key', ['theme_settings', 'feature_toggles', 'visitor_count']);
+        if (error) throw error;
+        return data || [];
       });
-      state.featureToggles = normalizeFeatureToggles(state.siteConfig.feature_toggles);
-      cacheFeatureToggles(state.featureToggles);
-      const savedVisitorCount = getVisitorCount(state.siteConfig.visitor_count);
-      if (savedVisitorCount != null) state.visitor.count = savedVisitorCount;
-      applyGlobalThemeSettings(state.siteConfig.theme_settings);
-      updateVisitorBadge();
+      applyGlobalSiteConfigRows(rows);
     } catch (error) {
       console.warn('Không thể tải cấu hình toàn trang:', error);
+      applyFeatureToggles();
+      syncAdminGlobalSettingsForms();
     }
-    applyFeatureToggles();
-    syncAdminGlobalSettingsForms();
   }
 
   function syncAdminGlobalSettingsForms() {
@@ -1137,21 +1271,31 @@
     });
   }
 
-  async function loadTongChuDecrees({ throwOnError = false } = {}) {
-    if (!supabaseClient) {
-      state.decrees = [];
+  async function loadTongChuDecrees({ throwOnError = false, force = false, cacheOnly = false } = {}) {
+    const cacheKey = 'tong-chu-decrees';
+    const cached = readStaticDataCache(cacheKey);
+    if (cached) {
+      state.decrees = cached.value;
+      renderFeaturedDecree();
+      renderAdminDecreeList();
+    }
+    if (cacheOnly) return;
+    if (!supabaseClient || cached && !force && Date.now() - cached.savedAt < STATIC_DATA_CACHE_TTL) {
+      if (!cached && !supabaseClient) state.decrees = [];
       renderFeaturedDecree();
       renderAdminDecreeList();
       return;
     }
     try {
-      const { data, error } = await supabaseClient.from('tong_chu_decrees')
-        .select('*')
-        .order('is_pinned', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(100);
-      if (error) throw error;
-      state.decrees = data || [];
+      state.decrees = await fetchStaticData(cacheKey, async () => {
+        const { data, error } = await supabaseClient.from('tong_chu_decrees')
+          .select('*')
+          .order('is_pinned', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(100);
+        if (error) throw error;
+        return data || [];
+      });
       renderFeaturedDecree();
       renderAdminDecreeList();
     } catch (error) {
@@ -1182,6 +1326,7 @@
             ? payload.new
             : payload.old;
           if (!row || !row.config_key) return;
+          clearStaticDataCache('site-config');
           const value = payload.eventType === 'DELETE' ? null : parseSettingValue(row.config_value);
           if (row.config_key === 'theme_settings') {
             state.siteConfig.theme_settings = value;
@@ -1205,7 +1350,8 @@
           schema: 'public',
           table: 'tong_chu_decrees'
         }, () => {
-          void loadTongChuDecrees();
+          clearStaticDataCache('tong-chu-decrees');
+          void loadTongChuDecrees({ force: true });
         })
         .subscribe(status => {
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -1856,6 +2002,8 @@
       const galleryPage = pageName === 'gallery';
       const adminPage = pageName === 'admin';
       const tongmonPage = pageName === 'tongmon';
+      const siteSettingsPromise = loadSiteSettings();
+      const globalSiteConfigPromise = loadGlobalSiteConfig();
 
       initHeroSection();
       if (homePage || galleryPage) initStickyNav();
@@ -1863,21 +2011,41 @@
       applyGlobalThemeSettings(state.themeSettings);
       applyFeatureToggles();
       if (homePage || galleryPage) renderStages();
+      pageContentInitialized = true;
+      if (homePage || adminPage) void loadTongChuDecrees({ cacheOnly: true });
       initOffscreenPerformance();
       if (homePage) initHomeCultivationCard();
       initHeaderOffset();
       initCultivationBackground();
       initXianxiaCanvas();
       if (homePage) {
-        initAchievements();
-        initTimeCapsule();
+        scheduleIdleTask(() => {
+          initAchievements();
+          initTimeCapsule();
+        }, {
+          target: document.getElementById('time-capsule'),
+          selector: '.achievement-card, [data-utility-target="time-capsule"]',
+          timeout: 1800
+        });
       }
 
-      if (tongmonPage) initTicketStation();
+      if (tongmonPage) {
+        scheduleIdleTask(initTicketStation, {
+          target: document.getElementById('ticket-station'),
+          selector: '#ticket-station',
+          timeout: 1400
+        });
+      }
       initBackgroundMusic();
       bindGlobalEvents();
       initModalNavbarSync();
-      if (homePage || tongmonPage) initUtilityPanels();
+      if (homePage || tongmonPage) {
+        scheduleIdleTask(initUtilityPanels, {
+          target: document.getElementById('utility-launcher'),
+          selector: '[data-utility-target]',
+          timeout: 1400
+        });
+      }
       initDiscipleProfileTools();
       initSpiritStoneIconSlots();
       initAuthPortal();
@@ -1886,20 +2054,29 @@
       initPageAccessControls();
       if (galleryPage) initArchiveLockModal();
       if (homePage) initCultivationOracle();
-      initFeatureModals();
+      scheduleIdleTask(initFeatureModals, {
+        selector: '#nav-thien-co-btn, #open-decree-history, [data-modal-close]',
+        timeout: 1200
+      });
       if (homePage || tongmonPage) initLeaderboardTabs();
       if (galleryPage || tongmonPage || adminPage) {
         void loadDynamicMemories().then(() => {
           if (adminPage && isAdminUser()) renderAdminMetrics();
         });
       }
-      void Promise.all([loadSiteSettings(), loadGlobalSiteConfig()])
+      void Promise.all([siteSettingsPromise, globalSiteConfigPromise])
         .then(() => {
           startConfiguredBackgroundMusic();
           if (homePage) initVisitorCounter();
           if (adminPage && isAdminUser()) void renderAdminMetrics();
         });
-      if (homePage || adminPage) void loadTongChuDecrees();
+      if (homePage) {
+        deferHomeLoad('decrees', document.getElementById('tong-chu-decree-section'), () => {
+          void loadTongChuDecrees();
+        });
+      } else if (adminPage) {
+        scheduleIdleTask(() => { void loadTongChuDecrees(); }, { timeout: 1400 });
+      }
       initGlobalSiteRealtime();
       window.setTimeout(initPresence, 300);
       if (homePage || tongmonPage) requestLeaderboardLoad();
@@ -2581,6 +2758,9 @@
     if (!button || cluster.dataset.dragInitialized) return;
     cluster.dataset.dragInitialized = 'true';
     const initialRect = player.getBoundingClientRect();
+    const clusterRect = cluster.getBoundingClientRect();
+    let clusterWidth = Math.max(1, clusterRect.width || 52);
+    let clusterHeight = Math.max(1, clusterRect.height || 52);
     cluster.classList.add('is-draggable');
     cluster.style.left = `${initialRect.left}px`;
     cluster.style.top = `${initialRect.top}px`;
@@ -2594,11 +2774,8 @@
     button.style.zIndex = '9990';
 
     const clampPosition = (left, top) => {
-      const bounds = cluster.getBoundingClientRect();
-      const width = Math.max(1, bounds.width || 52);
-      const height = Math.max(1, bounds.height || 52);
-      const maxLeft = Math.max(12, window.innerWidth - width - 20);
-      const maxTop = Math.max(12, window.innerHeight - height - 22);
+      const maxLeft = Math.max(12, window.innerWidth - clusterWidth - 20);
+      const maxTop = Math.max(12, window.innerHeight - clusterHeight - 22);
       const minTop = Math.min(72, maxTop);
       return {
         left: Math.max(12, Math.min(Number(left) || 0, maxLeft)),
@@ -2623,9 +2800,8 @@
     };
     const snapToNearestEdge = (left, top, shouldSave = true) => {
       const bounded = clampPosition(left, top);
-      const width = cluster.getBoundingClientRect().width || 52;
-      const rightEdge = Math.max(12, window.innerWidth - width - 20);
-      const snappedLeft = bounded.left + width / 2 <= window.innerWidth / 2 ? 20 : rightEdge;
+      const rightEdge = Math.max(12, window.innerWidth - clusterWidth - 20);
+      const snappedLeft = bounded.left + clusterWidth / 2 <= window.innerWidth / 2 ? 20 : rightEdge;
       const position = applyPosition(snappedLeft, bounded.top, shouldSave);
       positionMiniMusicControl();
       return position;
@@ -2648,9 +2824,12 @@
     const finishDrag = event => {
       if (!pointer || event.pointerId !== pointer.id) return;
       if (pointer.dragged) {
-        const bounds = cluster.getBoundingClientRect();
         cluster.classList.remove('is-dragging');
-        snapToNearestEdge(bounds.left, bounds.top, true);
+        snapToNearestEdge(
+          pointer.left + event.clientX - pointer.startX,
+          pointer.top + event.clientY - pointer.startY,
+          true
+        );
         suppressMusicClickAfterDrag = true;
         window.setTimeout(() => { suppressMusicClickAfterDrag = false; }, 350);
       }
@@ -2685,9 +2864,16 @@
       const position = applyPosition(pointer.left + deltaX, pointer.top + deltaY);
       pointer.left = position.left - deltaX;
       pointer.top = position.top - deltaY;
-      positionMiniMusicControl();
       if (event.cancelable) event.preventDefault();
     });
+
+    window.addEventListener('resize', () => {
+      window.requestAnimationFrame(() => {
+        const bounds = cluster.getBoundingClientRect();
+        clusterWidth = Math.max(1, bounds.width || 52);
+        clusterHeight = Math.max(1, bounds.height || 52);
+      });
+    }, { passive: true });
     button.addEventListener('pointerup', finishDrag);
     button.addEventListener('pointercancel', finishDrag);
     window.addEventListener('resize', () => {
@@ -2786,26 +2972,30 @@
   }
 
   function positionMiniMusicControl() {
-    const panel = document.getElementById('mini-bg-music-control');
-    const button = document.getElementById('bg-music-toggle-btn');
-    if (!panel || panel.hidden || !button) return;
-    const anchor = button.getBoundingClientRect();
-    const bounds = panel.getBoundingClientRect();
-    const gap = 12;
-    const width = Math.min(280, Math.max(0, window.innerWidth - gap * 2));
-    const height = bounds.height;
-    const placeRight = anchor.left < window.innerWidth / 2;
-    const belowSpace = window.innerHeight - anchor.bottom - gap;
-    const aboveSpace = anchor.top - gap;
-    const placeBelow = belowSpace >= height || belowSpace >= aboveSpace;
-    const proposedLeft = placeRight ? anchor.right + gap : anchor.left - width - gap;
-    const proposedTop = placeBelow
-      ? anchor.bottom + gap
-      : anchor.top - height - gap;
-    const left = Math.max(gap, Math.min(proposedLeft, window.innerWidth - width - gap));
-    const top = Math.max(gap, Math.min(proposedTop, window.innerHeight - height - gap));
-    panel.style.left = `${left}px`;
-    panel.style.top = `${top}px`;
+    if (miniMusicPositionFrame) return;
+    miniMusicPositionFrame = window.requestAnimationFrame(() => {
+      miniMusicPositionFrame = 0;
+      const panel = document.getElementById('mini-bg-music-control');
+      const button = document.getElementById('bg-music-toggle-btn');
+      if (!panel || panel.hidden || !button) return;
+      const anchor = button.getBoundingClientRect();
+      const bounds = panel.getBoundingClientRect();
+      const gap = 12;
+      const width = Math.min(280, Math.max(0, window.innerWidth - gap * 2));
+      const height = bounds.height;
+      const placeRight = anchor.left < window.innerWidth / 2;
+      const belowSpace = window.innerHeight - anchor.bottom - gap;
+      const aboveSpace = anchor.top - gap;
+      const placeBelow = belowSpace >= height || belowSpace >= aboveSpace;
+      const proposedLeft = placeRight ? anchor.right + gap : anchor.left - width - gap;
+      const proposedTop = placeBelow
+        ? anchor.bottom + gap
+        : anchor.top - height - gap;
+      const left = Math.max(gap, Math.min(proposedLeft, window.innerWidth - width - gap));
+      const top = Math.max(gap, Math.min(proposedTop, window.innerHeight - height - gap));
+      panel.style.left = `${left}px`;
+      panel.style.top = `${top}px`;
+    });
   }
 
   function updateMiniMusicControlUI() {
@@ -2927,11 +3117,9 @@
           return;
         }
       }
-      const ipCheck = await checkAndRegisterIp(false, user.email);
-      if (!ipCheck.allowed) {
-        await rejectIpRegistration(user, ipCheck.reason);
-        return;
-      }
+      scheduleIdleTask(() => {
+        void checkAndRegisterIp(false, user.email);
+      }, { timeout: 1800 });
 
       const cachedProfile = getCachedDiscipleProfile(user.id);
       const payload = {
@@ -4250,7 +4438,7 @@
       if (supabaseClient && supabaseClient.channel) {
         sectCommentsChannel = supabaseClient.channel('sect-comments-live')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'sect_comments' }, () => {
-            void loadSectComments(false);
+            void loadSectComments(false, true);
           })
           .subscribe(status => {
             if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -4281,10 +4469,10 @@
     input.placeholder = parent ? 'Viết phản hồi...' : 'Đăng nhập để lưu lại lời đàm đạo...';
   }
 
-  async function loadSectComments(append = false) {
+  async function loadSectComments(append = false, refreshAfterCurrentLoad = false) {
     if (!supabaseClient || !document.getElementById('sect-comment-list')) return;
     if (sectCommentState.loading) {
-      sectCommentState.reloadPending = true;
+      if (append || refreshAfterCurrentLoad) sectCommentState.reloadPending = true;
       return;
     }
     const pageSize = append ? 5 : Math.max(3, sectCommentState.visibleRoots);
@@ -5234,13 +5422,21 @@
   function initHeaderOffset() {
     const header = document.getElementById('sticky-header');
     if (!header) return;
-    const updateHeight = () => {
-      document.documentElement.style.setProperty('--header-height', `${Math.ceil(header.getBoundingClientRect().height)}px`);
-    };
-    updateHeight();
     if ('ResizeObserver' in window) {
-      new ResizeObserver(updateHeight).observe(header);
+      new ResizeObserver(entries => {
+        const entry = entries[0];
+        if (!entry) return;
+        const borderBox = entry.borderBoxSize;
+        const height = Array.isArray(borderBox) && borderBox.length
+          ? borderBox[0].blockSize
+          : entry.contentRect.height + 1;
+        document.documentElement.style.setProperty('--header-height', `${Math.ceil(height)}px`);
+      }).observe(header);
     } else {
+      const updateHeight = () => {
+        document.documentElement.style.setProperty('--header-height', `${Math.ceil(header.getBoundingClientRect().height)}px`);
+      };
+      updateHeight();
       window.addEventListener('resize', updateHeight, { passive: true });
     }
   }
@@ -6541,7 +6737,7 @@
           form.reset();
           if (cancelEditButton) cancelEditButton.hidden = true;
           if (submitButton) submitButton.textContent = '⚡ Ban Bố Chiếu Thư';
-          await loadTongChuDecrees({ throwOnError: true });
+          await loadTongChuDecrees({ throwOnError: true, force: true });
           setAdminToolStatus('admin-decree-status', wasEditing
             ? 'Chiếu thư đã được lưu thành công.'
             : 'Đã ban bố chiếu thư thành công!');
@@ -6590,7 +6786,7 @@
           } else {
             decree.is_pinned = !decree.is_pinned;
           }
-          await loadTongChuDecrees({ throwOnError: true });
+          await loadTongChuDecrees({ throwOnError: true, force: true });
           setAdminToolStatus('admin-decree-status', action === 'delete'
             ? 'Đã xóa chiếu thư.'
             : 'Đã cập nhật trạng thái ghim.');
@@ -7772,15 +7968,16 @@
     if (!context) return;
 
     const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const mobile = () => window.innerWidth < 768;
-    const stars = Array.from({ length: mobile() ? 42 : 72 }, () => ({
+    const mobile = () => window.innerWidth <= 768;
+    const lowPowerDevice = mobile() || (Number(navigator.hardwareConcurrency) || 8) <= 4;
+    const stars = Array.from({ length: lowPowerDevice ? 36 : 72 }, () => ({
       x: Math.random(),
       y: Math.random(),
       radius: Math.random() * 1.15 + 0.25,
       phase: Math.random() * Math.PI * 2,
       color: Math.random() > 0.78 ? '#f5d98b' : Math.random() > 0.55 ? '#8de8d4' : '#e8f5f2'
     }));
-    const motes = Array.from({ length: mobile() ? 12 : 18 }, () => ({
+    const motes = Array.from({ length: lowPowerDevice ? 10 : 18 }, () => ({
       x: Math.random(),
       y: Math.random(),
       speed: Math.random() * 0.018 + 0.006,
@@ -7789,7 +7986,7 @@
       radius: Math.random() * 1.8 + 0.7,
       jade: Math.random() > 0.5
     }));
-    const spiritParticles = Array.from({ length: 25 }, () => ({
+    const spiritParticles = Array.from({ length: lowPowerDevice ? 20 : 25 }, () => ({
       x: Math.random(),
       y: Math.random(),
       radius: 0.7 + Math.random() * 1.8,
@@ -7798,7 +7995,7 @@
       phase: Math.random() * Math.PI * 2,
       gold: Math.random() > 0.56
     }));
-    const leaves = Array.from({ length: mobile() ? 5 : 9 }, () => ({
+    const leaves = Array.from({ length: lowPowerDevice ? 4 : 9 }, () => ({
       x: Math.random(),
       y: Math.random(),
       speed: Math.random() * 0.035 + 0.012,
@@ -7822,6 +8019,7 @@
     let lastFrameTime = 0;
     let resizeTimer = 0;
     let animationPaused = false;
+    let canvasVisible = true;
     let nextMeteorAt = 4;
     const startedAt = performance.now();
 
@@ -7972,7 +8170,7 @@
     }
 
     const animate = now => {
-      if (mobile() && lastFrameTime && now - lastFrameTime < 1000 / 30) {
+      if (lowPowerDevice && lastFrameTime && now - lastFrameTime < 1000 / 35) {
         frameId = window.requestAnimationFrame(animate);
         return;
       }
@@ -7991,25 +8189,31 @@
       window.cancelAnimationFrame(frameId);
       frameId = 0;
     };
+    const syncMotion = () => {
+      document.documentElement.classList.toggle('is-document-hidden', document.hidden);
+      if (reducedMotionQuery.matches || document.hidden || animationPaused || !canvasVisible) stop();
+      else start();
+    };
     pauseXianxiaAnimation = paused => {
       animationPaused = paused;
-      if (paused) stop();
-      else start();
+      syncMotion();
     };
     const scheduleResize = () => {
       window.clearTimeout(resizeTimer);
       resizeTimer = window.setTimeout(resize, 200);
     };
-    const syncMotion = () => {
-      if (reducedMotionQuery.matches || document.hidden) stop();
-      else start();
-    };
-
     resize();
-    start();
+    syncMotion();
     window.addEventListener('resize', scheduleResize, { passive: true });
     document.addEventListener('visibilitychange', syncMotion);
     if (reducedMotionQuery.addEventListener) reducedMotionQuery.addEventListener('change', syncMotion);
+    if ('IntersectionObserver' in window) {
+      const canvasObserver = new IntersectionObserver(entries => {
+        canvasVisible = entries.some(entry => entry.isIntersecting);
+        syncMotion();
+      }, { threshold: 0 });
+      canvasObserver.observe(canvas);
+    }
   }
 
   // ========================================================
@@ -8246,7 +8450,7 @@
                 </span>
                 <span class="rpg-collapsed-content">
                   <span class="rpg-avatar rpg-summary-avatar" data-stage-id="${escapeHtml(stage.id)}">
-                    <img src="${escapeHtml(stage.coverImage)}" alt="${escapeHtml(stage.title)}" loading="lazy" decoding="async">
+                    ${renderMemoryMediaMarkup(stage.coverImage, stage.title)}
                     <span class="rpg-avatar-lv">${escapeHtml(getCultivationLevel(stage))}</span>
                   </span>
                   <span class="rpg-summary-copy">
@@ -8264,7 +8468,7 @@
                     <span class="rpg-toggle-label" aria-hidden="true">✧ Thu Gọn ▴</span>
                   </span>
                   <span class="rpg-avatar rpg-expanded-avatar" data-stage-id="${escapeHtml(stage.id)}">
-                    <img src="${escapeHtml(stage.coverImage)}" alt="${escapeHtml(stage.title)}" loading="lazy" decoding="async">
+                    ${renderMemoryMediaMarkup(stage.coverImage, stage.title)}
                     <span class="rpg-avatar-lv">${escapeHtml(getCultivationLevel(stage))}</span>
                   </span>
                   <span class="rpg-expanded-title">
@@ -8814,7 +9018,10 @@
   // 5. MEMORY CARD HTML BUILDER (Photo / Stack / Quote)
   // ========================================================
   function renderMemoryMediaMarkup(url, alt, className = '', options = {}) {
-    const source = escapeHtml(url);
+    const optimizedImage = isVideoUrl(url)
+      ? null
+      : getOptimizedLocalImage(url);
+    const source = escapeHtml(optimizedImage ? optimizedImage.src : url);
     const safeClass = escapeHtml(className);
     if (isVideoUrl(url)) {
       return `<video class="${safeClass}" src="${source}" ${options.controls ? 'controls' : ''} playsinline preload="metadata" aria-label="${escapeHtml(alt)}"></video>`;
@@ -8822,7 +9029,26 @@
     const focalStyle = options.focalPoint
       ? `style="object-position: ${escapeHtml(options.focalPoint)};"`
       : '';
-    return `<img class="${safeClass}" src="${source}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async" ${focalStyle}>`;
+    const fallback = optimizedImage && optimizedImage.fallback
+      ? `data-fallback-src="${escapeHtml(optimizedImage.fallback)}"`
+      : '';
+    return `<img class="${safeClass}" src="${source}" alt="${escapeHtml(alt)}" width="${optimizedImage.width}" height="${optimizedImage.height}" ${fallback} loading="lazy" decoding="async" ${focalStyle}>`;
+  }
+
+  function getOptimizedLocalImage(url) {
+    const original = String(url || '');
+    let decoded = original;
+    try {
+      decoded = decodeURI(original);
+    } catch (error) {
+      console.warn('Không thể giải mã đường dẫn ảnh:', error);
+    }
+    return OPTIMIZED_LOCAL_IMAGES[decoded] || {
+      src: original,
+      fallback: '',
+      width: 800,
+      height: 600
+    };
   }
 
   function renderMemoryCardHTML(mem) {
@@ -9796,6 +10022,8 @@
   function startNewGame() {
     if (!authenticatedUser) { openFeatureAuthSeal('game'); return; }
     if (!hasDiscipleFeatureAccess()) return;
+    if (typeof window.ensureGameModal === 'function') window.ensureGameModal();
+    initGameModalControls();
     const pool = buildGameImagePool();
     if (pool.length < 4) {
       alert('Không đủ hình ảnh để bắt đầu trò chơi.');
@@ -9866,6 +10094,88 @@
     }
   }
 
+  function startAuthenticatedGame() {
+    if (!authenticatedUser) {
+      openFeatureAuthSeal('game');
+      return;
+    }
+    if (!hasDiscipleFeatureAccess()) return;
+    if (!requireAuth(startNewGame)) return;
+    startNewGame();
+  }
+
+  function initGameModalControls() {
+    const modal = document.getElementById('game-modal');
+    if (!modal || modal.dataset.controlsInitialized === 'true') return;
+    modal.dataset.controlsInitialized = 'true';
+    const btnCloseGame = document.getElementById('btn-close-game');
+    if (btnCloseGame) btnCloseGame.addEventListener('click', closeGameModal);
+    const modalGameBackdrop = document.getElementById('modal-game-backdrop');
+    if (modalGameBackdrop) modalGameBackdrop.addEventListener('click', closeGameModal);
+
+    document.querySelectorAll('[data-game-mode]').forEach(button => {
+      button.addEventListener('click', () => {
+        const mode = button.dataset.gameMode === 'death' ? 'death' : 'normal';
+        if (state.game.mode === mode) return;
+        state.game.mode = mode;
+        document.querySelectorAll('[data-game-mode]').forEach(item => {
+          const active = item.dataset.gameMode === mode;
+          item.classList.toggle('active', active);
+          item.setAttribute('aria-pressed', String(active));
+        });
+        if (document.getElementById('game-modal')?.classList.contains('active')) startAuthenticatedGame();
+      });
+    });
+
+    document.querySelectorAll('[data-game-powerup]').forEach(button => {
+      button.addEventListener('click', () => {
+        const power = button.dataset.gamePowerup;
+        const status = document.getElementById('game-hint-status');
+        if (!power || state.game.usedPowerups.has(power) || state.game.hasAnswered) return;
+        if (power === 'freeze' && state.game.mode !== 'death') {
+          if (status) {
+            status.textContent = 'Định Thần Phù chỉ có tác dụng trong chế độ Độ Kiếp Sinh Tử.';
+            status.hidden = false;
+          }
+          return;
+        }
+        state.game.usedPowerups.add(power);
+        button.disabled = true;
+        if (power === 'fifty') {
+          const correct = getGameAnswer(state.game.questions[state.game.currentIndex]);
+          const wrongChoices = Array.from(document.querySelectorAll('.game-year-choice'))
+            .filter(choice => choice.textContent !== correct);
+          shuffleArray(wrongChoices).slice(0, Math.max(0, wrongChoices.length - 1))
+            .forEach(choice => { choice.hidden = true; });
+          if (status) status.textContent = 'Thiên Cơ Kính đã khai mở hai đáp án sai.';
+        } else if (power === 'hint') {
+          const question = state.game.questions[state.game.currentIndex];
+          if (status) status.textContent = question.description || 'Tàn hồn này lưu dấu một khoảnh khắc trong hành trình tu luyện.';
+        } else if (power === 'freeze') {
+          stopGameTimer();
+          if (status) status.textContent = 'Định Thần Phù đã đóng băng đồng hồ của câu hỏi này.';
+        }
+        if (status) status.hidden = false;
+      });
+    });
+
+    const btnGameNext = document.getElementById('btn-game-next');
+    if (btnGameNext) {
+      btnGameNext.addEventListener('click', () => {
+        state.game.currentIndex += 1;
+        if (state.game.currentIndex < state.game.questions.length) {
+          renderGameQuestion(state.game.currentIndex);
+        } else {
+          showGameResult();
+        }
+      });
+    }
+    const btnGameReplay = document.getElementById('btn-game-replay');
+    if (btnGameReplay) btnGameReplay.addEventListener('click', startAuthenticatedGame);
+    const btnGameExit = document.getElementById('btn-game-exit');
+    if (btnGameExit) btnGameExit.addEventListener('click', closeGameModal);
+  }
+
   function renderGameQuestion(index) {
     stopGameTimer();
     const { questions } = state.game;
@@ -9904,8 +10214,7 @@
     const photoWrap = imgEl.closest('.game-photo-wrap');
     if (photoWrap) {
       photoWrap.classList.remove('is-question-transition');
-      void photoWrap.offsetWidth;
-      photoWrap.classList.add('is-question-transition');
+      window.requestAnimationFrame(() => photoWrap.classList.add('is-question-transition'));
       window.setTimeout(() => photoWrap.classList.remove('is-question-transition'), 520);
     }
 
@@ -10115,10 +10424,6 @@
     const modalContainer = document.querySelector('.year-guess-dialog');
     if (modalContainer) {
       requestAnimationFrame(() => {
-        modalContainer.scrollTo({
-          top: modalContainer.scrollHeight,
-          behavior: 'smooth'
-        });
         revealCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       });
     }
@@ -10897,88 +11202,11 @@
     }
 
     // Game Trigger & Control Events
-    const startAuthenticatedGame = () => {
-      if (!authenticatedUser) {
-        openFeatureAuthSeal('game');
-        return;
-      }
-      if (!hasDiscipleFeatureAccess()) return;
-      if (!requireAuth(startNewGame)) return;
-      startNewGame();
-    };
     document.querySelectorAll('#btn-hero-game, [data-game-launch]').forEach(button => {
       button.addEventListener('click', startAuthenticatedGame);
     });
-
-    const btnCloseGame = document.getElementById('btn-close-game');
-    if (btnCloseGame) btnCloseGame.addEventListener('click', closeGameModal);
-
-    const modalGameBackdrop = document.getElementById('modal-game-backdrop');
-    if (modalGameBackdrop) modalGameBackdrop.addEventListener('click', closeGameModal);
-
-    document.querySelectorAll('[data-game-mode]').forEach(button => {
-      button.addEventListener('click', () => {
-        const mode = button.dataset.gameMode === 'death' ? 'death' : 'normal';
-        if (state.game.mode === mode) return;
-        state.game.mode = mode;
-        document.querySelectorAll('[data-game-mode]').forEach(item => {
-          const active = item.dataset.gameMode === mode;
-          item.classList.toggle('active', active);
-          item.setAttribute('aria-pressed', String(active));
-        });
-        if (document.getElementById('game-modal')?.classList.contains('active')) startAuthenticatedGame();
-      });
-    });
-
-    document.querySelectorAll('[data-game-powerup]').forEach(button => {
-      button.addEventListener('click', () => {
-        const power = button.dataset.gamePowerup;
-        const status = document.getElementById('game-hint-status');
-        if (!power || state.game.usedPowerups.has(power) || state.game.hasAnswered) return;
-        if (power === 'freeze' && state.game.mode !== 'death') {
-          if (status) {
-            status.textContent = 'Định Thần Phù chỉ có tác dụng trong chế độ Độ Kiếp Sinh Tử.';
-            status.hidden = false;
-          }
-          return;
-        }
-        state.game.usedPowerups.add(power);
-        button.disabled = true;
-        if (power === 'fifty') {
-          const correct = getGameAnswer(state.game.questions[state.game.currentIndex]);
-          const wrongChoices = Array.from(document.querySelectorAll('.game-year-choice'))
-            .filter(choice => choice.textContent !== correct);
-          shuffleArray(wrongChoices).slice(0, Math.max(0, wrongChoices.length - 1))
-            .forEach(choice => { choice.hidden = true; });
-          if (status) status.textContent = 'Thiên Cơ Kính đã khai mở hai đáp án sai.';
-        } else if (power === 'hint') {
-          const question = state.game.questions[state.game.currentIndex];
-          if (status) status.textContent = question.description || 'Tàn hồn này lưu dấu một khoảnh khắc trong hành trình tu luyện.';
-        } else if (power === 'freeze') {
-          stopGameTimer();
-          if (status) status.textContent = 'Định Thần Phù đã đóng băng đồng hồ của câu hỏi này.';
-        }
-        if (status) status.hidden = false;
-      });
-    });
-
-    const btnGameNext = document.getElementById('btn-game-next');
-    if (btnGameNext) {
-      btnGameNext.addEventListener('click', () => {
-        state.game.currentIndex += 1;
-        if (state.game.currentIndex < state.game.questions.length) {
-          renderGameQuestion(state.game.currentIndex);
-        } else {
-          showGameResult();
-        }
-      });
-    }
-
-    const btnGameReplay = document.getElementById('btn-game-replay');
-    if (btnGameReplay) btnGameReplay.addEventListener('click', startAuthenticatedGame);
-
-    const btnGameExit = document.getElementById('btn-game-exit');
-    if (btnGameExit) btnGameExit.addEventListener('click', closeGameModal);
+    window.addEventListener('game-modal:ready', initGameModalControls);
+    initGameModalControls();
 
     // Cinema Reel Trigger & Control Events
     const btnHeroCinema = document.getElementById('btn-hero-cinema');
@@ -11076,6 +11304,12 @@
     window.addEventListener('error', function (e) {
       const target = e.target;
       if (target && target.tagName === 'IMG') {
+        if (target.dataset.fallbackSrc) {
+          const fallback = target.dataset.fallbackSrc;
+          delete target.dataset.fallbackSrc;
+          target.src = fallback;
+          return;
+        }
         // Tìm thẻ cha gần nhất là memory-card hoặc rpg-avatar (ảnh bìa stage)
         const card = target.closest('.memory-card');
         if (card) {

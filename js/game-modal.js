@@ -1,7 +1,17 @@
 (() => {
-  if (document.getElementById('game-modal')) return;
-
-  document.body.insertAdjacentHTML('beforeend', `
+  let idleHandle = 0;
+  let fallbackTimer = 0;
+  const mount = () => {
+    const existing = document.getElementById('game-modal');
+    if (existing) return existing;
+    if (idleHandle && typeof window.cancelIdleCallback === 'function') {
+      window.cancelIdleCallback(idleHandle);
+    }
+    if (fallbackTimer) window.clearTimeout(fallbackTimer);
+    document.removeEventListener('pointerdown', ensureOnInteraction, true);
+    document.removeEventListener('click', ensureOnInteraction, true);
+    document.removeEventListener('focusin', ensureOnInteraction, true);
+    document.body.insertAdjacentHTML('beforeend', `
     <div id="game-modal" class="modal game-modal year-guess-modal" aria-hidden="true" inert hidden role="dialog" aria-labelledby="game-modal-title">
       <div class="modal-backdrop" id="modal-game-backdrop"></div>
       <div class="modal-dialog game-dialog year-guess-dialog">
@@ -72,5 +82,23 @@
         </div>
       </div>
     </div>
-  `);
+    `);
+    const modal = document.getElementById('game-modal');
+    document.dispatchEvent(new Event('game-modal:ready'));
+    return modal;
+  };
+  const ensureOnInteraction = event => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target && target.closest('#btn-hero-game, [data-game-launch]')) mount();
+  };
+
+  window.ensureGameModal = mount;
+  document.addEventListener('pointerdown', ensureOnInteraction, true);
+  document.addEventListener('click', ensureOnInteraction, true);
+  document.addEventListener('focusin', ensureOnInteraction, true);
+  if (typeof window.requestIdleCallback === 'function') {
+    idleHandle = window.requestIdleCallback(mount, { timeout: 1600 });
+  } else {
+    fallbackTimer = window.setTimeout(mount, 120);
+  }
 })();

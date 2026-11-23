@@ -9,10 +9,26 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=80">
-  <link rel="stylesheet" href="css/style.css?v=90">
+  <style id="critical-css">
+    :root{color-scheme:dark;--font-sans:'Plus Jakarta Sans',system-ui,-apple-system,sans-serif;--font-serif:'Playfair Display',Georgia,serif;--container-max:1240px;--bg-deep:#040d0b;--text-primary:#f0fdf7;--text-secondary:#a7c7ba;--text-gold:#fcd98a;--bg-card:rgba(8,24,21,.88);--bg-card-border:rgba(45,212,191,.2);--glass-shadow:0 20px 40px -15px rgba(0,0,0,.72);--glow-gold:0 0 35px rgba(245,158,11,.22)}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{font-size:16px;background:#040d0b;color-scheme:dark}
+    body.museum-body{position:relative;min-height:100vh;overflow-x:hidden;background:linear-gradient(160deg,#040d0b 0%,#06100e 48%,#081412 100%);color:var(--text-primary);font:16px/1.6 var(--font-sans)}
+    #cultivation-bg{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none;background:radial-gradient(ellipse at 18% 24%,rgba(16,185,129,.12),transparent 34%),radial-gradient(ellipse at 82% 76%,rgba(245,158,11,.09),transparent 36%),linear-gradient(160deg,rgba(4,13,11,.3),rgba(8,20,18,.52))}
+    .sticky-nav{position:fixed;top:0;left:0;width:100%;z-index:100;background:rgba(4,13,11,.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--bg-card-border)}
+    .nav-container{max-width:var(--container-max);margin:0 auto;padding:.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:1.5rem}
+    .nav-brand{display:flex;align-items:center;gap:.6rem;color:var(--text-primary);font-size:.9rem;font-weight:800;letter-spacing:.08em;text-decoration:none}
+    .brand-logo-img{width:36px;height:36px;flex-shrink:0;object-fit:cover;object-position:center 20%;border:1.5px solid #fbbf24;border-radius:8px}
+    .nav-actions{display:flex;align-items:center;gap:.75rem}
+    .nav-btn{display:flex;align-items:center;gap:.4rem;padding:.45rem .9rem;border:1px solid var(--bg-card-border);border-radius:9999px;background:rgba(255,255,255,.06);color:var(--text-primary);font-size:.8rem;font-weight:600}
+    .card-frame{display:flex;height:100%;flex-direction:column;padding:1rem}
+    @media(max-width:768px){.nav-container{flex-direction:column;align-items:stretch;gap:.45rem;padding:.45rem .75rem}}
+  </style>
+  <link rel="preload" href="css/style.css?v=91" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="css/style.css?v=91"></noscript>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600;1,700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 </head>
 <body class="museum-body">
 <div id="cultivation-bg" aria-hidden="true">
@@ -598,10 +614,10 @@
       </div>
     </div>
   </footer>
-<script defer src="js/memories.js?v=90"></script>
+<script defer src="js/memories.js?v=91"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="js/premium-effects.js?v=90"></script>
-<script defer src="js/game-modal.js?v=90"></script>
-<script defer src="js/app.js?v=90"></script>
+<script defer src="js/premium-effects.js?v=91"></script>
+<script defer src="js/game-modal.js?v=91"></script>
+<script defer src="js/app.js?v=91"></script>
 </body>
 </html>
