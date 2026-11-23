@@ -9,6 +9,7 @@
   const SUPABASE_URL = 'https://ruevfxnbpjhqxzaojpbz.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_QNd2mBQcvG4Ay3TXFscC-g_2tucdI69';
   const ADMIN_EMAIL = 'phamnguyenhaithanh4@gmail.com';
+  const IP_REGISTRATION_BLOCK_MESSAGE = '⛔ Giới Hạn Nhập Môn — Mỗi thiết bị hoặc địa chỉ mạng (IP) chỉ được tạo duy nhất 1 tài khoản tại Tông Môn. Nếu bạn đã có tài khoản, vui lòng sử dụng mục Đăng Nhập!';
   const SITE_NAME = 'Thiên Mệnh Chi Thành';
   const pageName = document.documentElement.dataset.page || document.body.dataset.page || 'home';
   const MUSIC_SESSION_KEY = 'thien-menh-chi-thanh:background-music';
@@ -102,6 +103,7 @@
   let adminWorkspaceInitialized = false;
   let adminPreviewObjectUrl = '';
   let discipleSyncUserId = '';
+  let pendingSignupEmail = '';
   let currentUserProfile = null;
   let sectOwnerProfile = null;
   let bannedAccountEnforcement = null;
@@ -2105,17 +2107,32 @@
     return deviceId;
   }
 
-  async function checkAndRegisterIp(isNewSignup) {
+  async function checkAndRegisterIp(isNewSignup, email = authenticatedUser && authenticatedUser.email) {
     let timeoutId = 0;
     let deviceId = '';
     try {
       if (!supabaseClient) throw new Error('Dịch vụ tài khoản chưa sẵn sàng.');
-      deviceId = getOrCreateDeviceId();
+      try {
+        deviceId = getOrCreateDeviceId();
+      } catch (error) {
+        console.warn('Không thể đọc mã thiết bị; dùng mã tạm cho lượt xác minh này:', error);
+        deviceId = `tm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+      }
+      const owner = String(email || '').trim().toLowerCase() === ADMIN_EMAIL || isAdminUser();
+      const signupCheck = Boolean(isNewSignup) && !owner;
       const request = supabaseClient.rpc('check_and_register_ip', {
           p_ip: '',
           p_device_id: deviceId,
-          p_is_new_signup: Boolean(isNewSignup)
+          p_is_new_signup: signupCheck
         });
+      if (owner) {
+        void request.then(({ error }) => {
+          if (error) console.warn('Không thể ghi nhận IP miễn trừ của Tông Chủ:', error);
+        }).catch(error => {
+          console.warn('Không thể ghi nhận IP miễn trừ của Tông Chủ:', error);
+        });
+        return { allowed: true, reason: '', deviceId };
+      }
       const { data, error } = await Promise.race([
         request,
         new Promise((resolve, reject) => {
@@ -2130,6 +2147,12 @@
       if (!result || typeof result.allowed !== 'boolean') {
         throw new Error('Phản hồi giới hạn IP/thiết bị không hợp lệ.');
       }
+      if (!signupCheck) {
+        if (!result.allowed) {
+          console.warn('Bỏ qua kết quả từ chối IP/thiết bị khi đăng nhập tài khoản hiện có:', result.reason);
+        }
+        return { allowed: true, reason: '', deviceId };
+      }
       return {
         allowed: result.allowed,
         reason: String(result.reason || ''),
@@ -2138,7 +2161,7 @@
     } catch (error) {
       console.error('Không thể xác minh giới hạn IP/thiết bị:', error);
       return {
-        allowed: false,
+        allowed: true,
         reason: `Không thể xác minh IP/thiết bị: ${error.message || 'Lỗi Supabase.'}`,
         deviceId
       };
@@ -2160,6 +2183,10 @@
   }
 
   async function rejectIpRegistration(user, reason) {
+    if (String(user && user.email || '').trim().toLowerCase() === ADMIN_EMAIL || isAdminUser(user)) {
+      void checkAndRegisterIp(false, user && user.email);
+      return;
+    }
     let signOutError = null;
     if (authenticatedUser && String(authenticatedUser.id || '') === String(user && user.id || '') &&
         supabaseClient) {
@@ -2172,10 +2199,38 @@
         console.error('Không thể đăng xuất phiên bị từ chối bởi giới hạn IP:', error);
       }
     }
-    const message = `Tài khoản bị từ chối: ${reason || 'IP hoặc thiết bị này đã được liên kết với tài khoản khác.'}` +
-      (signOutError ? ` Chưa thể đăng xuất tự động: ${signOutError.message || 'lỗi kết nối.'}` : '');
-    openAuthModal(message);
-    setAdminStatus(message, true);
+    if (reason) console.warn('Tông Môn đã từ chối tài khoản do trùng IP/thiết bị:', reason);
+    if (signOutError) console.error('Phiên bị từ chối chưa thể đăng xuất tự động:', signOutError);
+    openAuthModal(IP_REGISTRATION_BLOCK_MESSAGE);
+    setAdminStatus(IP_REGISTRATION_BLOCK_MESSAGE, true);
+    showIpRegistrationBlockNotice();
+  }
+
+  function showIpRegistrationBlockNotice() {
+    let modal = document.getElementById('ip-device-block-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'ip-device-block-modal';
+      modal.className = 'ip-device-block-modal';
+      modal.hidden = true;
+      modal.setAttribute('role', 'alertdialog');
+      modal.setAttribute('aria-modal', 'true');
+      modal.setAttribute('aria-label', 'Giới Hạn Nhập Môn');
+      modal.innerHTML = `
+        <section class="ip-device-block-dialog">
+          <p>${IP_REGISTRATION_BLOCK_MESSAGE}</p>
+          <button type="button" class="ip-device-block-confirm">Đã hiểu</button>
+        </section>`;
+      modal.addEventListener('click', event => {
+        if (event.target === modal || event.target.closest('.ip-device-block-confirm')) {
+          modal.hidden = true;
+          modal.classList.remove('active');
+        }
+      });
+      document.body.appendChild(modal);
+    }
+    modal.hidden = false;
+    modal.classList.add('active');
   }
 
   function requireAuth(actionCallback) {
@@ -2498,12 +2553,13 @@
     button.style.cursor = 'grab';
     button.style.position = 'relative';
     button.style.zIndex = '9990';
-    button.style.width = '46px';
-    button.style.height = '46px';
 
     const clampPosition = (left, top) => {
-      const maxLeft = Math.max(12, window.innerWidth - 58);
-      const maxTop = Math.max(12, window.innerHeight - 64);
+      const bounds = cluster.getBoundingClientRect();
+      const width = Math.max(1, bounds.width || 52);
+      const height = Math.max(1, bounds.height || 52);
+      const maxLeft = Math.max(12, window.innerWidth - width - 12);
+      const maxTop = Math.max(12, window.innerHeight - height - 12);
       const minTop = Math.min(72, maxTop);
       return {
         left: Math.max(12, Math.min(Number(left) || 0, maxLeft)),
@@ -2519,15 +2575,18 @@
     };
     const applyPosition = (left, top, shouldSave = false) => {
       const position = clampPosition(left, top);
-      cluster.style.left = `${position.left}px`;
-      cluster.style.top = `${position.top}px`;
+      cluster.style.setProperty('left', `${position.left}px`, 'important');
+      cluster.style.setProperty('top', `${position.top}px`, 'important');
+      cluster.style.setProperty('right', 'auto', 'important');
+      cluster.style.setProperty('bottom', 'auto', 'important');
       if (shouldSave) savePosition(position);
       return position;
     };
     const snapToNearestEdge = (left, top, shouldSave = true) => {
       const bounded = clampPosition(left, top);
-      const rightEdge = Math.max(12, window.innerWidth - 58);
-      const snappedLeft = bounded.left + 23 <= window.innerWidth / 2 ? 12 : rightEdge;
+      const width = cluster.getBoundingClientRect().width || 52;
+      const rightEdge = Math.max(12, window.innerWidth - width - 12);
+      const snappedLeft = bounded.left + width / 2 <= window.innerWidth / 2 ? 12 : rightEdge;
       const position = applyPosition(snappedLeft, bounded.top, shouldSave);
       positionMiniMusicControl();
       return position;
@@ -2746,6 +2805,7 @@
   async function syncDiscipleForUser(user) {
     if (!user || !user.id || discipleSyncUserId === String(user.id)) return;
     discipleSyncUserId = String(user.id);
+    const createdDuringCurrentSignup = pendingSignupEmail === String(user.email || '').trim().toLowerCase();
     state.discipleStatusReady = false;
     syncPageAccess();
     const visitKey = `thien-menh:disciple-visit:${user.id}`;
@@ -2775,16 +2835,16 @@
       } catch (error) {
         console.warn('Không thể lưu lượt ghé thăm Tông Môn:', error);
       }
-      const { data: existing, error: readError } = await supabaseClient.from('disciples')
+      const { data: existingData, error: readError } = await supabaseClient.from('disciples')
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
+      let existing = null;
+      const existingProfileKnown = !readError;
       if (readError) {
-        await rejectIpRegistration(
-          user,
-          `Không thể xác minh hồ sơ để kiểm soát IP/thiết bị: ${readError.message || 'Lỗi Supabase.'}`
-        );
-        return;
+        console.warn('Không thể đọc hồ sơ môn đồ; không suy đoán đây là tài khoản đăng ký mới:', readError);
+      } else {
+        existing = existingData;
       }
       if (existing && String(authenticatedUser && authenticatedUser.id || '') === String(user.id)) {
         setCurrentUserProfile(existing);
@@ -2797,15 +2857,20 @@
         return;
       }
 
-      const needsSignupCheck = !existing && !isAdminUser(user);
+      const googleProvider = String(user.app_metadata && user.app_metadata.provider || '').toLowerCase() === 'google' ||
+        (Array.isArray(user.identities) && user.identities.some(identity =>
+          String(identity && identity.provider || '').toLowerCase() === 'google'
+        ));
+      const needsSignupCheck = !existing && !isAdminUser(user) &&
+        (createdDuringCurrentSignup || (existingProfileKnown && googleProvider));
       if (needsSignupCheck) {
-        const signupCheck = await checkAndRegisterIp(true);
+        const signupCheck = await checkAndRegisterIp(true, user.email);
         if (!signupCheck.allowed) {
           await rejectIpRegistration(user, signupCheck.reason);
           return;
         }
       }
-      const ipCheck = await checkAndRegisterIp(false);
+      const ipCheck = await checkAndRegisterIp(false, user.email);
       if (!ipCheck.allowed) {
         await rejectIpRegistration(user, ipCheck.reason);
         return;
@@ -3611,14 +3676,9 @@
         </div>
         <p id="sect-chat-status" class="sect-chat-status" role="status" aria-live="polite"></p>
       </section>`;
-    const cluster = document.createElement('div');
-    cluster.id = 'floating-controls-cluster';
-    cluster.className = 'floating-controls-cluster';
     const musicPlayer = document.getElementById('floating-bg-player');
-    if (musicPlayer) cluster.append(musicPlayer);
     document.body.appendChild(widget);
-    document.body.appendChild(cluster);
-    if (musicPlayer) initDraggableMusicControl(musicPlayer, cluster);
+    if (musicPlayer) initDraggableMusicControl(musicPlayer, musicPlayer);
     const overlay = widget;
     const openSectChat = async () => {
       overlay.hidden = false;
@@ -6775,11 +6835,15 @@
             starting_spirit_stones: 20
           }
         };
-        const ipCheck = await checkAndRegisterIp(true);
+        const ipCheck = await checkAndRegisterIp(true, email);
         reservationDeviceId = ipCheck.deviceId || '';
         if (!ipCheck.allowed) {
-          throw new Error(ipCheck.reason || 'IP hoặc thiết bị này đã được liên kết với tài khoản khác.');
+          showIpRegistrationBlockNotice();
+          openAuthModal(IP_REGISTRATION_BLOCK_MESSAGE);
+          setAdminStatus(IP_REGISTRATION_BLOCK_MESSAGE, true);
+          return;
         }
+        pendingSignupEmail = email.trim().toLowerCase();
         const { data, error } = await supabaseClient.auth.signUp({ email, password, options });
         if (error) throw error;
         signupCompleted = true;
@@ -6800,6 +6864,7 @@
         }
         setAdminStatus(authErrorMessage(error, 'signup'), true);
       } finally {
+        if (pendingSignupEmail === email.trim().toLowerCase()) pendingSignupEmail = '';
         if (submitButton) submitButton.disabled = false;
       }
     });
@@ -11512,23 +11577,26 @@
 
   function updateBgMusicUI() {
     const playerWidget = document.getElementById('floating-bg-player');
-    const diskIcon = document.getElementById('bg-disk-icon');
     const toggleBtn = document.getElementById('bg-music-toggle-btn');
     const globalAudioToggle = document.getElementById('global-audio-toggle');
 
     const isActive = !state.bgMusic.isUserMuted;
+    const isPlaying = Boolean(state.bgMusic.isPlaying && state.bgMusic.audio &&
+      !state.bgMusic.audio.paused && !state.bgMusic.isUserMuted);
 
+    if (playerWidget) {
+      playerWidget.classList.toggle('playing', isPlaying);
+      playerWidget.classList.toggle('is-playing', isPlaying);
+    }
     if (isActive && !state.currentAudio) {
-      if (playerWidget) playerWidget.classList.add('playing');
       if (globalAudioToggle) globalAudioToggle.classList.add('playing');
     } else {
-      if (playerWidget) playerWidget.classList.remove('playing');
       if (globalAudioToggle && !state.currentAudio) globalAudioToggle.classList.remove('playing');
     }
-    if (diskIcon) diskIcon.textContent = '🎵';
     if (toggleBtn) {
       toggleBtn.title = 'Mở bảng điều khiển Âm Luật';
       toggleBtn.setAttribute('aria-label', toggleBtn.title);
+      toggleBtn.setAttribute('aria-pressed', String(isPlaying));
       const miniPanel = document.getElementById('mini-bg-music-control');
       toggleBtn.setAttribute('aria-expanded', String(Boolean(miniPanel && !miniPanel.hidden)));
     }
