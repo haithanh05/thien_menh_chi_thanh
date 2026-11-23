@@ -8,8 +8,8 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=72">
-  <link rel="stylesheet" href="css/style.css?v=72">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=73">
+  <link rel="stylesheet" href="css/style.css?v=73">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -149,12 +149,22 @@
 
 <section id="admin-dashboard" hidden>
             <h3 class="auth-admin-heading">Quản Trị Tiên Giới (Admin)</h3>
+            <section class="admin-tool-card admin-presence-panel" id="admin-presence-panel" aria-labelledby="admin-presence-heading">
+              <div class="admin-presence-heading">
+                <h4 id="admin-presence-heading">👁️ Thiên Nhãn Giám Sát (Đang Trực Tuyến)</h4>
+                <strong id="admin-online-count" aria-live="polite">0 đang online</strong>
+              </div>
+              <div id="admin-online-visitors" class="admin-online-visitors" aria-live="polite">
+                <p class="admin-memory-empty">Đang mở Thiên Nhãn…</p>
+              </div>
+            </section>
             <div class="admin-dashboard-tabs" role="tablist" aria-label="Khu vực quản trị">
               <button type="button" class="admin-dashboard-tab active" id="admin-tab-decrees" role="tab" aria-selected="true" aria-controls="admin-panel-decrees" data-admin-panel-target="admin-panel-decrees">📊 Tổng Quan &amp; Cấu Hình</button>
               <button type="button" class="admin-dashboard-tab" id="admin-tab-memory" role="tab" aria-selected="false" aria-controls="admin-panel-memory" data-admin-panel-target="admin-panel-memory">🖼️ Mốc &amp; Tàn Hồn (Ảnh)</button>
               <button type="button" class="admin-dashboard-tab" id="admin-tab-reviews" role="tab" aria-selected="false" aria-controls="admin-panel-reviews" data-admin-panel-target="admin-panel-reviews">💬 Duyệt Lưu Bút &amp; Bình Luận</button>
               <button type="button" class="admin-dashboard-tab" id="admin-tab-game" role="tab" aria-selected="false" aria-controls="admin-panel-game" data-admin-panel-target="admin-panel-game">🎯 Đố Vui Độ Kiếp</button>
               <button type="button" class="admin-dashboard-tab" id="admin-tab-backup" role="tab" aria-selected="false" aria-controls="admin-panel-backup" data-admin-panel-target="admin-panel-backup">💾 Sao Lưu Dữ Liệu</button>
+              <button type="button" class="admin-dashboard-tab" id="admin-tab-disciples" role="tab" aria-selected="false" aria-controls="admin-panel-disciples" data-admin-panel-target="admin-panel-disciples">👥 Quản Lý Tông Môn</button>
             </div>
 
             <section class="admin-dashboard-panel" id="admin-panel-decrees" role="tabpanel" aria-labelledby="admin-tab-decrees">
@@ -411,6 +421,21 @@
                 <input id="admin-game-search" type="search" placeholder="Nhập từ khóa...">
                 <div id="admin-game-score-list" class="admin-review-list" aria-live="polite"></div>
                 <p id="admin-game-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+                <div class="admin-game-controls">
+                  <button type="button" class="admin-secondary-button" id="admin-reset-game-leaderboard">♻️ Đặt lại Bảng Phong Thần</button>
+                </div>
+                <form id="admin-special-question-form" class="admin-form">
+                  <h4>✨ Thêm Câu Hỏi Đặc Biệt</h4>
+                  <label for="admin-special-question-image">URL ảnh</label>
+                  <input id="admin-special-question-image" type="url" required placeholder="https://...">
+                  <label for="admin-special-question-period">Niên hiệu / Giai đoạn</label>
+                  <input id="admin-special-question-period" type="text" maxlength="40" required placeholder="2024 hoặc Tuổi thơ">
+                  <label for="admin-special-question-description">Gợi ý / Bối cảnh</label>
+                  <textarea id="admin-special-question-description" rows="2" maxlength="300" required></textarea>
+                  <button type="submit" class="admin-primary-button">➕ Thêm Câu Hỏi</button>
+                  <p id="admin-special-question-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+                </form>
+                <div id="admin-special-question-list" class="admin-review-list"></div>
               </section>
             </section>
             <section class="admin-dashboard-panel" id="admin-panel-backup" role="tabpanel" aria-labelledby="admin-tab-backup" hidden>
@@ -419,6 +444,15 @@
                 <p class="admin-form-intro">Xuất cấu hình, ký ức, lưu bút, bình luận và bảng Độ Kiếp thành một tệp JSON.</p>
                 <button type="button" class="admin-primary-button" id="admin-export-backup">⬇️ Xuất File Sao Lưu (.json)</button>
                 <p id="admin-backup-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+              </section>
+            </section>
+            <section class="admin-dashboard-panel" id="admin-panel-disciples" role="tabpanel" aria-labelledby="admin-tab-disciples" hidden>
+              <section class="admin-tool-card">
+                <h4>👥 Sổ Danh Sách Môn Đồ</h4>
+                <label class="admin-search-label" for="admin-disciples-search">Tìm theo tên hoặc email</label>
+                <input id="admin-disciples-search" type="search" placeholder="Tên hoặc email đạo hữu...">
+                <div id="admin-disciples-list" class="admin-disciples-list" aria-live="polite"></div>
+                <p id="admin-disciples-status" class="admin-tool-status" role="status" aria-live="polite"></p>
               </section>
             </section>
           </section>
@@ -535,8 +569,9 @@
       </div>
     </div>
   </footer>
-<script defer src="js/memories.js?v=72"></script>
+<script defer src="js/memories.js?v=73"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="js/app.js?v=72"></script>
+<script defer src="js/premium-effects.js?v=73"></script>
+<script defer src="js/app.js?v=73"></script>
 </body>
 </html>

@@ -94,6 +94,12 @@
   let adminDashboardRequest = null;
   let adminWorkspaceInitialized = false;
   let adminPreviewObjectUrl = '';
+  let discipleSyncUserId = '';
+  let presenceChannel = null;
+  let discipleRealtimeChannel = null;
+  let presenceJoinTime = new Date().toISOString();
+  let onlinePresenceState = {};
+  let disciplesLoadPromise = null;
 
   // State Management
   const state = {
@@ -118,6 +124,9 @@
     adminGuestbookRows: [],
     adminCommentRows: [],
     adminGameRows: [],
+    adminDisciples: [],
+    disciple: null,
+    discipleStatusReady: false,
     archive: {
       memories: [],
       renderedCount: 0,
@@ -176,7 +185,18 @@
       resultSaved: false,
       hasAnswered: false,
       lastCorrectLine: '',
-      lastWrongLine: ''
+      lastWrongLine: '',
+      mode: 'normal',
+      combo: 0,
+      bestCombo: 0,
+      correctAnswers: 0,
+      lives: 3,
+      timeLeft: 15,
+      questionStartedAt: 0,
+      timerId: null,
+      powerups: { fifty: false, hint: false, freeze: false },
+      usedPowerups: new Set(),
+      choices: []
     },
     cinema: {
       slides: [],
@@ -682,7 +702,7 @@
     try {
       const { data, error } = await supabaseClient.from('site_settings')
         .select('key,value')
-        .in('key', ['cultivation_overrides', 'custom_attributes', 'visitor_config', 'hidden_memories', 'announcement_config']);
+        .in('key', ['cultivation_overrides', 'custom_attributes', 'visitor_config', 'hidden_memories', 'announcement_config', 'quiz_special_questions']);
       if (error) throw error;
 
       (data || []).forEach(row => {
@@ -705,6 +725,7 @@
       refreshCultivationStageCards();
       renderStages();
       renderAdminMemoryList();
+      renderAdminSpecialQuestions();
       updateVisitorBadge();
       syncAdminSettingsForm();
     } catch (error) {
@@ -1647,7 +1668,7 @@
       initBackgroundMusic();
       bindGlobalEvents();
       initModalNavbarSync();
-      if (homePage) initUtilityPanels();
+      if (homePage || tongmonPage) initUtilityPanels();
       initAuthPortal();
       initPageAccessControls();
       if (galleryPage) initArchiveLockModal();
@@ -1667,6 +1688,7 @@
         });
       if (homePage || adminPage) void loadTongChuDecrees();
       initGlobalSiteRealtime();
+      window.setTimeout(initPresence, 300);
       if (homePage || tongmonPage) void loadLeaderboard();
     } catch (e) {
       console.error('Không thể khởi tạo trang:', e);
@@ -1898,6 +1920,284 @@
     return false;
   }
 
+  function isDiscipleBanned() {
+    return Boolean(state.disciple && state.disciple.is_banned === true);
+  }
+
+  function discipleBanMessage(status) {
+    if (status) {
+      status.textContent = '⚠️ Tài khoản của đạo hữu đã bị Tông Môn Phong Ấn!';
+      status.classList.add('is-error');
+    } else {
+      showToast('⚠️ Tài khoản của đạo hữu đã bị Tông Môn Phong Ấn!', '🔒');
+    }
+    return false;
+  }
+
+  function hasDiscipleFeatureAccess(status) {
+    if (!authenticatedUser) return false;
+    if (!state.discipleStatusReady) {
+      if (status) status.textContent = 'Đang xác minh tư cách môn đồ, xin chờ một lát.';
+      else showToast('Đang xác minh tư cách môn đồ, xin chờ một lát.', '⏳');
+      return false;
+    }
+    return !isDiscipleBanned() || discipleBanMessage(status);
+  }
+
+  function safeSessionValue(key, createValue) {
+    try {
+      let value = sessionStorage.getItem(key);
+      if (!value) {
+        value = createValue();
+        sessionStorage.setItem(key, value);
+      }
+      return value;
+    } catch (error) {
+      console.warn('Không thể lưu trạng thái phiên Tông Môn:', error);
+      return createValue();
+    }
+  }
+
+  function getMemberFullName(user) {
+    const metadata = user && user.user_metadata || {};
+    return String(metadata.full_name || metadata.name || metadata.display_name ||
+      user && user.email && user.email.split('@')[0] || 'Đạo Hữu').trim();
+  }
+
+  function getMemberAvatar(user) {
+    const metadata = user && user.user_metadata || {};
+    const value = String(metadata.avatar_url || metadata.picture || '').trim();
+    return /^https:\/\//i.test(value) ? value : '';
+  }
+
+  async function syncDiscipleForUser(user) {
+    if (!user || !user.id || !supabaseClient || discipleSyncUserId === String(user.id)) return;
+    discipleSyncUserId = String(user.id);
+    state.discipleStatusReady = false;
+    syncPageAccess();
+    const visitKey = `thien-menh:disciple-visit:${user.id}`;
+    let isNewVisit = false;
+    try {
+      isNewVisit = !sessionStorage.getItem(visitKey);
+      if (isNewVisit) sessionStorage.setItem(visitKey, '1');
+      const { data: existing, error: readError } = await supabaseClient.from('disciples')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (readError) throw readError;
+
+      const payload = {
+        user_id: user.id,
+        email: String(user.email || ''),
+        full_name: getMemberFullName(user),
+        avatar_url: getMemberAvatar(user) || String(existing && existing.avatar_url || ''),
+        sect_title: String(existing && existing.sect_title || 'Ngoại Môn Đệ Tử'),
+        is_banned: Boolean(existing && existing.is_banned),
+        visit_count: Math.max(0, Number(existing && existing.visit_count) || 0) + (isNewVisit ? 1 : 0),
+        last_seen: new Date().toISOString()
+      };
+      const { data, error } = await supabaseClient.from('disciples')
+        .upsert(payload, { onConflict: 'user_id' })
+        .select('*')
+        .single();
+      if (error) throw error;
+      state.disciple = data || payload;
+      state.discipleStatusReady = true;
+      initDiscipleRealtime(user);
+      refreshDiscipleshipUI();
+      updatePresence();
+      void loadGameLeaderboard();
+      if (isAdminUser()) void loadAdminDisciples();
+    } catch (error) {
+      discipleSyncUserId = '';
+      state.disciple = {
+        user_id: user.id,
+        email: String(user.email || ''),
+        full_name: getMemberFullName(user),
+        avatar_url: getMemberAvatar(user),
+        sect_title: 'Ngoại Môn Đệ Tử',
+        is_banned: false,
+        visit_count: 0
+      };
+      state.discipleStatusReady = false;
+      console.warn('Không thể đồng bộ Sổ Môn Đồ:', error);
+      refreshDiscipleshipUI();
+      updatePresence();
+    }
+  }
+
+  function initDiscipleRealtime(user) {
+    if (!supabaseClient || !user || !user.id || !supabaseClient.channel) return;
+    if (discipleRealtimeChannel) void supabaseClient.removeChannel(discipleRealtimeChannel);
+    discipleRealtimeChannel = supabaseClient.channel(`disciples-access:${user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'disciples',
+        filter: `user_id=eq.${user.id}`
+      }, payload => {
+        if (!payload.new || String(payload.new.user_id) !== String(authenticatedUser && authenticatedUser.id)) return;
+        state.disciple = { ...(state.disciple || {}), ...payload.new };
+        state.discipleStatusReady = true;
+        refreshDiscipleshipUI();
+        updatePresence();
+      })
+      .subscribe(status => {
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('Không thể đồng bộ cập nhật Sổ Môn Đồ theo thời gian thực.');
+        }
+      });
+  }
+
+  function refreshDiscipleshipUI() {
+    syncPageAccess();
+    const title = document.getElementById('ticket-disp-sect-title');
+    if (title) {
+      title.textContent = String(state.disciple && state.disciple.sect_title || 'Ngoại Môn Đệ Tử');
+      title.hidden = false;
+    }
+    if (isDiscipleBanned()) {
+      document.querySelectorAll('.milestone-comment-form textarea, .milestone-comment-form button[type="submit"]')
+        .forEach(element => { element.disabled = true; });
+      const gameModal = document.getElementById('game-modal');
+      if (gameModal && gameModal.classList.contains('active')) closeGameModal();
+      const ticketStation = document.getElementById('ticket-station');
+      if (ticketStation) {
+        ticketStation.hidden = true;
+        ticketStation.classList.remove('open');
+      }
+    } else {
+      document.querySelectorAll('.milestone-comment-form textarea, .milestone-comment-form button[type="submit"]')
+        .forEach(element => { element.disabled = false; });
+    }
+  }
+
+  function getPresencePageName() {
+    return {
+      home: 'Đại Điện',
+      gallery: 'Tàng Kinh Các',
+      tongmon: 'Tông Môn Các',
+      admin: 'Nội Các'
+    }[pageName] || 'Đại Điện';
+  }
+
+  function getMaskedEmail(email) {
+    const [name, domain] = String(email || '').split('@');
+    if (!name || !domain) return '';
+    return `${name.slice(0, 1)}***@${domain}`;
+  }
+
+  function currentPresencePayload() {
+    const user = authenticatedUser;
+    const anonymousId = safeSessionValue('thien-menh:anonymous-id', () =>
+      `anon-${Math.random().toString(36).slice(2, 8)}`);
+    const anonymousName = safeSessionValue('thien-menh:anonymous-name', () =>
+      `Tán Tu Ẩn Danh #${Math.floor(1000 + Math.random() * 9000)}`);
+    return {
+      user_id: user ? String(user.id) : '',
+      anonymous_id: user ? '' : anonymousId,
+      full_name: user
+        ? String(state.disciple && state.disciple.full_name || getMemberFullName(user))
+        : anonymousName,
+      email: user ? getMaskedEmail(user.email) : '',
+      avatar_url: user
+        ? String(state.disciple && state.disciple.avatar_url || getMemberAvatar(user))
+        : '',
+      sect_title: user
+        ? String(state.disciple && state.disciple.sect_title || 'Ngoại Môn Đệ Tử')
+        : 'Tán Tu',
+      page: getPresencePageName(),
+      device: window.matchMedia('(max-width: 767px)').matches ? 'Điện thoại' : 'Máy tính',
+      joined_at: presenceJoinTime
+    };
+  }
+
+  function updatePresence() {
+    if (!presenceChannel) return;
+    void presenceChannel.track(currentPresencePayload()).catch(error => {
+      console.warn('Không thể cập nhật hiện diện Tông Môn:', error);
+    });
+  }
+
+  function initPresence() {
+    if (!supabaseClient || presenceChannel) return;
+    const key = safeSessionValue('thien-menh:presence-key', () =>
+      `visit-${Math.random().toString(36).slice(2, 12)}`);
+    try {
+      presenceChannel = supabaseClient.channel('tongmon-online-presence', {
+        config: { presence: { key } }
+      });
+      presenceChannel
+        .on('presence', { event: 'sync' }, () => {
+          onlinePresenceState = presenceChannel.presenceState();
+          renderAdminOnlinePresence();
+        })
+        .subscribe(status => {
+          if (status === 'SUBSCRIBED') updatePresence();
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            const list = document.getElementById('admin-online-visitors');
+            if (list && isAdminUser()) list.textContent = 'Thiên Nhãn chưa kết nối được Realtime Presence.';
+          }
+        });
+    } catch (error) {
+      console.warn('Không thể mở kênh Realtime Presence:', error);
+    }
+  }
+
+  function renderAdminOnlinePresence() {
+    const list = document.getElementById('admin-online-visitors');
+    const count = document.getElementById('admin-online-count');
+    if (!list || !count || !isAdminUser()) return;
+    const membersById = new Map((state.adminDisciples || []).map(member => [String(member.user_id), member]));
+    const unique = new Map();
+    Object.values(onlinePresenceState || {}).flat().forEach(presence => {
+      const identity = presence.user_id
+        ? `user:${presence.user_id}`
+        : `anon:${presence.anonymous_id || presence.full_name || Math.random()}`;
+      if (!unique.has(identity)) unique.set(identity, presence);
+    });
+    const visitors = Array.from(unique.values());
+    count.textContent = `${visitors.length} đang online`;
+    list.replaceChildren();
+    if (!visitors.length) {
+      const empty = document.createElement('p');
+      empty.className = 'admin-memory-empty';
+      empty.textContent = 'Hiện chưa có đạo hữu nào trực tuyến.';
+      list.appendChild(empty);
+      return;
+    }
+    visitors.forEach(visitor => {
+      const member = membersById.get(String(visitor.user_id || ''));
+      const row = document.createElement('article');
+      row.className = 'admin-online-row';
+      const avatar = document.createElement('img');
+      avatar.className = 'admin-online-avatar';
+      avatar.alt = '';
+      avatar.loading = 'lazy';
+      avatar.decoding = 'async';
+      if (visitor.avatar_url && /^https:\/\//i.test(visitor.avatar_url)) avatar.src = visitor.avatar_url;
+      else avatar.hidden = true;
+      const identity = document.createElement('div');
+      identity.className = 'admin-online-identity';
+      const name = document.createElement('strong');
+      name.textContent = String(visitor.full_name || 'Tán Tu Ẩn Danh');
+      const email = document.createElement('span');
+      email.textContent = String(member && member.email || visitor.email || 'Ẩn danh');
+      const title = document.createElement('span');
+      title.textContent = String(member && member.sect_title || visitor.sect_title || 'Tán Tu');
+      identity.append(name, email, title);
+      const badges = document.createElement('div');
+      badges.className = 'admin-online-badges';
+      [visitor.page || 'Đại Điện', visitor.device || 'Máy tính'].forEach(text => {
+        const badge = document.createElement('span');
+        badge.textContent = text;
+        badges.appendChild(badge);
+      });
+      row.append(avatar, identity, badges);
+      list.appendChild(row);
+    });
+  }
+
   function openAuthModal(message = '') {
     const modal = document.getElementById('auth-modal');
     if (!modal) return;
@@ -2024,9 +2324,22 @@
 
   function setAuthenticatedUser(user) {
     const wasAuthenticated = Boolean(authenticatedUser);
+    const previousUserId = String(authenticatedUser && authenticatedUser.id || '');
     authenticatedUser = user || null;
+    if (previousUserId && previousUserId !== String(authenticatedUser && authenticatedUser.id || '') &&
+        discipleRealtimeChannel && supabaseClient) {
+      void supabaseClient.removeChannel(discipleRealtimeChannel);
+      discipleRealtimeChannel = null;
+    }
+    if (!authenticatedUser || previousUserId !== String(authenticatedUser.id)) {
+      state.disciple = null;
+      state.discipleStatusReady = false;
+      discipleSyncUserId = '';
+    }
     renderAuthState(authenticatedUser);
     syncPageAccess();
+    const discipleSync = authenticatedUser ? syncDiscipleForUser(authenticatedUser) : null;
+    updatePresence();
     refreshVisibleMemoryLikes();
     initMilestoneComments();
     if (authenticatedUser) {
@@ -2046,7 +2359,8 @@
       pendingAuthAction = null;
       closeAuthModal();
       const cultivationSync = state.cultivation.syncPromise;
-      if (cultivationSync) void cultivationSync.finally(action);
+      const requiredSyncs = [cultivationSync, discipleSync].filter(Boolean);
+      if (requiredSyncs.length) void Promise.allSettled(requiredSyncs).then(action);
       else action();
     } else if (!authenticatedUser && wasAuthenticated) {
       pendingAuthAction = null;
@@ -2056,8 +2370,10 @@
 
   function syncPageAccess() {
     const isAdmin = isAdminUser();
+    const homeLink = document.getElementById('nav-home-link');
     const adminLink = document.getElementById('nav-admin-link');
     const homeAdminLink = document.getElementById('home-admin-route');
+    if (homeLink) homeLink.hidden = pageName === 'home';
     if (adminLink) adminLink.hidden = !isAdmin;
     if (homeAdminLink) homeAdminLink.hidden = !isAdmin;
 
@@ -2066,10 +2382,16 @@
       const content = document.getElementById('tongmon-content');
       const ticketStation = document.getElementById('ticket-station');
       const isAuthenticated = Boolean(authenticatedUser);
-      if (lock) lock.hidden = isAuthenticated;
-      if (lock && lock.parentElement) lock.parentElement.hidden = isAuthenticated;
-      if (content) content.hidden = !isAuthenticated;
-      if (ticketStation) ticketStation.hidden = !isAuthenticated || !state.featureToggles.ticket;
+      const banLock = document.getElementById('tongmon-ban-lock');
+      const checkingLock = document.getElementById('tongmon-checking-lock');
+      const isBanned = isDiscipleBanned();
+      if (lock) lock.hidden = isAuthenticated || isBanned;
+      if (lock && lock.parentElement) lock.parentElement.hidden = isAuthenticated || isBanned;
+      if (banLock) banLock.hidden = !isAuthenticated || !isBanned;
+      const isChecking = isAuthenticated && !state.discipleStatusReady;
+      if (checkingLock) checkingLock.hidden = !isChecking;
+      if (content) content.hidden = !isAuthenticated || isBanned || isChecking;
+      if (ticketStation) ticketStation.hidden = !isAuthenticated || isBanned || isChecking || !state.featureToggles.ticket;
     }
 
     if (pageName === 'admin') {
@@ -2416,6 +2738,26 @@
         else renderAdminGameScores();
       });
     });
+    const disciplesSearch = document.getElementById('admin-disciples-search');
+    if (disciplesSearch) disciplesSearch.addEventListener('input', renderAdminDisciples);
+    const sectTitles = document.createElement('datalist');
+    sectTitles.id = 'admin-sect-title-options';
+    ['Đại Trưởng Lão', 'Hộ Pháp', 'Chân Truyền Đệ Tử', 'Nội Môn Đệ Tử', 'Ngoại Môn Đệ Tử']
+      .forEach(value => {
+        const option = document.createElement('option');
+        option.value = value;
+        sectTitles.appendChild(option);
+      });
+    document.body.appendChild(sectTitles);
+    const specialQuestionForm = document.getElementById('admin-special-question-form');
+    if (specialQuestionForm) {
+      specialQuestionForm.addEventListener('submit', event => {
+        event.preventDefault();
+        void addAdminSpecialQuestion(specialQuestionForm);
+      });
+    }
+    const resetGameButton = document.getElementById('admin-reset-game-leaderboard');
+    if (resetGameButton) resetGameButton.addEventListener('click', () => void resetDisciplesGameLeaderboard(resetGameButton));
     const dashboard = document.getElementById('admin-dashboard');
     if (dashboard) {
       dashboard.addEventListener('click', event => {
@@ -2427,6 +2769,14 @@
         }
         const deleteButton = target && target.closest('[data-admin-delete-table]');
         if (deleteButton) void deleteAdminRecord(deleteButton);
+        const discipleAction = target && target.closest('[data-disciple-action]');
+        if (discipleAction) void handleAdminDiscipleAction(discipleAction);
+        const specialDelete = target && target.closest('[data-special-question-delete]');
+        if (specialDelete) void removeAdminSpecialQuestion(specialDelete.dataset.specialQuestionDelete);
+      });
+      dashboard.addEventListener('change', event => {
+        const target = event.target instanceof HTMLInputElement ? event.target : null;
+        if (target && target.matches('.admin-disciple-title-input')) void saveDiscipleTitle(target);
       });
     }
     initAdminMemoryPreview();
@@ -2484,6 +2834,8 @@
     if (!isAdminUser() || !supabaseClient || adminDashboardRequest) return adminDashboardRequest;
     adminDashboardRequest = (async () => {
       await Promise.all([renderAdminMetrics(), loadAdminReviewData(), loadAdminGameScoresData()]);
+      await loadAdminDisciples();
+      renderAdminSpecialQuestions();
     })();
     try {
       await adminDashboardRequest;
@@ -2600,9 +2952,10 @@
     const status = document.getElementById('admin-game-status');
     if (!status || !supabaseClient || !isAdminUser()) return;
     status.textContent = 'Đang tải bảng Độ Kiếp…';
-    const { data, error } = await supabaseClient.from('leaderboard')
-      .select('user_id,display_name,best_score,best_streak,updated_at')
-      .order('best_score', { ascending: false })
+    const { data, error } = await supabaseClient.from('disciples')
+      .select('user_id,email,full_name,quiz_best_score,quiz_max_combo,last_seen')
+      .order('quiz_best_score', { ascending: false })
+      .order('quiz_max_combo', { ascending: false })
       .limit(500);
     state.adminGameRows = error ? [] : data || [];
     renderAdminGameScores();
@@ -2616,19 +2969,280 @@
     if (!list) return;
     const query = String(document.getElementById('admin-game-search')?.value || '').trim().toLocaleLowerCase('vi');
     const rows = (state.adminGameRows || []).filter(row =>
-      `${row.display_name || ''} ${row.user_id || ''} ${row.best_score || ''}`
+      `${row.full_name || ''} ${row.email || ''} ${row.quiz_best_score || ''}`
         .toLocaleLowerCase('vi').includes(query));
     list.replaceChildren();
     rows.forEach((row, index) => {
       const item = document.createElement('article');
       item.className = 'admin-review-item';
       const heading = document.createElement('strong');
-      heading.textContent = `${index + 1}. ${row.display_name || 'Đạo hữu'} · ${row.best_score || 0} điểm`;
+      heading.textContent = `${index + 1}. ${row.full_name || row.email || 'Đạo hữu'} · ${row.quiz_best_score || 0} điểm`;
       const content = document.createElement('p');
-      content.textContent = `Chuỗi đúng: ${row.best_streak || 0} · Cập nhật: ${row.updated_at || '—'} · ID: ${row.user_id || '—'}`;
+      content.textContent = `Combo dài nhất: ${row.quiz_max_combo || 0} · Lần cuối: ${row.last_seen || '—'} · ID: ${row.user_id || '—'}`;
       item.append(heading, content);
       list.appendChild(item);
     });
+  }
+
+  async function loadAdminDisciples() {
+    const list = document.getElementById('admin-disciples-list');
+    const status = document.getElementById('admin-disciples-status');
+    if (!list || !status || !isAdminUser() || !supabaseClient) return;
+    status.textContent = 'Đang tải sổ môn đồ…';
+    const disciples = [];
+    let offset = 0;
+    try {
+      while (true) {
+        const { data, error } = await supabaseClient.from('disciples')
+          .select('user_id,email,full_name,avatar_url,sect_title,is_banned,visit_count,last_seen,quiz_best_score,quiz_max_combo')
+          .order('last_seen', { ascending: false })
+          .range(offset, offset + 999);
+        if (error) throw error;
+        const batch = data || [];
+        disciples.push(...batch);
+        if (batch.length < 1000) break;
+        offset += batch.length;
+      }
+    } catch (error) {
+      state.adminDisciples = [];
+      renderAdminDisciples();
+      status.textContent = `Không tải được Sổ Môn Đồ: ${error.message || 'Lỗi truy vấn Supabase.'}`;
+      renderAdminOnlinePresence();
+      return;
+    }
+    state.adminDisciples = disciples;
+    renderAdminDisciples();
+    renderAdminOnlinePresence();
+    status.textContent = `Đã tải ${state.adminDisciples.length} môn đồ.`;
+  }
+
+  function getMemberGuestbookCounts() {
+    const counts = new Map();
+    (state.adminGuestbookRows || []).forEach(entry => {
+      const key = String(entry.user_id || '').trim();
+      const fallback = String(entry.sender_name || '').trim().toLocaleLowerCase('vi');
+      const member = state.adminDisciples.find(item =>
+        key && String(item.user_id) === key ||
+        fallback && [item.full_name, item.email].some(value =>
+          String(value || '').trim().toLocaleLowerCase('vi') === fallback)
+      );
+      if (member) {
+        const memberId = String(member.user_id);
+        counts.set(memberId, (counts.get(memberId) || 0) + 1);
+      }
+    });
+    return counts;
+  }
+
+  function renderAdminDisciples() {
+    const list = document.getElementById('admin-disciples-list');
+    if (!list) return;
+    const query = String(document.getElementById('admin-disciples-search')?.value || '')
+      .trim().toLocaleLowerCase('vi');
+    const counts = getMemberGuestbookCounts();
+    const rows = (state.adminDisciples || []).filter(member =>
+      `${member.full_name || ''} ${member.email || ''} ${member.sect_title || ''}`
+        .toLocaleLowerCase('vi').includes(query));
+    list.replaceChildren();
+    if (!rows.length) {
+      const empty = document.createElement('p');
+      empty.className = 'admin-memory-empty';
+      empty.textContent = query ? 'Không tìm thấy môn đồ phù hợp.' : 'Chưa có đạo hữu trong Sổ Môn Đồ.';
+      list.appendChild(empty);
+      return;
+    }
+    rows.forEach(member => {
+      const row = document.createElement('article');
+      row.className = `admin-disciple-row${member.is_banned ? ' is-banned' : ''}`;
+      const avatar = document.createElement('img');
+      avatar.className = 'admin-disciple-avatar';
+      avatar.alt = '';
+      avatar.loading = 'lazy';
+      avatar.decoding = 'async';
+      avatar.src = /^https:\/\//i.test(String(member.avatar_url || ''))
+        ? member.avatar_url
+        : 'images/default-avatar.svg';
+      avatar.addEventListener('error', () => { avatar.hidden = true; }, { once: true });
+
+      const identity = document.createElement('div');
+      identity.className = 'admin-disciple-identity';
+      const name = document.createElement('strong');
+      name.textContent = String(member.full_name || 'Đạo Hữu');
+      const email = document.createElement('span');
+      email.textContent = String(member.email || '');
+      identity.append(name, email);
+
+      const details = document.createElement('div');
+      details.className = 'admin-disciple-details';
+      const visits = document.createElement('span');
+      visits.textContent = `Lượt ghé: ${Math.max(0, Number(member.visit_count) || 0)}`;
+      const lastSeen = document.createElement('span');
+      lastSeen.textContent = `Lần cuối: ${member.last_seen ? new Date(member.last_seen).toLocaleString('vi-VN') : '—'}`;
+      const messages = document.createElement('span');
+      messages.textContent = `Lời nhắn: ${counts.get(String(member.user_id)) || 0}`;
+      details.append(visits, lastSeen, messages);
+
+      const controls = document.createElement('div');
+      controls.className = 'admin-disciple-controls';
+      const title = document.createElement('input');
+      title.type = 'text';
+      title.className = 'admin-disciple-title-input';
+      title.setAttribute('list', 'admin-sect-title-options');
+      title.setAttribute('aria-label', `Cấp chức vụ của ${member.full_name || member.email || 'môn đồ'}`);
+      title.dataset.userId = String(member.user_id);
+      title.value = String(member.sect_title || 'Ngoại Môn Đệ Tử');
+      title.maxLength = 60;
+      const ban = document.createElement('button');
+      ban.type = 'button';
+      ban.className = member.is_banned ? 'admin-delete-button' : 'admin-secondary-button';
+      ban.dataset.discipleAction = 'ban';
+      ban.dataset.userId = String(member.user_id);
+      ban.dataset.banned = String(Boolean(member.is_banned));
+      ban.textContent = member.is_banned ? '🔓 Giải Ấn' : '🔒 Phong Ấn';
+      controls.append(title, ban);
+      row.append(avatar, identity, details, controls);
+      list.appendChild(row);
+    });
+  }
+
+  async function saveDiscipleTitle(input) {
+    if (!isAdminUser() || !supabaseClient) return;
+    const userId = input.dataset.userId;
+    const title = input.value.trim().slice(0, 60);
+    if (!userId || !title) {
+      input.value = 'Ngoại Môn Đệ Tử';
+      return;
+    }
+    input.disabled = true;
+    try {
+      const { data, error } = await supabaseClient.from('disciples')
+        .update({ sect_title: title })
+        .eq('user_id', userId)
+        .select('user_id')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error('Không tìm thấy môn đồ hoặc tài khoản quản trị không có quyền cập nhật.');
+      const member = state.adminDisciples.find(item => String(item.user_id) === userId);
+      if (member) member.sect_title = title;
+      updatePresence();
+      renderAdminOnlinePresence();
+      const status = document.getElementById('admin-disciples-status');
+      if (status) status.textContent = `Đã cập nhật chức vụ: ${title}.`;
+    } catch (error) {
+      const status = document.getElementById('admin-disciples-status');
+      if (status) status.textContent = `Không thể cập nhật chức vụ: ${error.message || 'Lỗi Supabase.'}`;
+    } finally {
+      input.disabled = false;
+    }
+  }
+
+  async function handleAdminDiscipleAction(button) {
+    if (!isAdminUser() || !supabaseClient) return;
+    const userId = button.dataset.userId;
+    const banned = button.dataset.banned !== 'true';
+    if (!userId) return;
+    button.disabled = true;
+    try {
+      const { data, error } = await supabaseClient.from('disciples')
+        .update({ is_banned: banned })
+        .eq('user_id', userId)
+        .select('user_id')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error('Không tìm thấy môn đồ hoặc tài khoản quản trị không có quyền cập nhật.');
+      const member = state.adminDisciples.find(item => String(item.user_id) === userId);
+      if (member) member.is_banned = banned;
+      renderAdminDisciples();
+      renderAdminOnlinePresence();
+      const status = document.getElementById('admin-disciples-status');
+      if (status) status.textContent = banned ? 'Đã phong ấn tài khoản.' : 'Đã giải ấn tài khoản.';
+    } catch (error) {
+      const status = document.getElementById('admin-disciples-status');
+      if (status) status.textContent = `Không thể cập nhật lệnh phong ấn: ${error.message || 'Lỗi Supabase.'}`;
+      button.disabled = false;
+    }
+  }
+
+  async function addAdminSpecialQuestion(form) {
+    if (!isAdminUser()) return;
+    const imageInput = document.getElementById('admin-special-question-image');
+    const periodInput = document.getElementById('admin-special-question-period');
+    const descriptionInput = document.getElementById('admin-special-question-description');
+    const status = document.getElementById('admin-special-question-status');
+    const imageUrl = String(imageInput && imageInput.value || '').trim();
+    const period = String(periodInput && periodInput.value || '').trim();
+    const description = String(descriptionInput && descriptionInput.value || '').trim();
+    try {
+      const parsed = new URL(imageUrl);
+      if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('URL ảnh chỉ được dùng HTTP hoặc HTTPS.');
+      if (!period || !description) throw new Error('Hãy nhập niên hiệu và gợi ý.');
+      const questions = Array.isArray(state.siteSettings.quiz_special_questions)
+        ? [...state.siteSettings.quiz_special_questions]
+        : [];
+      questions.push({
+        id: `special-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        image_url: parsed.href,
+        period,
+        description
+      });
+      await saveSiteSetting('quiz_special_questions', questions);
+      form.reset();
+      renderAdminSpecialQuestions();
+      status.textContent = 'Đã thêm câu hỏi đặc biệt vào bộ đề.';
+    } catch (error) {
+      if (status) status.textContent = `Không thể thêm câu hỏi: ${error.message || 'Lỗi lưu Supabase.'}`;
+    }
+  }
+
+  function renderAdminSpecialQuestions() {
+    const list = document.getElementById('admin-special-question-list');
+    if (!list) return;
+    list.replaceChildren();
+    (Array.isArray(state.siteSettings.quiz_special_questions) ? state.siteSettings.quiz_special_questions : [])
+      .forEach(question => {
+      const row = document.createElement('article');
+      row.className = 'admin-review-item';
+      const title = document.createElement('strong');
+      title.textContent = `${question.period || 'Giai đoạn'} · ${question.description || 'Câu hỏi đặc biệt'}`;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'admin-delete-button';
+      remove.dataset.specialQuestionDelete = String(question.id || '');
+      remove.textContent = 'Xóa';
+      row.append(title, remove);
+      list.appendChild(row);
+    });
+  }
+
+  async function removeAdminSpecialQuestion(questionId) {
+    if (!questionId || !isAdminUser() || !window.confirm('Xóa câu hỏi đặc biệt này khỏi bộ đề?')) return;
+    const questions = (state.siteSettings.quiz_special_questions || [])
+      .filter(question => String(question.id) !== String(questionId));
+    try {
+      await saveSiteSetting('quiz_special_questions', questions);
+      renderAdminSpecialQuestions();
+      setAdminToolStatus('admin-special-question-status', 'Đã xóa câu hỏi đặc biệt.');
+    } catch (error) {
+      setAdminToolStatus('admin-special-question-status', `Không thể xóa câu hỏi: ${error.message || 'Lỗi cập nhật.'}`, true);
+    }
+  }
+
+  async function resetDisciplesGameLeaderboard(button) {
+    if (!isAdminUser() || !supabaseClient ||
+        !window.confirm('Đặt lại toàn bộ điểm và combo trên Bảng Phong Thần?')) return;
+    button.disabled = true;
+    try {
+      const { error } = await supabaseClient.from('disciples')
+        .update({ quiz_best_score: 0, quiz_max_combo: 0 })
+        .not('user_id', 'is', null);
+      if (error) throw error;
+      await Promise.all([loadGameLeaderboard(), loadAdminGameScoresData()]);
+      setAdminToolStatus('admin-game-status', 'Đã đặt lại Bảng Phong Thần.');
+    } catch (error) {
+      setAdminToolStatus('admin-game-status', `Không thể đặt lại bảng xếp hạng: ${error.message || 'Lỗi cập nhật.'}`, true);
+    } finally {
+      button.disabled = false;
+    }
   }
 
   async function deleteAdminRecord(button) {
@@ -2658,7 +3272,7 @@
     }
     button.disabled = true;
     if (status) status.textContent = 'Đang lấy dữ liệu sao lưu…';
-    const tables = ['site_config', 'site_settings', 'memories', 'guestbook', 'milestone_comments', 'leaderboard'];
+    const tables = ['site_config', 'site_settings', 'memories', 'guestbook', 'milestone_comments', 'leaderboard', 'disciples'];
     try {
       const results = await Promise.all(tables.map(async table => {
         const { data, error } = await supabaseClient.from(table).select('*');
@@ -2718,6 +3332,7 @@
         activateAdminPanel(panelId);
         if (panelId === 'admin-panel-reviews') void loadAdminReviewData();
         if (panelId === 'admin-panel-game') void loadAdminGameScoresData();
+        if (panelId === 'admin-panel-disciples') void loadAdminDisciples();
         return;
       }
       const memoryTab = clicked.closest('.admin-memory-subtab[data-memory-panel-target]');
@@ -4886,7 +5501,7 @@
     return formatter.format(-Math.floor(seconds / 86400), 'day');
   }
 
-  function renderMilestoneComment(comment, profileByUser) {
+  function renderMilestoneComment(comment, profileByUser, discipleByUser) {
     const item = document.createElement('li');
     item.className = 'milestone-comment-item';
 
@@ -4903,6 +5518,13 @@
       badge.className = 'milestone-comment-rank';
       badge.textContent = getCultivationRank(getCultivationPoints(profile)).name;
       header.appendChild(badge);
+    }
+    const disciple = discipleByUser && discipleByUser.get(String(comment.user_id || ''));
+    if (disciple && disciple.sect_title) {
+      const titleBadge = document.createElement('span');
+      titleBadge.className = 'milestone-comment-sect-title';
+      titleBadge.textContent = String(disciple.sect_title);
+      header.appendChild(titleBadge);
     }
 
     const time = document.createElement('time');
@@ -4953,15 +5575,18 @@
       const comments = data || [];
       const userIds = [...new Set(comments.map(comment => String(comment.user_id || '')).filter(Boolean))];
       const profileByUser = new Map();
+      const discipleByUser = new Map();
       if (userIds.length) {
-        const { data: profiles, error: profileError } = await supabaseClient.from('user_cultivation')
-          .select('user_id,tu_vi')
-          .in('user_id', userIds);
-        if (profileError) {
-          console.warn('Không thể tải Cảnh Giới của người truyền âm:', profileError);
-        } else {
-          (profiles || []).forEach(profile => profileByUser.set(String(profile.user_id), profile));
-        }
+        const [profileResult, discipleResult] = await Promise.all([
+          supabaseClient.from('user_cultivation').select('user_id,tu_vi').in('user_id', userIds),
+          supabaseClient.from('disciples').select('user_id,sect_title').in('user_id', userIds)
+        ]);
+        if (profileResult.error) console.warn('Không thể tải Cảnh Giới của người truyền âm:', profileResult.error);
+        else (profileResult.data || []).forEach(profile =>
+          profileByUser.set(String(profile.user_id), profile));
+        if (discipleResult.error) console.warn('Không thể tải chức vụ của người truyền âm:', discipleResult.error);
+        else (discipleResult.data || []).forEach(disciple =>
+          discipleByUser.set(String(disciple.user_id), disciple));
       }
 
       list.replaceChildren();
@@ -4971,7 +5596,7 @@
         empty.textContent = 'Chưa có đạo hữu truyền âm ở mốc này. Hãy khai lời đầu tiên!';
         list.appendChild(empty);
       } else {
-        comments.forEach(comment => list.appendChild(renderMilestoneComment(comment, profileByUser)));
+        comments.forEach(comment => list.appendChild(renderMilestoneComment(comment, profileByUser, discipleByUser)));
       }
       const totalCount = Math.max(comments.length, Number(count) || 0);
       state.milestoneCommentCounts.set(stageId, totalCount);
@@ -5179,6 +5804,7 @@
       }
       return;
     }
+    if (!hasDiscipleFeatureAccess(status)) return;
 
     const user = authenticatedUser;
     submitButton.disabled = true;
@@ -6132,6 +6758,7 @@
       modal.setAttribute('aria-hidden', 'false');
       modal.inert = false;
     }
+    document.body.classList.add('lightbox-qi-active');
     document.body.style.overflow = 'hidden';
   }
 
@@ -6226,6 +6853,7 @@
       modal.inert = true;
       modal.hidden = true;
     }
+    document.body.classList.remove('lightbox-qi-active');
     const wrapper = document.getElementById('lightbox-img-wrapper');
     if (wrapper) wrapper.classList.remove('zoomed');
     setLightboxTransform(1, 0, 0);
@@ -6311,29 +6939,86 @@
       });
     });
 
+    (Array.isArray(state.siteSettings.quiz_special_questions) ? state.siteSettings.quiz_special_questions : [])
+      .forEach(question => {
+        const imageUrl = String(question.image_url || '').trim();
+        if (!imageUrl || seenImages.has(imageUrl) || !/^https?:\/\//i.test(imageUrl)) return;
+        seenImages.add(imageUrl);
+        pool.push({
+          imageUrl,
+          stageId: 'special',
+          stageTitle: 'Câu Hỏi Đặc Biệt',
+          period: String(question.period || ''),
+          title: 'Câu hỏi đặc biệt',
+          time: String(question.period || ''),
+          description: String(question.description || '')
+        });
+      });
+
     return pool;
   }
 
+  function getGameAnswer(question) {
+    const text = `${question.period || ''} ${question.time || ''}`;
+    const year = text.match(/\b(?:19|20)\d{2}\b/);
+    return year ? year[0] : String(question.period || question.time || 'Tuổi thơ').trim();
+  }
+
+  function stopGameTimer() {
+    if (state.game.timerId) window.clearInterval(state.game.timerId);
+    state.game.timerId = null;
+  }
+
+  function renderGameTimer() {
+    const countdown = document.getElementById('game-countdown');
+    const lives = document.getElementById('game-lives');
+    if (countdown) {
+      countdown.hidden = state.game.mode !== 'death';
+      countdown.textContent = `${state.game.timeLeft} giây`;
+      countdown.classList.toggle('is-urgent', state.game.timeLeft <= 5 && state.game.mode === 'death');
+    }
+    if (lives) {
+      lives.hidden = state.game.mode !== 'death';
+      lives.textContent = `❤️ ${'♥'.repeat(Math.max(0, state.game.lives))}${'♡'.repeat(Math.max(0, 3 - state.game.lives))}`;
+    }
+  }
+
   function startNewGame() {
+    if (!authenticatedUser) { openFeatureAuthSeal('game'); return; }
+    if (!hasDiscipleFeatureAccess()) return;
     const pool = buildGameImagePool();
     if (pool.length < 4) {
       alert('Không đủ hình ảnh để bắt đầu trò chơi.');
       return;
     }
 
-    // Pick 10 unique random images
+    stopGameTimer();
     const shuffledPool = shuffleArray(pool);
-    const questionsCount = Math.min(10, shuffledPool.length);
+    const questionsCount = state.game.mode === 'death'
+      ? Math.min(30, shuffledPool.length)
+      : Math.min(10, shuffledPool.length);
     state.game.questions = shuffledPool.slice(0, questionsCount);
+    state.game.pool = pool;
     state.game.currentIndex = 0;
     state.game.score = 0;
     state.game.streak = 0;
     state.game.bestStreak = 0;
+    state.game.combo = 0;
+    state.game.bestCombo = 0;
+    state.game.correctAnswers = 0;
+    state.game.lives = 3;
+    state.game.timeLeft = 15;
     state.game.resultSaved = false;
     state.game.hasAnswered = false;
+    state.game.usedPowerups = new Set();
+    state.game.powerups = { fifty: false, hint: false, freeze: false };
     setLeaderboardStatus('leaderboard-save-status', '');
 
-    // Reset UI screens
+    document.querySelectorAll('[data-game-powerup]').forEach(button => { button.disabled = false; });
+    document.querySelectorAll('[data-game-mode]').forEach(button => {
+      button.classList.toggle('active', button.dataset.gameMode === state.game.mode);
+      button.setAttribute('aria-pressed', String(button.dataset.gameMode === state.game.mode));
+    });
     document.getElementById('game-play-screen').style.display = 'flex';
     document.getElementById('game-result-screen').style.display = 'none';
 
@@ -6352,6 +7037,7 @@
   }
 
   function closeGameModal() {
+    stopGameTimer();
     const modal = document.getElementById('game-modal');
     if (modal) {
       modal.classList.remove('active');
@@ -6368,8 +7054,9 @@
   }
 
   function renderGameQuestion(index) {
+    stopGameTimer();
     const { questions } = state.game;
-    if (index >= questions.length) {
+    if (index >= questions.length || state.game.lives <= 0) {
       showGameResult();
       return;
     }
@@ -6378,13 +7065,16 @@
     if (gameDialog) gameDialog.scrollTop = 0;
 
     state.game.hasAnswered = false;
+    state.game.questionStartedAt = Date.now();
     const currentQ = questions[index];
+    state.game.timeLeft = 15;
 
-    // Update Status Bar
     document.getElementById('game-q-counter').textContent = `Câu ${index + 1} / ${questions.length}`;
-    document.getElementById('game-score-badge').textContent = `Điểm: ${state.game.score} | Chuỗi: ${state.game.streak}🔥`;
+    document.getElementById('game-score-badge').textContent =
+      `Điểm: ${state.game.score} | Combo: ${state.game.combo}🔥`;
     const progressPct = ((index + 1) / questions.length) * 100;
     document.getElementById('game-progress-fill').style.width = `${progressPct}%`;
+    renderGameTimer();
 
     // Hide reveal card
     const revealCard = document.getElementById('game-reveal-card');
@@ -6396,35 +7086,40 @@
       revealHint.textContent = '';
     }
 
-    // Set Image (Strictly no titles, dates, or stage hints)
     const imgEl = document.getElementById('game-current-img');
     imgEl.src = currentQ.imageUrl;
     imgEl.alt = 'Bức ảnh bí ẩn cần đoán năm';
 
     const yearInput = document.getElementById('game-year-input');
     const submitBtn = document.getElementById('game-year-submit');
+    const choices = document.getElementById('game-year-choices');
+    const correctAnswer = getGameAnswer(currentQ);
+    const answerOptions = Array.from(new Set([
+      correctAnswer,
+      ...shuffleArray(Array.from(new Set(state.game.pool.map(getGameAnswer)
+        .filter(answer => answer && answer !== correctAnswer)))).slice(0, 3)
+    ]));
+    state.game.choices = shuffleArray(answerOptions);
+    if (choices) {
+      choices.replaceChildren();
+      state.game.choices.forEach(answer => {
+        const choice = document.createElement('button');
+        choice.type = 'button';
+        choice.className = 'game-year-choice';
+        choice.textContent = answer;
+        choice.addEventListener('click', () => handleGameYearAnswer(currentQ, answer));
+        choices.appendChild(choice);
+      });
+    }
     if (yearInput) {
       yearInput.value = '';
       yearInput.disabled = false;
-      setTimeout(() => yearInput.focus(), 50);
     }
     if (submitBtn) submitBtn.disabled = false;
 
     if (yearInput) {
-      yearInput.oninput = () => {
-        yearInput.value = yearInput.value.replace(/\D/g, '').slice(0, 4);
-      };
-      yearInput.onpaste = event => {
-        const pastedText = event.clipboardData?.getData('text');
-        if (typeof pastedText !== 'string') return;
-
-        event.preventDefault();
-        const start = yearInput.selectionStart ?? yearInput.value.length;
-        const end = yearInput.selectionEnd ?? start;
-        const pastedDigits = pastedText.replace(/[^0-9]/g, '');
-        yearInput.value = `${yearInput.value.slice(0, start)}${pastedDigits}${yearInput.value.slice(end)}`.slice(0, 4);
-        yearInput.dispatchEvent(new Event('input', { bubbles: true }));
-      };
+      yearInput.maxLength = 40;
+      yearInput.oninput = () => { yearInput.value = yearInput.value.slice(0, 40); };
       yearInput.onkeydown = event => {
         if (event.key === 'Enter') {
           event.preventDefault();
@@ -6439,31 +7134,40 @@
 
     function submitYearAnswer() {
       if (!yearInput || state.game.hasAnswered) return;
-      const guessedYear = parseInt(yearInput.value.replace(/\D/g, ''), 10);
-      if (!Number.isFinite(guessedYear) || yearInput.value.length === 0) {
+      const guessedAnswer = yearInput.value.trim();
+      if (!guessedAnswer) {
         yearInput.focus();
         yearInput.classList.remove('game-input-shake');
-          window.requestAnimationFrame(() => yearInput.classList.add('game-input-shake'));
+        window.requestAnimationFrame(() => yearInput.classList.add('game-input-shake'));
         return;
       }
-      handleGameYearAnswer(currentQ, guessedYear);
+      handleGameYearAnswer(currentQ, guessedAnswer);
+    }
+
+    if (state.game.mode === 'death') {
+      state.game.timerId = window.setInterval(() => {
+        if (state.game.hasAnswered || state.game.mode !== 'death') return;
+        state.game.timeLeft = Math.max(0, state.game.timeLeft - 1);
+        renderGameTimer();
+        if (state.game.timeLeft <= 0) handleGameYearAnswer(currentQ, '', true);
+      }, 1000);
     }
   }
 
-  function handleGameYearAnswer(question, guessedYear) {
+  function handleGameYearAnswer(question, guessedAnswer, timedOut = false) {
     if (state.game.hasAnswered) return;
     state.game.hasAnswered = true;
+    stopGameTimer();
 
     const yearInput = document.getElementById('game-year-input');
     const submitBtn = document.getElementById('game-year-submit');
     if (yearInput) yearInput.disabled = true;
     if (submitBtn) submitBtn.disabled = true;
+    document.querySelectorAll('.game-year-choice').forEach(button => { button.disabled = true; });
 
-    const period = String(question.period || '');
-    const timeText = String(question.time || '');
-    const actualYearMatch = period.match(/\d{4}/) || timeText.match(/\d{4}/);
-    const actualYear = actualYearMatch ? parseInt(actualYearMatch[0], 10) : 2007;
-    const isCorrect = guessedYear === actualYear;
+    const actualAnswer = getGameAnswer(question);
+    const isCorrect = !timedOut && String(guessedAnswer || '').trim().toLocaleLowerCase('vi') ===
+      actualAnswer.toLocaleLowerCase('vi');
 
     const revealCard = document.getElementById('game-reveal-card');
     const statusIcon = document.getElementById('reveal-status-icon');
@@ -6510,12 +7214,22 @@
     ];
 
     if (isCorrect) {
-      state.game.score += 1;
+      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - state.game.questionStartedAt) / 1000));
+      state.game.correctAnswers += 1;
       state.game.streak += 1;
       state.game.bestStreak = Math.max(state.game.bestStreak, state.game.streak);
-      void awardCultivation(5, 'Trả lời đúng Đoán Năm', {
-        sourceElement: document.getElementById('game-year-submit')
-      });
+      state.game.combo += 1;
+      state.game.bestCombo = Math.max(state.game.bestCombo, state.game.combo);
+      const speedBonus = state.game.mode === 'death'
+        ? state.game.timeLeft * 10
+        : Math.max(0, 50 - Math.round(elapsedSeconds * 3));
+      const multiplier = state.game.mode === 'death' ? Math.min(3, Math.max(1, state.game.combo)) : 1;
+      state.game.score += (100 + speedBonus) * multiplier;
+      if (!isDiscipleBanned()) {
+        void awardCultivation(5, 'Trả lời đúng Đoán Năm', {
+          sourceElement: document.getElementById('game-year-submit')
+        });
+      }
       revealCard.classList.add('is-correct');
       revealHeader.className = 'reveal-header is-correct';
       statusIcon.textContent = '🎉';
@@ -6527,15 +7241,23 @@
         revealHint.hidden = true;
         revealHint.textContent = '';
       }
+      const gameDialog = document.querySelector('.year-guess-dialog');
+      if (gameDialog && state.game.combo >= 2) {
+        gameDialog.classList.remove('is-combo-lightning');
+        window.requestAnimationFrame(() => gameDialog.classList.add('is-combo-lightning'));
+        window.setTimeout(() => gameDialog.classList.remove('is-combo-lightning'), 900);
+      }
     } else {
       state.game.streak = 0;
+      state.game.combo = 0;
+      if (state.game.mode === 'death') state.game.lives = Math.max(0, state.game.lives - 1);
       revealCard.classList.add('is-wrong');
       let line;
       do { line = wrongLines[Math.floor(Math.random() * wrongLines.length)]; } while (line === state.game.lastWrongLine);
       state.game.lastWrongLine = line;
-      const hint = guessedYear < actualYear
-        ? `💡 Gợi ý: Năm thực tế LỚN HƠN ${guessedYear}`
-        : `💡 Gợi ý: Năm thực tế NHỎ HƠN ${guessedYear}`;
+      const hint = timedOut
+        ? `⏳ Hết thời gian! Đáp án là ${actualAnswer}.`
+        : `💡 Đáp án đúng: ${actualAnswer}`;
       revealHeader.className = 'reveal-header is-wrong';
       statusIcon.textContent = '😅';
       statusText.textContent = line;
@@ -6544,7 +7266,9 @@
         revealHint.hidden = false;
       }
     }
-    document.getElementById('game-score-badge').textContent = `Điểm: ${state.game.score} | Chuỗi: ${state.game.streak}🔥`;
+    renderGameTimer();
+    document.getElementById('game-score-badge').textContent =
+      `Điểm: ${state.game.score} | Combo: ${state.game.combo}🔥`;
 
     // Populate Reveal Memory Details
     document.getElementById('reveal-memory-title').textContent = question.title;
@@ -6553,9 +7277,9 @@
 
     // Next Button Text
     const nextBtn = document.getElementById('btn-game-next');
-    const isLast = (state.game.currentIndex === state.game.questions.length - 1);
+    const isLast = state.game.currentIndex === state.game.questions.length - 1 || state.game.lives <= 0;
     nextBtn.innerHTML = isLast 
-      ? `<span>Xem kết quả tổng kết</span> <span>🏆</span>` 
+      ? `<span>${state.game.lives <= 0 ? 'Kết thúc Độ Kiếp' : 'Xem kết quả tổng kết'}</span> <span>🏆</span>` 
       : `<span>Câu tiếp theo</span> <span>→</span>`;
 
     // Show Reveal Card
@@ -6656,10 +7380,10 @@
       place.textContent = `Hạng ${index + 1}`;
       const name = document.createElement('span');
       name.className = 'leaderboard-name';
-      name.textContent = String(row.display_name || 'Đạo Hữu');
+      name.textContent = String(row.full_name || row.display_name || 'Đạo Hữu');
       const score = document.createElement('span');
       score.className = 'leaderboard-score';
-      score.textContent = `${Number(row.best_score) || 0} điểm · ${Number(row.best_streak) || 0}🔥`;
+      score.textContent = `${Number(row.quiz_best_score ?? row.best_score) || 0} điểm · ${Number(row.quiz_max_combo ?? row.best_streak) || 0}🔥`;
       item.append(place, name, score);
       list.appendChild(item);
     });
@@ -6728,13 +7452,37 @@
     const statusId = 'game-leaderboard-status';
     setLeaderboardStatus(statusId, 'Đang triệu hồi Cao Thủ Đoán Niên Hiệu...');
     try {
-      const { data, error } = await supabaseClient.from('leaderboard')
-        .select('*')
-        .order('best_score', { ascending: false })
-        .order('best_streak', { ascending: false })
+      if (!authenticatedUser || !state.discipleStatusReady) {
+        const { data: legacyRows, error: legacyError } = await supabaseClient.from('leaderboard')
+          .select('user_id,display_name,best_score,best_streak')
+          .order('best_score', { ascending: false })
+          .order('best_streak', { ascending: false })
+          .limit(10);
+        if (legacyError) throw legacyError;
+        renderGameLeaderboard(legacyRows || []);
+        setLeaderboardStatus(statusId, '');
+        return;
+      }
+      const { data, error } = await supabaseClient.from('disciples')
+        .select('user_id,full_name,sect_title,quiz_best_score,quiz_max_combo')
+        .order('quiz_best_score', { ascending: false })
+        .order('quiz_max_combo', { ascending: false })
         .limit(10);
-      if (error) throw error;
-      renderGameLeaderboard(data || []);
+      if (error) {
+        console.warn('Chưa thể đọc Bảng Phong Thần từ Sổ Môn Đồ; thử bảng tương thích:', error);
+        const { data: legacyRows, error: legacyError } = await supabaseClient.from('leaderboard')
+          .select('user_id,display_name,best_score,best_streak')
+          .order('best_score', { ascending: false })
+          .order('best_streak', { ascending: false })
+          .limit(10);
+        if (legacyError) throw legacyError;
+        renderGameLeaderboard(legacyRows || []);
+        setLeaderboardStatus(statusId, 'Bảng đang hiển thị dữ liệu tương thích; cấp quyền đọc công khai cho Bảng Phong Thần để đồng bộ điểm từ disciples.');
+        return;
+      }
+      renderGameLeaderboard((data || []).filter(row =>
+        Number(row.quiz_best_score) > 0 || Number(row.quiz_max_combo) > 0
+      ));
       setLeaderboardStatus(statusId, '');
     } catch (error) {
       console.error('Không thể tải Cao Thủ Đoán Niên Hiệu:', error);
@@ -6784,31 +7532,61 @@
   }
 
   async function saveGameScore() {
-    if (!supabaseClient || !authenticatedUser) return;
+    if (!supabaseClient || !authenticatedUser || !state.discipleStatusReady || isDiscipleBanned()) return;
     setLeaderboardStatus('leaderboard-save-status', 'Đang khắc thành tích vào Thiên Kiêu Bảng…');
     try {
-      const { data: previous, error: readError } = await supabaseClient.from('leaderboard')
-        .select('*')
+      const { data: previous, error: readError } = await supabaseClient.from('disciples')
+        .select('quiz_best_score,quiz_max_combo')
         .eq('user_id', authenticatedUser.id)
         .maybeSingle();
       if (readError) throw readError;
 
-      const displayName = getUserDisplayName(authenticatedUser);
-      const score = Math.max(Number(previous && previous.best_score) || 0, state.game.score);
-      const bestStreak = Math.max(Number(previous && previous.best_streak) || 0, state.game.bestStreak);
-      const { error: saveError } = await supabaseClient.from('leaderboard').upsert({
+      const score = Math.max(Number(previous && previous.quiz_best_score) || 0, state.game.score);
+      const bestCombo = Math.max(Number(previous && previous.quiz_max_combo) || 0, state.game.bestCombo);
+      const { data: saved, error: saveError } = await supabaseClient.from('disciples').update({
+        quiz_best_score: score,
+        quiz_max_combo: bestCombo,
+        last_seen: new Date().toISOString()
+      }).eq('user_id', authenticatedUser.id).select('*').maybeSingle();
+      if (saveError) throw saveError;
+      if (!saved) {
+        const { data: inserted, error: insertError } = await supabaseClient.from('disciples').upsert({
         user_id: authenticatedUser.id,
-        display_name: displayName,
+          email: String(authenticatedUser.email || ''),
+          full_name: getMemberFullName(authenticatedUser),
+          avatar_url: getMemberAvatar(authenticatedUser),
+          sect_title: String(state.disciple.sect_title || 'Ngoại Môn Đệ Tử'),
+          is_banned: false,
+          visit_count: 1,
+          last_seen: new Date().toISOString(),
+          quiz_best_score: score,
+          quiz_max_combo: bestCombo
+        }, { onConflict: 'user_id' }).select('*').single();
+        if (insertError) throw insertError;
+        state.disciple = inserted;
+      } else {
+        state.disciple = saved;
+      }
+
+      let legacySynced = true;
+      const { error: legacyError } = await supabaseClient.from('leaderboard').upsert({
+        user_id: authenticatedUser.id,
+        display_name: getMemberFullName(authenticatedUser),
         best_score: score,
-        best_streak: bestStreak,
+        best_streak: bestCombo,
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' });
-      if (saveError) throw saveError;
+      if (legacyError) {
+        legacySynced = false;
+        console.warn('Điểm đã lưu vào Sổ Môn Đồ nhưng chưa đồng bộ sang bảng công khai tương thích:', legacyError);
+      }
 
-      setLeaderboardStatus('leaderboard-save-status', 'Thành tích đã được lưu vào Thiên Kiêu Bảng.');
+      setLeaderboardStatus('leaderboard-save-status', legacySynced
+        ? 'Thành tích đã được lưu vào Bảng Phong Thần.'
+        : 'Điểm đã lưu trong Sổ Môn Đồ; bảng công khai tương thích chưa đồng bộ được.');
     } catch (error) {
       console.error('Không thể lưu thành tích:', error);
-      setLeaderboardStatus('leaderboard-save-status', 'Chưa thể lưu thành tích. Kiểm tra cấu hình bảng leaderboard và thử lại.', true);
+      setLeaderboardStatus('leaderboard-save-status', 'Chưa thể lưu thành tích vào Sổ Môn Đồ. Kiểm tra quyền bảng disciples và thử lại.', true);
     }
   }
 
@@ -6817,27 +7595,30 @@
     const resultScreen = document.getElementById('game-result-screen');
     resultScreen.style.display = 'flex';
 
+    stopGameTimer();
     const score = state.game.score;
     const total = state.game.questions.length;
-    document.getElementById('result-score-highlight').textContent = `${score} / ${total}`;
+    const correct = state.game.correctAnswers;
+    document.getElementById('result-score-highlight').textContent =
+      `${score} điểm · ${correct}/${total} câu đúng`;
 
     let trophy = '🏆';
     let rank = '';
     let commentary = '';
 
-    if (score === 10) {
+    if (correct === total) {
       trophy = '👑';
       rank = 'BẬC THẦY KÝ ỨC TUYỆT ĐỐI';
       commentary = 'Trí nhớ đỉnh của chóp! Bạn nhớ từng chi tiết nhỏ nhất trong cuộc đời mình, như thể bạn có gắn chip nhớ SSD 1TB trong đầu vậy!';
-    } else if (score >= 8) {
+    } else if (correct >= Math.ceil(total * 0.8)) {
       trophy = '🏆';
       rank = 'CHIẾN THẦN HOÀI NIỆM';
       commentary = 'Phong độ quá đẳng cấp! Bạn chỉ nhầm một chút ở những góc chụp hiểm hóc thôi, ký ức của bạn cực kỳ sắc bén!';
-    } else if (score >= 6) {
+    } else if (correct >= Math.ceil(total * 0.6)) {
       trophy = '🌟';
       rank = 'NGƯỜI LỮ HÀNH TỈNH TÁO';
       commentary = 'Khá lắm! Đa số các mốc thời gian lớn bạn đều bắt chuẩn, chỉ có vài tấm quậy phá làm bạn hơi lú một tẹo.';
-    } else if (score >= 4) {
+    } else if (correct >= Math.ceil(total * 0.4)) {
       trophy = '🤔';
       rank = 'KÝ ỨC CHẠY MẠNG 3G';
       commentary = 'Hình như não bộ đang load dữ liệu qua mạng 3G chập chờn? Lúc nhớ lúc quên, nhưng nhìn lại ảnh vẫn thấy xúc động đúng không!';
@@ -7176,11 +7957,6 @@
         });
         section.hidden = false;
         section.classList.add('open');
-        if (targetId === 'ticket-station' && authenticatedUser) {
-          void ensureHtml2Canvas().catch(() => {
-            showToast('Chưa thể tải pháp bảo xuất ảnh vé; đạo hữu có thể thử lại khi tải vé.', '⚠️');
-          });
-        }
         const button = document.querySelector(`[data-utility-target="${targetId}"]`);
         if (button) button.setAttribute('aria-expanded', 'true');
         section.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -7198,6 +7974,7 @@
           openFeatureAuthSeal('ticket');
           return;
         }
+        if (targetId === 'ticket-station' && !hasDiscipleFeatureAccess()) return;
         if (!requireAuth(() => toggleUtility(targetId, true))) return;
       }
       toggleUtility(targetId, shouldOpen);
@@ -7226,6 +8003,7 @@
           openFeatureAuthSeal('ticket');
           return;
         }
+        if (!hasDiscipleFeatureAccess()) return;
         if (!requireAuth(() => toggleUtility('ticket-station', true))) return;
         toggleUtility('ticket-station', true);
       });
@@ -7239,6 +8017,7 @@
           openFeatureAuthSeal('ticket');
           return;
         }
+        if (!hasDiscipleFeatureAccess()) return;
         if (!requireAuth(() => toggleUtility('ticket-station', true))) return;
         toggleUtility('ticket-station', true);
       });
@@ -7311,6 +8090,7 @@
         openFeatureAuthSeal('game');
         return;
       }
+      if (!hasDiscipleFeatureAccess()) return;
       if (!requireAuth(startNewGame)) return;
       startNewGame();
     };
@@ -7325,6 +8105,52 @@
 
     const modalGameBackdrop = document.getElementById('modal-game-backdrop');
     if (modalGameBackdrop) modalGameBackdrop.addEventListener('click', closeGameModal);
+
+    document.querySelectorAll('[data-game-mode]').forEach(button => {
+      button.addEventListener('click', () => {
+        const mode = button.dataset.gameMode === 'death' ? 'death' : 'normal';
+        if (state.game.mode === mode) return;
+        state.game.mode = mode;
+        document.querySelectorAll('[data-game-mode]').forEach(item => {
+          const active = item.dataset.gameMode === mode;
+          item.classList.toggle('active', active);
+          item.setAttribute('aria-pressed', String(active));
+        });
+        if (document.getElementById('game-modal')?.classList.contains('active')) startAuthenticatedGame();
+      });
+    });
+
+    document.querySelectorAll('[data-game-powerup]').forEach(button => {
+      button.addEventListener('click', () => {
+        const power = button.dataset.gamePowerup;
+        const status = document.getElementById('game-hint-status');
+        if (!power || state.game.usedPowerups.has(power) || state.game.hasAnswered) return;
+        if (power === 'freeze' && state.game.mode !== 'death') {
+          if (status) {
+            status.textContent = 'Định Thần Phù chỉ có tác dụng trong chế độ Độ Kiếp Sinh Tử.';
+            status.hidden = false;
+          }
+          return;
+        }
+        state.game.usedPowerups.add(power);
+        button.disabled = true;
+        if (power === 'fifty') {
+          const correct = getGameAnswer(state.game.questions[state.game.currentIndex]);
+          const wrongChoices = Array.from(document.querySelectorAll('.game-year-choice'))
+            .filter(choice => choice.textContent !== correct);
+          shuffleArray(wrongChoices).slice(0, Math.max(0, wrongChoices.length - 1))
+            .forEach(choice => { choice.hidden = true; });
+          if (status) status.textContent = 'Thiên Cơ Kính đã khai mở hai đáp án sai.';
+        } else if (power === 'hint') {
+          const question = state.game.questions[state.game.currentIndex];
+          if (status) status.textContent = question.description || 'Tàn hồn này lưu dấu một khoảnh khắc trong hành trình tu luyện.';
+        } else if (power === 'freeze') {
+          stopGameTimer();
+          if (status) status.textContent = 'Định Thần Phù đã đóng băng đồng hồ của câu hỏi này.';
+        }
+        if (status) status.hidden = false;
+      });
+    });
 
     const btnGameNext = document.getElementById('btn-game-next');
     if (btnGameNext) {
@@ -7624,6 +8450,7 @@
     if (btnPrint) {
       btnPrint.addEventListener('click', () => {
         if (!requireAuth(() => btnPrint.click())) return;
+        if (!hasDiscipleFeatureAccess()) return;
         updateTicket(true);
         void awardCultivation(15, 'In Vé Lưu Niệm', {
           claimField: 'ticket_claimed',
@@ -7636,6 +8463,7 @@
     if (btnDownload) {
       btnDownload.addEventListener('click', async () => {
         if (!requireAuth(() => btnDownload.click())) return;
+        if (!hasDiscipleFeatureAccess()) return;
         let renderHtml2Canvas;
         try {
           renderHtml2Canvas = await ensureHtml2Canvas();
@@ -8133,10 +8961,15 @@
 
       // Trigger 2-second border highlight pulse
       targetElement.classList.remove('achievement-highlight-pulse');
+      const aura = document.createElement('span');
+      aura.className = 'achievement-highlight-aura';
+      aura.setAttribute('aria-hidden', 'true');
+      targetElement.appendChild(aura);
       window.requestAnimationFrame(() => targetElement.classList.add('achievement-highlight-pulse'));
 
       setTimeout(() => {
         targetElement.classList.remove('achievement-highlight-pulse');
+        aura.remove();
       }, 2000);
     }
 
@@ -8452,6 +9285,7 @@
     if (sealBtn) {
       sealBtn.addEventListener('click', async () => {
         if (!requireAuth(() => sealBtn.click())) return;
+        if (!hasDiscipleFeatureAccess()) return;
         const sender = senderInput.value.trim() || 'Người bạn bí ẩn';
         const tagVal = tagSelect.value;
         const tagText = tagSelect.options[tagSelect.selectedIndex].text;

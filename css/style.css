@@ -101,6 +101,359 @@
     word-break: break-word;
   }
 }
+
+.qi-cursor-layer,
+.world-transition-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  pointer-events: none;
+}
+
+.qi-cursor-layer {
+  overflow: hidden;
+  contain: strict;
+}
+
+.qi-cursor-particle {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #d7fff1 0, #40e2bd 40%, transparent 76%);
+  opacity: 0;
+  transform: translate3d(-50%, -50%, 0) scale(0.12);
+  transition: opacity 460ms ease-out, transform 460ms ease-out;
+  will-change: transform, opacity;
+}
+
+.qi-cursor-particle.is-gold {
+  background: radial-gradient(circle, #fff2be 0, #eac45e 42%, transparent 76%);
+}
+
+.qi-cursor-layer.is-suspended {
+  visibility: hidden;
+}
+
+.world-transition-veil {
+  z-index: 20000;
+  background: radial-gradient(ellipse at center, rgba(10, 48, 47, 0.96), rgba(4, 10, 17, 0.99));
+  opacity: 0;
+  transition: opacity 220ms ease;
+}
+
+.world-transition-veil.is-leaving {
+  opacity: 1;
+}
+
+.qi-reveal {
+  position: relative;
+  contain: layout paint;
+  transform: translate3d(0, 18px, 0);
+  opacity: 0.82;
+  transition: transform 480ms ease, opacity 480ms ease;
+}
+
+.qi-reveal.qi-revealed {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+}
+
+.qi-sheen {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.qi-sheen::after {
+  position: absolute;
+  inset: -35% auto -35% -45%;
+  width: 28%;
+  content: '';
+  background: linear-gradient(90deg, transparent, rgba(255, 231, 163, 0.18), transparent);
+  transform: translate3d(-160%, 0, 0) skewX(-16deg);
+  animation: qi-sheen-pass 7s ease-in-out infinite;
+}
+
+.qi-sheen[style*="paused"]::after {
+  animation-play-state: paused;
+}
+
+@keyframes qi-sheen-pass {
+  0%, 62% { transform: translate3d(-160%, 0, 0) skewX(-16deg); }
+  100% { transform: translate3d(520%, 0, 0) skewX(-16deg); }
+}
+
+#genesis-card {
+  transform: perspective(1000px) rotateX(var(--tilt-x, 0deg)) rotateY(var(--tilt-y, 0deg));
+  transition: transform 180ms ease-out;
+  will-change: transform;
+}
+
+.genesis-card-wrapper,
+.genesis-flip-card,
+.souvenir-ticket {
+  contain: layout paint;
+}
+
+.souvenir-ticket {
+  transform: perspective(1100px) rotateX(var(--holo-x, 0deg)) rotateY(var(--holo-y, 0deg));
+  transition: transform 180ms ease-out;
+  will-change: transform;
+}
+
+.souvenir-ticket::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  content: '';
+  opacity: var(--holo-opacity, 0);
+  pointer-events: none;
+  background: linear-gradient(118deg, transparent 22%, rgba(84, 242, 211, 0.15) 42%, rgba(255, 225, 143, 0.24) 52%, transparent 72%);
+  transition: opacity 180ms ease-out;
+  transform: translateZ(1px);
+}
+
+.game-mode-selector,
+.game-powerups,
+.game-year-choices,
+.admin-game-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+}
+
+.game-mode-selector,
+.game-powerups {
+  margin: 0.7rem 0;
+}
+
+.game-mode-button,
+.game-powerups button,
+.game-year-choice {
+  min-height: 40px;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid rgba(104, 230, 198, 0.35);
+  border-radius: 999px;
+  color: #e8fff8;
+  background: rgba(15, 44, 43, 0.76);
+  font: inherit;
+  cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease, background-color 160ms ease;
+}
+
+.game-mode-button.active,
+.game-year-choice:hover:not(:disabled) {
+  color: #fff4d0;
+  background: rgba(26, 108, 91, 0.8);
+}
+
+.game-powerups button:disabled,
+.game-mode-button:disabled,
+.game-year-choice:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.game-mode-button:hover:not(:disabled),
+.game-powerups button:hover:not(:disabled),
+.game-year-choice:hover:not(:disabled) {
+  transform: translate3d(0, -2px, 0);
+}
+
+.game-year-choices {
+  margin: 0.7rem 0 1rem;
+}
+
+.game-year-choice[hidden] {
+  display: none;
+}
+
+.game-status-info {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.game-countdown.is-urgent {
+  color: #ff9a72;
+}
+
+.game-lives {
+  color: #ff8c9a;
+  letter-spacing: 0.12em;
+}
+
+.game-hint-status {
+  padding: 0.65rem 0.8rem;
+  border: 1px solid rgba(240, 205, 119, 0.3);
+  border-radius: 12px;
+  color: #ffe8ad;
+  background: rgba(76, 57, 21, 0.28);
+}
+
+.year-guess-dialog {
+  position: relative;
+  isolation: isolate;
+}
+
+.year-guess-dialog.is-combo-lightning::after {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  content: '';
+  pointer-events: none;
+  background: linear-gradient(126deg, transparent 34%, rgba(255, 227, 151, 0.36) 48%, transparent 62%);
+  opacity: 0;
+  transform: translate3d(-100%, 0, 0);
+  animation: qi-combo-flash 760ms ease-out;
+}
+
+@keyframes qi-combo-flash {
+  20% { opacity: 0.85; }
+  100% { opacity: 0; transform: translate3d(100%, 0, 0); }
+}
+
+.admin-online-visitors,
+.admin-disciples-list {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.admin-online-row,
+.admin-disciple-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) minmax(120px, 0.8fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid rgba(89, 205, 183, 0.22);
+  border-radius: 14px;
+  background: rgba(7, 26, 29, 0.54);
+}
+
+.admin-online-avatar,
+.admin-disciple-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(80, 174, 151, 0.2);
+}
+
+.admin-online-identity,
+.admin-disciple-identity,
+.admin-disciple-details,
+.admin-disciple-controls {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.admin-online-identity span,
+.admin-disciple-identity span,
+.admin-disciple-details span {
+  overflow-wrap: anywhere;
+  color: rgba(235, 248, 243, 0.75);
+  font-size: 0.84rem;
+}
+
+.admin-online-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.admin-online-badges span {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgba(238, 204, 121, 0.3);
+  border-radius: 999px;
+  color: #f5dfaa;
+  font-size: 0.76rem;
+}
+
+.admin-disciple-row.is-banned {
+  border-color: rgba(242, 108, 108, 0.55);
+}
+
+.admin-disciple-title-input {
+  width: 100%;
+  min-width: 150px;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid rgba(89, 205, 183, 0.34);
+  border-radius: 9px;
+  color: inherit;
+  background: rgba(3, 18, 22, 0.72);
+}
+
+.admin-disciple-controls button {
+  white-space: nowrap;
+}
+
+.milestone-comment-sect-title {
+  padding: 0.15rem 0.45rem;
+  border: 1px solid rgba(232, 198, 116, 0.35);
+  border-radius: 999px;
+  color: #f2d795;
+  font-size: 0.72rem;
+}
+
+.lightbox-qi-active #lightbox-backdrop::after {
+  position: absolute;
+  inset: -18%;
+  content: '';
+  opacity: 0.45;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle, rgba(255, 224, 138, 0.8) 0 1px, transparent 2px),
+    radial-gradient(circle, rgba(95, 231, 195, 0.58) 0 1px, transparent 2px);
+  background-size: 132px 146px, 204px 186px;
+  background-position: 0 0, 60px 48px;
+  animation: lightbox-qi-drift 18s linear infinite;
+  will-change: transform, opacity;
+}
+
+@keyframes lightbox-qi-drift {
+  to { transform: translate3d(0, -42px, 0); }
+}
+
+@media (max-width: 700px) {
+  .admin-online-row,
+  .admin-disciple-row {
+    grid-template-columns: 38px minmax(0, 1fr);
+  }
+
+  .admin-online-badges,
+  .admin-disciple-details,
+  .admin-disciple-controls {
+    grid-column: 2;
+  }
+
+  .admin-disciple-controls {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qi-cursor-layer,
+  .world-transition-veil,
+  .qi-sheen,
+  .qi-sheen::after,
+  .lightbox-qi-active #lightbox-backdrop::after,
+  .qi-reveal,
+  #genesis-card,
+  .souvenir-ticket,
+  .year-guess-dialog.is-combo-lightning::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
 /* LINH CĂN BAR */
 .rpg-mainstat-bar {
   width: 100%;
@@ -2015,7 +2368,7 @@ html[data-theme="xianxia"] body.museum-body {
   font-weight: 700;
   letter-spacing: 0.3px;
   cursor: pointer;
-  transition: var(--transition);
+  transition: transform 0.3s ease, opacity 0.3s ease, color 0.3s ease;
   backdrop-filter: var(--glass-blur);
   box-shadow: 0 4px 16px rgba(245, 158, 11, 0.28);
   position: relative;
@@ -2030,13 +2383,13 @@ html[data-theme="xianxia"] body.museum-body {
   left: -55%;
   width: 38%;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
-  transform: skewX(-18deg);
+  transform: translate3d(0, 0, 0) skewX(-18deg);
   animation: archive-shimmer 3.6s ease-in-out infinite;
 }
 
 @keyframes archive-shimmer {
-  0%, 72% { left: -55%; }
-  100% { left: 125%; }
+  0%, 72% { transform: translate3d(0, 0, 0) skewX(-18deg); }
+  100% { transform: translate3d(475%, 0, 0) skewX(-18deg); }
 }
 
 .btn-open-archive:hover {
@@ -4827,23 +5180,31 @@ html[data-theme="xianxia"] body.museum-body {
   transform: translateX(4px);
 }
 
-/* Pulse Highlight Animation for target stages */
+/* Composite-only highlight for target stages */
 @keyframes achievementHighlightPulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
-    border-color: var(--bg-card-border);
-  }
-  50% {
-    box-shadow: 0 0 45px 12px rgba(245, 158, 11, 0.75), inset 0 0 25px rgba(245, 158, 11, 0.25);
-    border-color: #fbbf24;
-  }
+  0% { opacity: 0; transform: scale(0.985); }
+  24%, 68% { opacity: 0.8; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.015); }
 }
 
 .achievement-highlight-pulse {
-  animation: achievementHighlightPulse 1s ease-in-out 2 !important;
   position: relative;
   z-index: 2;
   border-radius: var(--radius-lg);
+}
+
+.achievement-highlight-aura {
+  position: absolute;
+  inset: -7px;
+  z-index: 10;
+  border: 1px solid rgba(255, 220, 127, 0.9);
+  border-radius: inherit;
+  box-shadow: 0 0 34px rgba(245, 158, 11, 0.42), inset 0 0 18px rgba(245, 158, 11, 0.2);
+  opacity: 0;
+  transform: scale(0.985);
+  animation: achievementHighlightPulse 1s ease-in-out 2;
+  pointer-events: none;
+  will-change: transform, opacity;
 }
 
 /* Toast Notification (RPG Achievements & Alerts) */
@@ -10747,7 +11108,7 @@ html[data-theme="xianxia"] .nav-btn-auth::before {
   inset: -30% auto -30% -55%;
   width: 38%;
   content: '';
-  transform: rotate(22deg);
+  transform: translate3d(0, 0, 0) rotate(22deg);
   background: linear-gradient(90deg, transparent, rgba(237, 255, 248, 0.48), rgba(255, 224, 138, 0.24), transparent);
   animation: emblem-awakening-sweep 7s ease-in-out infinite;
   pointer-events: none;
@@ -10793,8 +11154,8 @@ html[data-theme="xianxia"] .nav-btn-auth::before {
 }
 
 @keyframes emblem-awakening-sweep {
-  0%, 62% { left: -55%; }
-  100% { left: 125%; }
+  0%, 62% { transform: translate3d(0, 0, 0) rotate(22deg); }
+  100% { transform: translate3d(475%, 0, 0) rotate(22deg); }
 }
 
 /* Per-stage rotating avatar arrays, sized around the existing portrait. */
@@ -11681,10 +12042,8 @@ body {
 }
 
 @keyframes genesis-aura-breathe {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% { transform: translateY(-2px); }
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -2px; }
 }
 
 .hero-card-ornament,
@@ -13968,12 +14327,6 @@ body.modal-open :not(.modal):not(.modal *):not(.lightbox-modal):not(.lightbox-mo
   }
 }
 
-@property --xianxia-beam-angle {
-  syntax: "<angle>";
-  inherits: false;
-  initial-value: 0deg;
-}
-
 .home-cultivation-card {
   border-color: var(--border-color, var(--bg-card-border, rgba(255, 255, 255, 0.2)));
   background: var(--bg-glass, var(--bg-card, rgba(10, 28, 22, 0.55)));
@@ -14039,7 +14392,7 @@ body.modal-open :not(.modal):not(.modal *):not(.lightbox-modal):not(.lightbox-mo
   backdrop-filter: blur(14px) saturate(155%) !important;
   box-shadow: 0 12px 34px color-mix(in srgb, var(--accent-primary, #4ade80) 9%, transparent) !important;
   color: var(--text-primary, #f8fafc) !important;
-  transition: border-color 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
 .rpg-card.rpg-card-collapsible::before,
@@ -14053,7 +14406,7 @@ body.modal-open :not(.modal):not(.modal *):not(.lightbox-modal):not(.lightbox-mo
   border-radius: inherit;
   background:
     conic-gradient(
-      from var(--xianxia-beam-angle),
+      from 0deg,
       transparent 0deg 40deg,
       var(--accent-gold, #f3d37a) 45deg,
       var(--accent-primary, #4ade80) 50deg,
@@ -14069,6 +14422,7 @@ body.modal-open :not(.modal):not(.modal *):not(.lightbox-modal):not(.lightbox-mo
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   mask-composite: exclude;
   padding: 1.75px;
+  transform-origin: 50% 50%;
   animation: xianxia-beam-orbit 11s linear infinite;
 }
 
@@ -14080,6 +14434,7 @@ body.modal-open :not(.modal):not(.modal *):not(.lightbox-modal):not(.lightbox-mo
   z-index: 0 !important;
   filter: blur(6px);
   opacity: 0.48;
+  animation-direction: reverse;
 }
 
 .rpg-card.rpg-card-collapsible > * {
@@ -14324,7 +14679,7 @@ html[data-theme] .rpg-card.rpg-card-collapsible .rpg-expanded-title .stage-main-
 }
 
 @keyframes xianxia-beam-orbit {
-  to { --xianxia-beam-angle: 360deg; }
+  to { transform: rotate(360deg); }
 }
 
 @media (max-width: 600px) {

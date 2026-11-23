@@ -8,8 +8,8 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=72">
-  <link rel="stylesheet" href="css/style.css?v=72">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=73">
+  <link rel="stylesheet" href="css/style.css?v=73">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=JetBrains+Mono:wght@400;600;700&family=Noto+Serif:wght@600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -146,6 +146,21 @@
     <div class="archive-lock-actions"><button type="button" class="btn btn-primary" id="tongmon-login-btn">⚡ Mở Cổng Đăng Nhập</button><a class="archive-lock-dismiss" href="index.html">← Quay lại Đại Điện</a></div>
   </section>
 </main>
+<main id="tongmon-ban-lock" class="page-access-layout" hidden>
+  <section class="page-access-card" role="alert" aria-labelledby="tongmon-ban-title">
+    <span class="archive-lock-seal" aria-hidden="true">⛔</span>
+    <h1 id="tongmon-ban-title">Kết Giới Phong Ấn</h1>
+    <p>⚠️ Tài khoản của đạo hữu đã bị Tông Môn Phong Ấn!</p>
+    <a class="archive-lock-dismiss" href="index.html">← Quay lại Đại Điện</a>
+  </section>
+</main>
+<main id="tongmon-checking-lock" class="page-access-layout" hidden>
+  <section class="page-access-card" role="status" aria-live="polite">
+    <span class="archive-lock-seal" aria-hidden="true">◈</span>
+    <h1>Đang Xác Minh Linh Tịch</h1>
+    <p>Xin chờ Tông Môn kiểm tra quyền nhập môn của đạo hữu…</p>
+  </section>
+</main>
 <div id="tongmon-content" hidden>
   <main class="container tongmon-main">
     <header class="page-section-heading"><span class="admin-modal-kicker">TÔNG MÔN CÁC</span><h1>⚔️ Độ Kiếp &amp; Thẻ Đệ Tử</h1><p>Chỉ đạo hữu đã ghi danh mới có thể tham gia các pháp hội của tông môn.</p></header>
@@ -253,6 +268,7 @@
                       <div class="ticket-field">
                         <span class="field-k">NGƯỜI THAM QUAN:</span>
                         <span class="field-v visitor-name" id="ticket-disp-visitor">Khách tham quan ẩn danh</span>
+                        <span class="discipleship-title" id="ticket-disp-sect-title"></span>
                       </div>
                       <div class="ticket-field">
                         <span class="field-k">GIAI ĐOẠN YÊU THÍCH:</span>
@@ -359,10 +375,17 @@
         <button type="button" class="modal-close-btn" id="btn-close-game" aria-label="Đóng trò chơi">×</button>
       </div>
 
+      <div class="game-mode-selector" role="group" aria-label="Chọn chế độ chơi">
+        <button type="button" class="game-mode-button active" data-game-mode="normal">🧘 Tu Luyện Thường · 10 ải</button>
+        <button type="button" class="game-mode-button" data-game-mode="death">⚔️ Độ Kiếp Sinh Tử · 3 mạng</button>
+      </div>
+
       <!-- Game Status & Progress Bar -->
       <div class="game-status-bar" id="game-status-bar">
         <div class="game-status-info">
           <span class="game-q-counter" id="game-q-counter">Câu 1 / 10</span>
+          <span id="game-countdown" class="game-countdown" hidden>15 giây</span>
+          <span id="game-lives" class="game-lives" hidden></span>
         </div>
         <div class="game-progress-track">
           <div class="game-progress-fill" id="game-progress-fill" style="width: 10%;"></div>
@@ -371,6 +394,12 @@
 
       <!-- Game Playing Screen -->
       <div class="game-body" id="game-play-screen">
+        <div class="game-powerups" id="game-powerups">
+          <button type="button" data-game-powerup="fifty" aria-label="Thiên Cơ Kính: loại hai đáp án sai">🔮 Thiên Cơ Kính</button>
+          <button type="button" data-game-powerup="hint" aria-label="Mảnh Tàn Hồn: xem gợi ý">📜 Mảnh Tàn Hồn</button>
+          <button type="button" data-game-powerup="freeze" aria-label="Định Thần Phù: đóng băng đồng hồ">⏳ Định Thần Phù</button>
+        </div>
+        <p id="game-hint-status" class="game-hint-status" role="status" aria-live="polite" hidden></p>
         
         <!-- Secret Photo Box (Strictly no titles, dates, or stage hints) -->
         <div class="game-photo-box">
@@ -382,9 +411,10 @@
 
         <!-- Nhập năm trực tiếp bằng bàn phím / Enter -->
         <div class="game-year-input-wrap">
-          <input id="game-year-input" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Nhập năm (VD: 2022)..." autocomplete="off" aria-label="Nhập năm đoán">
+          <input id="game-year-input" type="text" maxlength="40" placeholder="Nhập năm hoặc giai đoạn (VD: 2022, Tuổi thơ)..." autocomplete="off" aria-label="Nhập năm hoặc giai đoạn đoán">
           <button type="button" class="btn btn-primary game-year-submit" id="game-year-submit">Kiểm tra</button>
         </div>
+        <div id="game-year-choices" class="game-year-choices" role="group" aria-label="Chọn niên hiệu"></div>
 
         <!-- Reveal Info Card (Shown after submitting an answer) -->
         <div class="game-reveal-card" id="game-reveal-card" style="display: none;">
@@ -430,6 +460,14 @@
 
     </div>
   </div>
+  <section id="disciples-game-board" class="disciples-game-board" aria-labelledby="disciples-game-board-title">
+    <div class="container public-leaderboard-card">
+      <span class="leaderboard-kicker">TÔNG MÔN CÁC • ĐỐ VUI ĐỘ KIẾP</span>
+      <h2 id="disciples-game-board-title">🏆 TOP 10 BẢNG PHONG THẦN</h2>
+      <ol id="disciples-game-leaderboard" class="leaderboard-list"></ol>
+      <p id="disciples-game-leaderboard-status" class="leaderboard-status" role="status" aria-live="polite"></p>
+    </div>
+  </section>
 <section id="public-leaderboard" class="public-leaderboard-section" aria-labelledby="leaderboard-title">
     <div class="container public-leaderboard-card">
       <span class="leaderboard-kicker">BẢNG VÀNG TU TIÊN</span>
@@ -571,8 +609,9 @@
       </div>
     </div>
   </footer>
-<script defer src="js/memories.js?v=72"></script>
+<script defer src="js/memories.js?v=73"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="js/app.js?v=72"></script>
+<script defer src="js/premium-effects.js?v=73"></script>
+<script defer src="js/app.js?v=73"></script>
 </body>
 </html>
