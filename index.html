@@ -9,7 +9,7 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=80">
-  <link rel="stylesheet" href="css/style.css?v=85">
+  <link rel="stylesheet" href="css/style.css?v=87">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -115,7 +115,7 @@
           <span class="brand-title">THIÊN MỆNH CHI THÀNH</span>
         </a>
         <div class="nav-account-actions">
-          <button type="button" class="nav-btn nav-cultivation-badge" id="nav-cultivation-badge" aria-label="Tu Vi Đạo Hữu" title="Mở Động Phủ Tu Luyện">✦ <span id="nav-cultivation-label">Phàm Nhân</span> • <span id="nav-cultivation-total">0</span></button>
+          <button type="button" class="nav-btn nav-cultivation-badge" id="nav-cultivation-badge" aria-label="Tu Vi Đạo Hữu" title="Mở Động Phủ Tu Luyện">✦ <span id="nav-cultivation-label">Phàm Nhân</span> • <span id="nav-cultivation-total">10</span></button>
           <button type="button" class="nav-btn nav-btn-auth" id="btn-header-auth" aria-haspopup="dialog" aria-controls="auth-modal">◈ Đăng nhập</button>
         </div>
       </div>
@@ -127,9 +127,9 @@
 
       <div class="nav-actions">
         <!-- Theme Switcher Dropdown (Nâng cấp Theme Switcher) -->
-        <button type="button" class="nav-btn nav-thien-co" id="nav-thien-co-btn" aria-haspopup="dialog" aria-controls="thienCoModal">
-        <span class="btn-icon">🔮</span>
-        <span class="btn-text">Thiên Cơ Lão Tổ</span>
+        <button type="button" class="nav-btn nav-btn-game" id="btn-nav-game" data-game-launch aria-haspopup="dialog" aria-controls="game-modal">
+        <span class="btn-icon">🎯</span>
+        <span class="btn-text">Đố Vui Độ Kiếp</span>
         </button>
         <a id="nav-tongmon-link" class="nav-btn nav-btn-game" href="tongmon.html" aria-label="Tông Môn Các: Độ Kiếp và Thẻ Đệ Tử">
           <span class="btn-icon">⚔️</span>
@@ -530,7 +530,7 @@
           <img class="home-cultivation-avatar" src="images/%E1%BA%A3nh%20ch%C3%ADnh/avt.jpg" alt="Ảnh đại diện Hải Thành Lão Tổ">
           <div class="home-cultivation-identity-copy">
             <h2 id="home-cultivation-title">Hải Thành Lão Tổ</h2>
-            <span class="home-cultivation-rank">👑 Chí Tôn • LV.9999</span>
+            <span class="home-cultivation-rank">👑 Chí Tôn • LV.99999</span>
             <span class="home-cultivation-qi-track" role="progressbar" aria-label="Linh lực tối đa" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><span></span></span>
           </div>
         </div>
@@ -745,13 +745,13 @@
               <span class="admin-modal-kicker">TU VI ĐẠO HỮU</span>
               <strong id="auth-cultivation-rank">Phàm Nhân Nhập Môn</strong>
             </div>
-            <p class="cultivation-total">Tổng tu vi: <strong id="auth-cultivation-total">0</strong></p>
+            <p class="cultivation-total">Tổng tu vi: <strong id="auth-cultivation-total">10</strong></p>
             <div class="cultivation-streak-row">
               <span class="cultivation-streak-badge" id="auth-cultivation-streak">🔥 Chuỗi 0 ngày</span>
             </div>
             <div class="cultivation-progress-wrap">
-              <progress id="auth-cultivation-progress" max="100" value="0" aria-label="Tiến độ cảnh giới"></progress>
-              <span id="auth-cultivation-progress-label">0 / 50 Tu Vi</span>
+              <progress id="auth-cultivation-progress" max="100" value="20" aria-label="Tiến độ cảnh giới"></progress>
+              <span id="auth-cultivation-progress-label">10 / 50 Tu Vi</span>
             </div>
             <p id="auth-cultivation-status" class="cultivation-status" role="status" aria-live="polite"></p>
             <h3 id="auth-cultivation-title">Nhiệm vụ khai mở tu vi</h3>
@@ -798,9 +798,10 @@
       </div>
     </div>
   </footer>
-<script defer src="js/memories-home.js?v=85"></script>
+<script defer src="js/memories-home.js?v=87"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="js/premium-effects.js?v=85"></script>
-<script defer src="js/app.js?v=85"></script>
+<script defer src="js/premium-effects.js?v=87"></script>
+<script defer src="js/game-modal.js?v=87"></script>
+<script defer src="js/app.js?v=87"></script>
 </body>
 </html>

@@ -94,6 +94,7 @@
   let suppressMusicClickAfterDrag = false;
   let pauseXianxiaAnimation = null;
   let html2CanvasPromise = null;
+  let appToastTimer = null;
   let adminToastTimer = null;
   let discipleNameToastTimer = null;
   let cultivationCardControlsBound = false;
@@ -177,7 +178,7 @@
     cultivation: {
       userId: null,
       profile: null,
-      tuVi: 0,
+      tuVi: 10,
       syncPromise: null,
       awardQueue: Promise.resolve(),
       pendingClaims: new Set()
@@ -496,12 +497,11 @@
     const displayedPoints = !authenticatedUser
       ? 0
       : isAdminUser()
-        ? 9999
-        : Math.max(0, Number(state.cultivation.tuVi) || 0);
+        ? 99999
+        : Math.max(10, Number(state.cultivation.tuVi) || 10);
     if (navTotal) navTotal.textContent = String(displayedPoints);
     if (navBadge && navLabel) {
       const isAdmin = isAdminUser();
-      const hideAdminPoints = isAdmin && state.featureToggles.hideAdminFromLeaderboard;
       const pointsRank = getCultivationRank(displayedPoints);
       const rankLabel = pointsRank.name
         .replace(' Nhập Môn', '')
@@ -509,7 +509,7 @@
         .replace(' Đại Năng', '');
       navLabel.textContent = rankLabel;
       if (navTotal) {
-        navTotal.hidden = hideAdminPoints;
+        navTotal.hidden = false;
         if (isAdmin) {
           navBadge.replaceChildren(document.createTextNode('👑 Chí Tôn • '), navTotal);
         } else {
@@ -522,11 +522,13 @@
         }
       }
       navBadge.setAttribute('aria-label', isAdmin
-        ? (hideAdminPoints ? 'Chí Tôn' : 'Chí Tôn • 9999')
+        ? 'Chí Tôn • 99999'
         : `${rankLabel} • ${displayedPoints}`);
     }
     if (!authenticatedUser) return;
-    const points = Math.max(0, Number(state.cultivation.tuVi) || 0);
+    const points = isAdminUser()
+      ? 99999
+      : Math.max(10, Number(state.cultivation.tuVi) || 10);
     if (streakBadge) {
       const streakDays = Math.max(0, Number(state.cultivation.profile && state.cultivation.profile.streak_days) || 0);
       streakBadge.textContent = `🔥 Chuỗi ${streakDays} ngày`;
@@ -541,7 +543,7 @@
       if (isAdminUser() || rank.next == null) {
         progress.value = 100;
         if (progressLabel) progressLabel.textContent = isAdminUser()
-          ? '9999 Tu Vi · Độ Kiếp Chí Tôn'
+          ? '99999 Tu Vi · Độ Kiếp Chí Tôn'
           : `${points} Tu Vi · Đã đạt cảnh giới tối cao`;
       } else {
         progress.value = Math.max(0, Math.min(100, ((points - rank.min) / (rank.next - rank.min)) * 100));
@@ -570,6 +572,35 @@
     toast.classList.add('show');
     if (cultivationToastTimer) clearTimeout(cultivationToastTimer);
     cultivationToastTimer = setTimeout(() => toast.classList.remove('show'), 3200);
+  }
+
+  function notifyToast(message, type = 'info') {
+    let toast = document.getElementById('app-notify-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'app-notify-toast';
+      toast.className = 'app-notify-toast';
+      toast.setAttribute('role', 'status');
+      toast.setAttribute('aria-live', 'polite');
+      document.body.appendChild(toast);
+    }
+    const normalizedType = ['success', 'warning', 'error'].includes(String(type))
+      ? String(type)
+      : 'info';
+    const icons = { success: '✨', warning: '⚠️', error: '⛔', info: 'ℹ️' };
+    const icon = document.createElement('span');
+    icon.className = 'app-notify-toast-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    icon.textContent = icons[normalizedType];
+    const text = document.createElement('span');
+    text.textContent = String(message || '');
+    toast.className = `app-notify-toast is-${normalizedType}`;
+    toast.replaceChildren(icon, text);
+    if (appToastTimer) window.clearTimeout(appToastTimer);
+    window.requestAnimationFrame(() => toast.classList.add('is-visible'));
+    appToastTimer = window.setTimeout(() => {
+      toast.classList.remove('is-visible');
+    }, 3600);
   }
 
   function spawnTuViBurst(sourceElement) {
@@ -872,7 +903,7 @@
     setVisibility('#nav-thien-co-btn', toggles.oracle);
     setVisibility('#nav-tongmon-link', toggles.ticket || toggles.game);
     setVisibility('#ticket-station', toggles.ticket);
-    setVisibility('#btn-nav-game', toggles.game);
+    setVisibility('[data-game-launch]', toggles.game);
     setVisibility('#global-audio-toggle', toggles.audio);
     const floatingMusicPlayer = document.getElementById('floating-bg-player');
     if (floatingMusicPlayer) floatingMusicPlayer.hidden = false;
@@ -1163,12 +1194,14 @@
 
   function applyCultivationProfile(profile) {
     const effectiveProfile = profile && isAdminUser()
-      ? { ...profile, tu_vi: 9999 }
+      ? { ...profile, tu_vi: 99999 }
       : profile;
     state.cultivation.profile = effectiveProfile || null;
-    state.cultivation.tuVi = Math.max(0, Number(
-      effectiveProfile && (effectiveProfile.cultivation_points ?? effectiveProfile.tu_vi)
-    ) || 0);
+    state.cultivation.tuVi = isAdminUser()
+      ? 99999
+      : Math.max(10, Number(
+        effectiveProfile && (effectiveProfile.cultivation_points ?? effectiveProfile.tu_vi)
+      ) || 10);
     state.cultivation.profileError = '';
     renderCultivationCard();
   }
@@ -1191,7 +1224,7 @@
       : Object.prototype.hasOwnProperty.call(changes, 'tu_vi')
         ? changes.tu_vi
         : values.cultivation_points ?? values.tu_vi;
-    const tuVi = Math.max(0, Number(changedTuVi) || 0);
+    const tuVi = isAdminUser(user) ? 99999 : Math.max(10, Number(changedTuVi) || 10);
     return {
       user_id: user.id,
       email: String(user.email || values.email || ''),
@@ -1210,7 +1243,7 @@
   }
 
   function getCultivationPoints(profile) {
-    return Math.max(0, Number(profile && (profile.cultivation_points ?? profile.tu_vi)) || 0);
+    return Math.max(10, Number(profile && (profile.cultivation_points ?? profile.tu_vi)) || 10);
   }
 
   async function fetchCultivationProfile(userId) {
@@ -1267,8 +1300,11 @@
 
     const streakDays = previousCheckin === shiftDateKey(today, -1) ? currentStreak + 1 : 1;
     const reward = isAdminUser(user) ? 0 : streakDays >= 7 ? 35 : streakDays >= 3 ? 20 : 10;
+    const rewardBalances = reward > 0
+      ? await rewardCultivationAndStones(reward, user)
+      : { tu_vi: 99999, spirit_stones: Number(state.disciple && state.disciple.spirit_stones) || 0 };
     const updatedProfile = buildCultivationPayload(user, profile, {
-      tu_vi: isAdminUser(user) ? 9999 : getCultivationPoints(profile) + reward,
+      tu_vi: rewardBalances.tu_vi,
       last_daily_claim: today,
       last_checkin_date: today,
       streak_days: streakDays
@@ -1278,7 +1314,7 @@
     applyCultivationProfile(updatedProfile);
     showCultivationToast(isAdminUser(user)
       ? `🔥 Tông Chủ duy trì chuỗi điểm danh ${streakDays} ngày.`
-      : `🔥 Chuỗi ${streakDays} ngày · +${reward} Tu Vi điểm danh`, '☀️');
+      : `🔥 Chuỗi ${streakDays} ngày · +${reward} Tu Vi & +${reward} Linh Thạch`, '☀️');
     if (reward > 0) spawnTuViBurst(document.getElementById('nav-cultivation-badge'));
     return true;
   }
@@ -1291,7 +1327,7 @@
     } else {
       state.cultivation.userId = user.id;
       state.cultivation.profile = null;
-      state.cultivation.tuVi = 0;
+      state.cultivation.tuVi = 10;
       state.cultivation.profileError = '';
       renderCultivationCard();
     }
@@ -1299,7 +1335,7 @@
     state.cultivation.syncPromise = (async () => {
       const profile = await fetchCultivationProfile(user.id);
       if (state.cultivation.userId !== user.id) return;
-      const syncedProfile = buildCultivationPayload(user, profile, isAdminUser(user) ? { tu_vi: 9999 } : {});
+      const syncedProfile = buildCultivationPayload(user, profile, isAdminUser(user) ? { tu_vi: 99999 } : {});
       await upsertCultivationProfile(syncedProfile);
       applyCultivationProfile(syncedProfile);
       const dailyClaim = state.cultivation.awardQueue.then(async () => {
@@ -1341,12 +1377,46 @@
     }
   }
 
+  async function rewardCultivationAndStones(points, user = authenticatedUser) {
+    if (!user || !supabaseClient || !Number.isInteger(points) || points <= 0) {
+      throw new Error('Phần thưởng Tu Vi và Linh Thạch không hợp lệ.');
+    }
+    const { data, error } = await supabaseClient.rpc('reward_cultivation_and_stones', {
+      p_points: points,
+      p_stones: points
+    });
+    if (error) throw error;
+    const result = Array.isArray(data) ? data[0] : data;
+    const tuVi = Number(result && result.tu_vi);
+    const spiritStones = Number(result && result.spirit_stones);
+    if (!Number.isFinite(tuVi) || !Number.isFinite(spiritStones)) {
+      throw new Error('Supabase không trả về số dư Tu Vi và Linh Thạch mới.');
+    }
+
+    if (authenticatedUser && authenticatedUser.id === user.id) {
+      setCurrentUserProfile({
+        ...(state.disciple || {}),
+        tu_vi: tuVi,
+        spirit_stones: spiritStones
+      }, true);
+      applyCultivationProfile({
+        ...(state.cultivation.profile || {}),
+        user_id: user.id,
+        tu_vi: tuVi,
+        cultivation_points: tuVi
+      });
+      renderDiscipleProfileTools();
+      refreshDiscipleshipUI();
+    }
+    return { tu_vi: tuVi, spirit_stones: spiritStones };
+  }
+
   async function applyCultivationAward(points, reason, options, userId) {
     if (!authenticatedUser || authenticatedUser.id !== userId) return false;
     const user = authenticatedUser;
     try {
       if (isAdminUser(user)) {
-        showCultivationToast('Tông Chủ đã đạt Chí Tôn • 9999 Tu Vi.', '👑');
+        showCultivationToast('Tông Chủ đã đạt Chí Tôn • 99999 Tu Vi.', '👑');
         return false;
       }
       const profile = await fetchCultivationProfile(user.id);
@@ -1372,16 +1442,16 @@
       }
 
       if (options.claimField) changes[options.claimField] = true;
+      const rewardBalances = await rewardCultivationAndStones(awardedPoints, user);
       const updatedProfile = buildCultivationPayload(user, profile, {
         ...changes,
-        tu_vi: getCultivationPoints(profile) + awardedPoints
+        tu_vi: rewardBalances.tu_vi
       });
-
       await upsertCultivationProfile(updatedProfile);
       if (authenticatedUser?.id !== user.id) return false;
 
       applyCultivationProfile({ ...(profile || {}), ...updatedProfile });
-      showCultivationToast(`+${awardedPoints} Tu Vi · ${reason}`, '✨');
+      showCultivationToast(`+${awardedPoints} Tu Vi & +${awardedPoints} Linh Thạch · ${reason}`, '✨');
       spawnTuViBurst(options.sourceElement);
       void loadCultivationLeaderboard();
       return true;
@@ -2012,7 +2082,17 @@
   }
 
   function isAdminUser(user = authenticatedUser) {
-    return String(user && user.email || '').toLowerCase() === ADMIN_EMAIL;
+    if (!user) return false;
+    if (String(user.email || '').toLowerCase() === ADMIN_EMAIL) return true;
+    const userId = String(user.id || '');
+    const profile = state.disciple &&
+      String(state.disciple.user_id || '') === userId
+      ? state.disciple
+      : currentUserProfile &&
+        String(currentUserProfile.user_id || '') === userId
+        ? currentUserProfile
+        : null;
+    return String(profile && profile.role || '').toLowerCase() === 'admin';
   }
 
   function getOrCreateDeviceId() {
@@ -2025,7 +2105,7 @@
     return deviceId;
   }
 
-  async function checkAndRegisterIp(user, isNewSignup) {
+  async function checkAndRegisterIp(isNewSignup) {
     let timeoutId = 0;
     let deviceId = '';
     try {
@@ -2034,8 +2114,7 @@
       const request = supabaseClient.rpc('check_and_register_ip', {
           p_ip: '',
           p_device_id: deviceId,
-          p_is_new_signup: Boolean(isNewSignup),
-          p_is_admin: isAdminUser(user)
+          p_is_new_signup: Boolean(isNewSignup)
         });
       const { data, error } = await Promise.race([
         request,
@@ -2195,7 +2274,7 @@
       status.textContent = `⚠️ ${message}`;
       status.classList.add('is-error');
     } else {
-      showToast(`⚠️ ${message}`, '🔒');
+      notifyToast(message, 'warning');
     }
     return false;
   }
@@ -2222,7 +2301,7 @@
     if (!authenticatedUser) return false;
     if (!state.discipleStatusReady) {
       if (status) status.textContent = 'Đang xác minh tư cách môn đồ, xin chờ một lát.';
-      else showToast('Đang xác minh tư cách môn đồ, xin chờ một lát.', '⏳');
+      else notifyToast('Đang xác minh tư cách môn đồ, xin chờ một lát.', 'info');
       return false;
     }
     return !isDiscipleBanned() || discipleBanMessage(status);
@@ -2286,10 +2365,11 @@
   function cacheDiscipleProfile(userId, profile) {
     if (!userId || !profile) return;
     try {
+      const frameId = normalizeFrameId(profile.avatar_frame || profile.active_frame);
       window.localStorage.setItem(`${DISCIPLE_PROFILE_CACHE_PREFIX}${userId}`, JSON.stringify({
         avatar_url: resolveAvatarUrl(profile.avatar_url),
-        active_frame: String(profile.active_frame || profile.avatar_frame || 'jade'),
-        avatar_frame: String(profile.avatar_frame || profile.active_frame || 'jade'),
+        active_frame: frameId,
+        avatar_frame: frameId,
         unlocked_frames: Array.isArray(profile.unlocked_frames) ? profile.unlocked_frames : ['jade'],
         spirit_stones: Math.max(0, Number(profile.spirit_stones) || 0)
       }));
@@ -2330,8 +2410,11 @@
   }
 
   function setCurrentUserProfile(profile, persist = false) {
+    const frameId = profile
+      ? normalizeFrameId(profile.avatar_frame || profile.active_frame)
+      : 'jade';
     currentUserProfile = profile
-      ? { ...profile, avatar_frame: String(profile.avatar_frame || profile.active_frame || 'jade') }
+      ? { ...profile, active_frame: frameId, avatar_frame: frameId }
       : null;
     state.disciple = currentUserProfile;
     if (persist && authenticatedUser && currentUserProfile &&
@@ -2674,12 +2757,15 @@
         user.email && user.email.split('@')[0] || ''),
       full_name: getMemberFullName(user),
       sect_title: 'Ngoại Môn Đệ Tử',
+      role: isAdminUser(user) ? 'admin' : 'disciple',
       spirit_stones: 20,
+      tu_vi: isAdminUser(user) ? 99999 : 10,
       is_banned: false,
       avatar_url: resolveAvatarUrl(''),
       visit_count: 0,
       unlocked_frames: ['jade'],
-      active_frame: 'jade'
+      active_frame: 'jade',
+      avatar_frame: 'default'
     };
     try {
       if (!supabaseClient) throw new Error('Dịch vụ Tông Môn chưa kết nối.');
@@ -2693,7 +2779,17 @@
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
-      if (readError) throw readError;
+      if (readError) {
+        await rejectIpRegistration(
+          user,
+          `Không thể xác minh hồ sơ để kiểm soát IP/thiết bị: ${readError.message || 'Lỗi Supabase.'}`
+        );
+        return;
+      }
+      if (existing && String(authenticatedUser && authenticatedUser.id || '') === String(user.id)) {
+        setCurrentUserProfile(existing);
+        renderAuthState(authenticatedUser);
+      }
       if (existing && existing.is_banned === true && !isAdminUser(user)) {
         setCurrentUserProfile(existing);
         state.discipleStatusReady = true;
@@ -2701,7 +2797,15 @@
         return;
       }
 
-      const ipCheck = await checkAndRegisterIp(user, !existing);
+      const needsSignupCheck = !existing && !isAdminUser(user);
+      if (needsSignupCheck) {
+        const signupCheck = await checkAndRegisterIp(true);
+        if (!signupCheck.allowed) {
+          await rejectIpRegistration(user, signupCheck.reason);
+          return;
+        }
+      }
+      const ipCheck = await checkAndRegisterIp(false);
       if (!ipCheck.allowed) {
         await rejectIpRegistration(user, ipCheck.reason);
         return;
@@ -2713,23 +2817,28 @@
         ...(existing || {}),
         user_id: user.id,
         email: String(user.email || ''),
+        role: String(existing && existing.role || (isAdminUser(user) ? 'admin' : 'disciple')),
         full_name: String(existing && existing.full_name || getMemberFullName(user)),
         username: String(existing && existing.username ||
           user.user_metadata && user.user_metadata.username || defaultProfile.username),
-        avatar_url: resolveAvatarUrl(existing && existing.avatar_url ||
-          getCachedDiscipleAvatar(user.id) || cachedProfile && cachedProfile.avatar_url || ''),
+        avatar_url: resolveAvatarUrl(existing && existing.avatar_url || ''),
         sect_title: String(existing && existing.sect_title || 'Ngoại Môn Đệ Tử'),
         is_banned: Boolean(existing && existing.is_banned),
         visit_count: Math.max(0, Number(existing && existing.visit_count) || 0) + (isNewVisit ? 1 : 0),
         spirit_stones: existing
           ? Math.max(0, Number(existing.spirit_stones) || 0)
           : 20,
+        tu_vi: isAdminUser(user)
+          ? 99999
+          : Math.max(10, Number(existing && existing.tu_vi) || 10),
         unlocked_frames: Array.isArray(existing && existing.unlocked_frames)
           ? existing.unlocked_frames
           : Array.isArray(cachedProfile && cachedProfile.unlocked_frames)
             ? cachedProfile.unlocked_frames : ['jade'],
-        active_frame: String(existing && existing.active_frame ||
-          cachedProfile && (cachedProfile.active_frame || cachedProfile.avatar_frame) || 'jade'),
+        active_frame: normalizeFrameId(existing &&
+          (existing.avatar_frame || existing.active_frame) || 'default'),
+        avatar_frame: normalizeFrameId(existing &&
+          (existing.avatar_frame || existing.active_frame) || 'default'),
         last_seen: new Date().toISOString()
       };
       const { data, error } = await supabaseClient.from('disciples')
@@ -2859,8 +2968,13 @@
   }
 
   function frameClass(frame) {
-    const allowed = DISCIPLE_FRAMES.some(item => item.id === frame);
-    return `frame-${allowed ? frame : 'jade'}`;
+    return `frame-${normalizeFrameId(frame)}`;
+  }
+
+  function normalizeFrameId(frame) {
+    const frameId = String(frame || '').trim().toLowerCase();
+    if (!frameId || frameId === 'default') return 'jade';
+    return DISCIPLE_FRAMES.some(item => item.id === frameId) ? frameId : 'jade';
   }
 
   function renderDiscipleProfileTools() {
@@ -2952,7 +3066,7 @@
         button.type = 'button';
         button.className = 'admin-secondary-button';
         button.dataset.frameId = frame.id;
-        if ((state.disciple.avatar_frame || state.disciple.active_frame) === frame.id) {
+        if (normalizeFrameId(state.disciple.avatar_frame || state.disciple.active_frame) === frame.id) {
           button.textContent = 'Đang trang bị';
           button.disabled = true;
         } else {
@@ -2997,27 +3111,6 @@
       if (status) status.textContent = message;
       console.error(message, error);
       return false;
-    }
-  }
-
-  async function awardDiscipleSpiritStones(amount, claimKey) {
-    if (!authenticatedUser || !state.discipleStatusReady || isDiscipleBanned() || !supabaseClient) return;
-    try {
-      const { error } = await supabaseClient.rpc('earn_quiz_spirit_stones', {
-        p_amount: amount,
-        p_claim_key: claimKey
-      });
-      if (error) throw error;
-      const { data, error: readError } = await supabaseClient.from('disciples').select('*')
-        .eq('user_id', authenticatedUser.id).maybeSingle();
-      if (readError) throw readError;
-      if (!data) throw new Error('Không tìm thấy hồ sơ môn đồ sau khi cộng Linh Thạch.');
-      setCurrentUserProfile(data, true);
-      renderDiscipleProfileTools();
-    } catch (error) {
-      console.warn('Không thể cộng Linh Thạch sau Đố Vui Độ Kiếp:', error);
-      const status = document.getElementById('disciple-avatar-status');
-      if (status) status.textContent = `Chưa thể cộng Linh Thạch: ${error.message || 'hãy kiểm tra cột spirit_stones trong Supabase.'}`;
     }
   }
 
@@ -3131,6 +3224,25 @@
     if (spinner) spinner.hidden = !isLoading;
   }
 
+  function encodeAvatarCanvas(canvas) {
+    const maxLength = 20 * 1024;
+    const qualities = [0.78, 0.68, 0.58, 0.48, 0.38, 0.28, 0.18];
+    for (const mimeType of ['image/webp', 'image/jpeg']) {
+      for (const quality of qualities) {
+        let dataUrl = '';
+        try {
+          dataUrl = canvas.toDataURL(mimeType, quality);
+        } catch (error) {
+          console.warn(`Không thể nén ảnh ${mimeType}:`, error);
+          break;
+        }
+        if (!dataUrl.startsWith(`data:${mimeType};base64,`)) break;
+        if (dataUrl.length <= maxLength) return dataUrl;
+      }
+    }
+    throw new Error('Ảnh sau khi nén vẫn vượt quá 20 KB. Hãy chọn ảnh khác.');
+  }
+
   function initUserProfileModal() {
     if (document.getElementById('userProfileModal')) return;
     const modal = document.createElement('div');
@@ -3239,6 +3351,31 @@
     document.body.classList.remove('user-profile-modal-open');
   }
 
+  function clearAuthSessionCache(userId) {
+    const visitKey = userId ? `thien-menh:disciple-visit:${userId}` : '';
+    const isAuthKey = key =>
+      /^sb-.*-auth-token(?:-code-verifier)?$/i.test(key) ||
+      /supabase.*(?:auth|session)|auth.*token/i.test(key);
+    try {
+      const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0];
+      window.localStorage.removeItem(`sb-${projectRef}-auth-token`);
+      for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
+        const key = window.localStorage.key(index);
+        if (key && isAuthKey(key)) window.localStorage.removeItem(key);
+      }
+    } catch (error) {
+      console.warn('Không thể dọn cache đăng nhập trong localStorage:', error);
+    }
+    try {
+      for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
+        const key = window.sessionStorage.key(index);
+        if (key && (key === visitKey || isAuthKey(key))) window.sessionStorage.removeItem(key);
+      }
+    } catch (error) {
+      console.warn('Không thể dọn cache đăng nhập trong sessionStorage:', error);
+    }
+  }
+
   async function signOutFromUserProfile(button) {
     const status = document.getElementById('user-profile-sign-out-status');
     if (!supabaseClient) {
@@ -3251,22 +3388,16 @@
     try {
       const { error } = await supabaseClient.auth.signOut();
       if (error) throw error;
-      try {
-        const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0];
-        window.localStorage.removeItem(`sb-${projectRef}-auth-token`);
-        if (userId) window.sessionStorage.removeItem(`thien-menh:disciple-visit:${userId}`);
-      } catch (error) {
-        console.warn('Không thể dọn bộ nhớ phiên đăng nhập sau khi đăng xuất:', error);
-      }
+      clearAuthSessionCache(userId);
       if (authenticatedUser) setAuthenticatedUser(null);
       activeAuthMode = 'login';
-      renderAuthState(null);
       setAuthMode('login');
       closeUserProfileModal();
-      showToast('Đã đăng xuất. Bạn đang ở chế độ Khách.', '🚪');
+      notifyToast('Đã đăng xuất. Bạn đang ở chế độ Khách.', 'success');
     } catch (error) {
       console.error('Không thể đăng xuất khỏi Hồ Sơ Cá Nhân:', error);
       if (status) status.textContent = `Không thể đăng xuất: ${error.message || 'Lỗi kết nối Supabase.'}`;
+      notifyToast('Chưa thể đăng xuất. Hãy thử lại khi kết nối ổn định.', 'error');
       if (button) button.disabled = false;
     }
   }
@@ -3300,7 +3431,7 @@
       if (!button || !authenticatedUser) return;
       if (!hasDiscipleFeatureAccess()) return;
       if (button.disabled || !button.dataset.avatarPath) return;
-      const finalUrl = new URL(button.dataset.avatarPath, window.location.href).href;
+      const finalUrl = button.dataset.avatarPath;
       void saveDiscipleAvatar(finalUrl);
     });
     if (upload && !upload.dataset.initialized) {
@@ -3333,8 +3464,8 @@
           const side = Math.min(image.naturalWidth, image.naturalHeight);
           if (!side) throw new Error('Ảnh không có kích thước hợp lệ.');
           const canvas = document.createElement('canvas');
-          canvas.width = 256;
-          canvas.height = 256;
+          canvas.width = 160;
+          canvas.height = 160;
           const context = canvas.getContext('2d');
           if (!context) throw new Error('Trình duyệt không hỗ trợ xử lý ảnh.');
           context.drawImage(image,
@@ -3344,40 +3475,11 @@
             side,
             0,
             0,
-            256,
-            256);
+            160,
+            160);
           URL.revokeObjectURL(source);
           source = '';
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-          if (!dataUrl.startsWith('data:image/jpeg;base64,')) {
-            throw new Error('Không thể nén ảnh sang định dạng JPEG.');
-          }
-
-          let finalUrl = dataUrl;
-          try {
-            if (!supabaseClient.storage) throw new Error('Supabase Storage chưa sẵn sàng.');
-            if (String(authenticatedUser && authenticatedUser.id || '') !== uploadUserId) {
-              throw new Error('Phiên đăng nhập đã thay đổi; hãy chọn lại ảnh.');
-            }
-            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
-            if (!blob) throw new Error('Không thể tạo tệp JPEG để tải lên Storage.');
-            const storagePath = `${uploadUserId}/avatar.jpg`;
-            const bucket = supabaseClient.storage.from('avatars');
-            const { error: storageError } = await bucket.upload(storagePath, blob, {
-              cacheControl: '3600',
-              contentType: 'image/jpeg',
-              upsert: true
-            });
-            if (storageError) throw storageError;
-            const { data: publicUrlData } = bucket.getPublicUrl(storagePath);
-            if (!publicUrlData || !publicUrlData.publicUrl) {
-              throw new Error('Không lấy được đường dẫn ảnh công khai từ Storage.');
-            }
-            const separator = publicUrlData.publicUrl.includes('?') ? '&' : '?';
-            finalUrl = `${publicUrlData.publicUrl}${separator}v=${Date.now()}`;
-          } catch (storageError) {
-            console.warn('Tải avatar lên Storage thất bại, chuyển sang lưu ảnh JPEG đã nén:', storageError);
-          }
+          const finalUrl = encodeAvatarCanvas(canvas);
           if (String(authenticatedUser && authenticatedUser.id || '') !== uploadUserId) {
             throw new Error('Phiên đăng nhập đã thay đổi; hãy chọn lại ảnh.');
           }
@@ -3408,13 +3510,26 @@
         status.classList.remove('is-error', 'is-warning');
       }
       try {
-        const { data, error } = await supabaseClient.rpc('equip_or_buy_frame', {
-          p_frame_id: frame.id,
-          p_cost: frame.cost,
-          p_is_admin: isAdminUser()
-        });
-        if (error) throw error;
-        let profile = data && typeof data === 'object' ? data : null;
+        let profile = null;
+        try {
+          const { data, error } = await supabaseClient.rpc('equip_or_buy_frame', {
+            p_frame_id: frame.id,
+            p_cost: frame.cost
+          });
+          if (error) throw error;
+          profile = data && typeof data === 'object' ? data : null;
+        } catch (rpcError) {
+          const { data, error } = await supabaseClient.from('disciples')
+            .update({ avatar_frame: frame.id })
+            .eq('user_id', userId)
+            .select('*')
+            .maybeSingle();
+          if (error) throw new Error(`${rpcError.message || 'RPC trang bị thất bại.'} · ${error.message}`);
+          if (!data || normalizeFrameId(data.avatar_frame || data.active_frame) !== frame.id) {
+            throw new Error(`${rpcError.message || 'RPC trang bị thất bại.'} · Khung này chưa được mở khóa.`);
+          }
+          profile = data;
+        }
         if (!profile || !profile.user_id) {
           const { data: refreshed, error: readError } = await supabaseClient.from('disciples')
             .select('*').eq('user_id', userId).maybeSingle();
@@ -3422,7 +3537,7 @@
           if (!refreshed) throw new Error('Không tìm thấy hồ sơ môn đồ sau khi trang bị khung viền.');
           profile = refreshed;
         }
-        const activeFrame = String(profile.avatar_frame || profile.active_frame || frame.id);
+        const activeFrame = normalizeFrameId(profile.avatar_frame || profile.active_frame || frame.id);
         const updatedProfile = {
           ...state.disciple,
           ...profile,
@@ -3431,7 +3546,10 @@
         };
         setCurrentUserProfile(updatedProfile, true);
         sectCommentState.rows.forEach(comment => {
-          if (String(comment.user_id || '') === userId) comment.active_frame = activeFrame;
+          if (String(comment.user_id || '') === userId) {
+            comment.active_frame = activeFrame;
+            comment.avatar_frame = activeFrame;
+          }
         });
         refreshDiscipleshipUI();
         renderDiscipleProfileTools();
@@ -3753,7 +3871,7 @@
     if (!supabaseClient) return null;
     try {
       const { data, error } = await supabaseClient.from('sect_public_disciples')
-        .select('user_id,full_name,avatar_url,active_frame,is_owner')
+        .select('user_id,full_name,avatar_url,active_frame,avatar_frame,role,is_owner')
         .eq('is_owner', true)
         .maybeSingle();
       if (error) throw error;
@@ -3765,7 +3883,7 @@
         setCurrentUserProfile({
           ...state.disciple,
           ...sectOwnerProfile,
-          avatar_frame: String(sectOwnerProfile.avatar_frame || sectOwnerProfile.active_frame || 'jade')
+          avatar_frame: normalizeFrameId(sectOwnerProfile.avatar_frame || sectOwnerProfile.active_frame)
         }, true);
         renderHeaderAccountButton(authenticatedUser);
       }
@@ -4128,16 +4246,16 @@
         const hasCurrentCultivation = state.cultivation.userId === currentUserId &&
           Boolean(state.cultivation.profile);
         const currentTuVi = hasCurrentCultivation
-          ? Number(state.cultivation.tuVi) || 0
-          : Number(savedProfile.tu_vi ?? savedProfile.cultivation_points) || 0;
+          ? Math.max(10, Number(state.cultivation.tuVi) || 10)
+          : Math.max(10, Number(savedProfile.tu_vi ?? savedProfile.cultivation_points) || 10);
         profilesByUserId.set(String(authenticatedUser.id), {
           ...savedProfile,
           user_id: authenticatedUser.id,
           full_name: getCurrentDiscipleName(),
           avatar_url: String(state.disciple.avatar_url || getCachedDiscipleAvatar(authenticatedUser.id) || ''),
           sect_title: String(state.disciple.sect_title || 'Đạo Hữu'),
-          active_frame: String(state.disciple.avatar_frame || state.disciple.active_frame || 'jade'),
-          avatar_frame: String(state.disciple.avatar_frame || state.disciple.active_frame || 'jade'),
+          active_frame: normalizeFrameId(state.disciple.avatar_frame || state.disciple.active_frame),
+          avatar_frame: normalizeFrameId(state.disciple.avatar_frame || state.disciple.active_frame),
           role: isAdminUser() ? 'admin' : 'disciple',
           is_owner: isAdminUser(),
           tu_vi: currentTuVi,
@@ -4151,12 +4269,12 @@
         if (profile.full_name) comment.user_name = String(profile.full_name);
         if (profile.sect_title) comment.sect_title = String(profile.sect_title);
         if (profile.active_frame || profile.avatar_frame) {
-          comment.active_frame = String(profile.avatar_frame || profile.active_frame);
+          comment.active_frame = normalizeFrameId(profile.avatar_frame || profile.active_frame);
           comment.avatar_frame = comment.active_frame;
         }
         comment.role = String(profile.role || (profile.is_owner ? 'admin' : 'disciple'));
         comment.is_owner = Boolean(profile.is_owner || comment.role === 'admin');
-        comment.tu_vi = Number(profile.tu_vi ?? profile.cultivation_points) || 0;
+        comment.tu_vi = Math.max(10, Number(profile.tu_vi ?? profile.cultivation_points) || 10);
         comment.cultivation_points = comment.tu_vi;
       });
       const byId = new Map(sectCommentState.rows.map(item => [String(item.id), item]));
@@ -4309,7 +4427,7 @@
   }
 
   function formatSectCommentCultivation(comment) {
-    const points = Math.max(0, Number(comment && (comment.cultivation_points ?? comment.tu_vi)) || 0);
+    const points = Math.max(10, Number(comment && (comment.cultivation_points ?? comment.tu_vi)) || 10);
     const rank = getCultivationRank(points).name
       .replace(' Nhập Môn', '')
       .replace(' Kỳ', '')
@@ -4355,7 +4473,7 @@
         user_name: String(state.disciple.full_name || state.disciple.username || getMemberFullName(authenticatedUser)),
         user_avatar: String(state.disciple.avatar_url || ''),
         sect_title: String(state.disciple.sect_title || 'Ngoại Môn Đệ Tử'),
-        active_frame: String(state.disciple.active_frame || 'jade'),
+        active_frame: normalizeFrameId(state.disciple.avatar_frame || state.disciple.active_frame),
         content,
         parent_id: replyRootId || null
       });
@@ -4920,18 +5038,25 @@
     renderAuthState(authenticatedUser);
     syncPageAccess();
     const discipleSync = authenticatedUser ? syncDiscipleForUser(authenticatedUser) : null;
+    const userForCultivationSync = authenticatedUser;
+    const cultivationSync = userForCultivationSync
+      ? Promise.resolve(discipleSync).then(() => {
+        if (String(authenticatedUser && authenticatedUser.id || '') !== String(userForCultivationSync.id)) return;
+        return syncCultivationForUser(userForCultivationSync);
+      })
+      : null;
     updatePresence();
     refreshVisibleMemoryLikes();
     initMilestoneComments();
     refreshSectMessaging();
     renderDiscipleProfileTools();
     if (authenticatedUser) {
-      void syncCultivationForUser(authenticatedUser);
+      void cultivationSync;
       requestLeaderboardLoad();
     } else {
       state.cultivation.userId = null;
       state.cultivation.profile = null;
-      state.cultivation.tuVi = 0;
+      state.cultivation.tuVi = 10;
       state.cultivation.profileError = '';
       state.cultivation.syncPromise = null;
       renderCultivationCard();
@@ -4941,7 +5066,6 @@
       const action = pendingAuthAction;
       pendingAuthAction = null;
       closeAuthModal();
-      const cultivationSync = state.cultivation.syncPromise;
       const requiredSyncs = [cultivationSync, discipleSync].filter(Boolean);
       if (requiredSyncs.length) void Promise.allSettled(requiredSyncs).then(action);
       else action();
@@ -6395,7 +6519,7 @@
           user_metadata: { display_name: existing.display_name || '' }
         };
         const nextProfile = buildCultivationPayload(targetUser, existing, {
-          tu_vi: String(existing.user_id) === String(authenticatedUser.id) ? 9999 : points
+          tu_vi: String(existing.user_id) === String(authenticatedUser.id) ? 99999 : points
         });
         await upsertCultivationProfile(nextProfile);
         if (String(existing.user_id) === String(authenticatedUser.id)) applyCultivationProfile(nextProfile);
@@ -6479,6 +6603,11 @@
     const signupForm = document.getElementById('auth-signup-form');
     if (!modal || !loginForm || !signupForm) return;
 
+    try {
+      getOrCreateDeviceId();
+    } catch (error) {
+      console.warn('Không thể lưu mã thiết bị:', error);
+    }
     renderAuthState(authenticatedUser);
     initDiscipleNameEditor();
     const oauthError = new URLSearchParams(window.location.search).get('error_description');
@@ -6526,6 +6655,7 @@
         googleButton.disabled = true;
         setAdminStatus('Đang mở cổng ghi danh Google…');
         try {
+          getOrCreateDeviceId();
           const { error } = await supabaseClient.auth.signInWithOAuth({
             provider: 'google',
             options: { redirectTo: `${window.location.origin}${window.location.pathname}` }
@@ -6645,7 +6775,7 @@
             starting_spirit_stones: 20
           }
         };
-        const ipCheck = await checkAndRegisterIp({ email }, true);
+        const ipCheck = await checkAndRegisterIp(true);
         reservationDeviceId = ipCheck.deviceId || '';
         if (!ipCheck.allowed) {
           throw new Error(ipCheck.reason || 'IP hoặc thiết bị này đã được liên kết với tài khoản khác.');
@@ -8801,7 +8931,12 @@
   function openFeatureAuthSeal(action) {
     const modal = document.getElementById('authSealModal');
     const authButton = document.getElementById('archive-lock-auth');
-    if (!modal || !authButton) return;
+    if (!modal || !authButton) {
+      openCommunityAuthGate(action === 'game'
+        ? 'tham gia Đố Vui Độ Kiếp và nhận thưởng'
+        : 'nhận Thẻ Đệ Tử');
+      return;
+    }
     const featureName = action === 'game' ? 'Đố Vui Độ Kiếp' : 'nhận Thẻ Đệ Tử';
     const message = modal.querySelector('.archive-lock-dialog p');
     if (message) {
@@ -9748,7 +9883,6 @@
         void awardCultivation(5, 'Trả lời đúng Đoán Năm', {
           sourceElement: document.getElementById('game-year-submit')
         });
-        void awardDiscipleSpiritStones(5, `${state.game.sessionId}:${state.game.currentIndex}`);
       }
       revealCard.classList.add('is-correct');
       revealHeader.className = 'reveal-header is-correct';
@@ -10496,15 +10630,17 @@
       });
     });
 
-    document.querySelectorAll('.utility-section').forEach(section => {
-      const closeBtn = document.createElement('button');
-      closeBtn.type = 'button';
-      closeBtn.className = 'utility-close-btn';
-      closeBtn.setAttribute('aria-label', 'Thu gọn khu vực');
-      closeBtn.textContent = '✕ Thu gọn';
-      closeBtn.addEventListener('click', () => closeUtility(section.id));
-      section.appendChild(closeBtn);
-    });
+    if (!document.getElementById('tongmon-content')) {
+      document.querySelectorAll('.utility-section').forEach(section => {
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'utility-close-btn';
+        closeBtn.setAttribute('aria-label', 'Thu gọn khu vực');
+        closeBtn.textContent = '✕ Thu gọn';
+        closeBtn.addEventListener('click', () => closeUtility(section.id));
+        section.appendChild(closeBtn);
+      });
+    }
 
     const navTicketBtn = document.getElementById('nav-ticket-btn');
     if (navTicketBtn) {
@@ -10604,11 +10740,9 @@
       if (!requireAuth(startNewGame)) return;
       startNewGame();
     };
-    const btnHeroGame = document.getElementById('btn-hero-game');
-    if (btnHeroGame) btnHeroGame.addEventListener('click', startAuthenticatedGame);
-
-    const btnNavGame = document.getElementById('btn-nav-game');
-    if (btnNavGame) btnNavGame.addEventListener('click', startAuthenticatedGame);
+    document.querySelectorAll('#btn-hero-game, [data-game-launch]').forEach(button => {
+      button.addEventListener('click', startAuthenticatedGame);
+    });
 
     const btnCloseGame = document.getElementById('btn-close-game');
     if (btnCloseGame) btnCloseGame.addEventListener('click', closeGameModal);
