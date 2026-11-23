@@ -13,8 +13,8 @@
   const SITE_NAME = 'Thiên Mệnh Chi Thành';
   const pageName = document.documentElement.dataset.page || document.body.dataset.page || 'home';
   const MUSIC_SESSION_KEY = 'thien-menh-chi-thanh:background-music';
-  const MUSIC_POSITION_KEY = 'thien-menh-chi-thanh:background-music-position';
-  const DISCIPLE_AVATAR_CACHE_PREFIX = 'thien-menh-chi-thanh:disciple-avatar:';
+  const MUSIC_POSITION_KEY = 'thien-menh-chi-thanh:background-music-position:v89';
+  const DISCIPLE_AVATAR_CACHE_PREFIX = 'tm_avatar_';
   const DISCIPLE_PROFILE_CACHE_PREFIX = 'thien-menh-chi-thanh:disciple-profile:';
   const DEVICE_ID_KEY = 'tm_device_id';
   const DEFAULT_DISCIPLE_AVATAR = 'images/avt/avt3.webp';
@@ -2490,8 +2490,9 @@
     const equippedAvatar = profile && (
       profile.equipped_avatar_url || profile.avatar_item_url || profile.active_avatar_url
     );
-    return resolveAvatarUrl(profile && profile.avatar_url || getCachedDiscipleAvatar(user.id) ||
-      equippedAvatar || getDefaultDiscipleAvatar(user));
+    if (profile) return resolveAvatarUrl(profile.avatar_url || equippedAvatar || '');
+    return resolveAvatarUrl(getCachedDiscipleAvatar(user.id) || equippedAvatar ||
+      getDefaultDiscipleAvatar(user));
   }
 
   function getSpiritStoneIconSVG(size = 16) {
@@ -2558,8 +2559,8 @@
       const bounds = cluster.getBoundingClientRect();
       const width = Math.max(1, bounds.width || 52);
       const height = Math.max(1, bounds.height || 52);
-      const maxLeft = Math.max(12, window.innerWidth - width - 12);
-      const maxTop = Math.max(12, window.innerHeight - height - 12);
+      const maxLeft = Math.max(12, window.innerWidth - width - 20);
+      const maxTop = Math.max(12, window.innerHeight - height - 22);
       const minTop = Math.min(72, maxTop);
       return {
         left: Math.max(12, Math.min(Number(left) || 0, maxLeft)),
@@ -2585,8 +2586,8 @@
     const snapToNearestEdge = (left, top, shouldSave = true) => {
       const bounded = clampPosition(left, top);
       const width = cluster.getBoundingClientRect().width || 52;
-      const rightEdge = Math.max(12, window.innerWidth - width - 12);
-      const snappedLeft = bounded.left + width / 2 <= window.innerWidth / 2 ? 12 : rightEdge;
+      const rightEdge = Math.max(12, window.innerWidth - width - 20);
+      const snappedLeft = bounded.left + width / 2 <= window.innerWidth / 2 ? 20 : rightEdge;
       const position = applyPosition(snappedLeft, bounded.top, shouldSave);
       positionMiniMusicControl();
       return position;
@@ -2601,11 +2602,8 @@
     } catch (error) {
       console.warn('Không thể khôi phục vị trí nút nhạc nền:', error);
     }
-    snapToNearestEdge(
-      savedPosition ? savedPosition.left : initialRect.left,
-      savedPosition ? savedPosition.top : initialRect.top,
-      true
-    );
+    if (savedPosition) snapToNearestEdge(savedPosition.left, savedPosition.top, true);
+    else applyPosition(initialRect.left, initialRect.top, true);
     initMiniMusicControl(button);
 
     let pointer = null;
@@ -2802,6 +2800,29 @@
       /^images\/avt\/avt[1-5]\.(?:webp|jpe?g|png)$/i.test(url);
   }
 
+  function ensureBackgroundMusicPlayer() {
+    let player = document.getElementById('floating-bg-player');
+    if (!player) {
+      player = document.createElement('aside');
+      player.id = 'floating-bg-player';
+      player.className = 'floating-bg-player';
+      player.setAttribute('aria-label', 'Trình phát nhạc nền');
+      player.innerHTML = `
+        <button id="bg-music-toggle-btn" class="bg-music-disk-btn" type="button" aria-label="Mở bảng điều khiển Âm Luật">
+          <span class="bg-disk-icon" aria-hidden="true"><svg viewBox="0 0 32 32" focusable="false"><path class="music-note" d="M17 4v17.1a5.7 5.7 0 1 1-2-4.3V8l12-2v12.1a5.7 5.7 0 1 1-2-4.3V3.2z"/><g class="music-wave"><path d="M28 12v8"/><path d="M31 10v12"/></g></svg></span>
+          <span class="bg-music-off-slash" aria-hidden="true"></span>
+        </button>
+        <div class="bg-music-info">
+          <span class="bg-music-tag">NHẠC NỀN TỔNG (SHUFFLE)</span>
+          <span class="bg-music-title" id="bg-music-current-title">Đang phát ngẫu nhiên...</span>
+        </div>
+        <button type="button" id="bg-music-next-btn" class="bg-music-skip-btn" title="Chuyển ngẫu nhiên bài kế tiếp">⏭️</button>
+        <button type="button" id="bg-music-collapse-btn" class="bg-music-collapse-btn" aria-label="Thu nhỏ trình phát nhạc">⌄</button>`;
+    }
+    if (player.parentElement !== document.body) document.body.appendChild(player);
+    return player;
+  }
+
   async function syncDiscipleForUser(user) {
     if (!user || !user.id || discipleSyncUserId === String(user.id)) return;
     discipleSyncUserId = String(user.id);
@@ -2839,13 +2860,11 @@
         .select('*')
         .eq('user_id', user.id)
         .maybeSingle();
-      let existing = null;
-      const existingProfileKnown = !readError;
       if (readError) {
-        console.warn('Không thể đọc hồ sơ môn đồ; không suy đoán đây là tài khoản đăng ký mới:', readError);
-      } else {
-        existing = existingData;
+        throw new Error(`Không thể đọc hồ sơ môn đồ trước khi đồng bộ: ${readError.message || 'Lỗi Supabase.'}`);
       }
+      const existing = existingData;
+      const existingProfileKnown = true;
       if (existing && String(authenticatedUser && authenticatedUser.id || '') === String(user.id)) {
         setCurrentUserProfile(existing);
         renderAuthState(authenticatedUser);
@@ -2906,13 +2925,26 @@
           (existing.avatar_frame || existing.active_frame) || 'default'),
         last_seen: new Date().toISOString()
       };
-      const { data, error } = await supabaseClient.from('disciples')
-        .upsert(payload, { onConflict: 'user_id' })
-        .select('*')
-        .maybeSingle();
+      let data;
+      let error;
+      if (existing) {
+        const existingAccountUpdate = { ...payload };
+        delete existingAccountUpdate.avatar_url;
+        ({ data, error } = await supabaseClient.from('disciples')
+          .update(existingAccountUpdate)
+          .eq('user_id', user.id)
+          .select('*')
+          .maybeSingle());
+      } else {
+        ({ data, error } = await supabaseClient.from('disciples')
+          .insert(payload)
+          .select('*')
+          .maybeSingle());
+      }
       if (error) throw error;
+      if (!data) throw new Error('Không thể tải lại hồ sơ môn đồ sau khi đồng bộ.');
       if (String(authenticatedUser && authenticatedUser.id || '') !== String(user.id)) return;
-      setCurrentUserProfile(data || payload, true);
+      setCurrentUserProfile(data, true);
       initDiscipleRealtime(user);
       renderHeaderAccountButton(authenticatedUser);
       requestLeaderboardLoad();
@@ -2921,7 +2953,6 @@
     } catch (error) {
       if (String(authenticatedUser && authenticatedUser.id || '') === String(user.id)) {
         discipleSyncUserId = '';
-        setCurrentUserProfile(defaultProfile, true);
         console.warn('Không thể đồng bộ Sổ Môn Đồ:', error);
       }
     } finally {
@@ -3195,58 +3226,32 @@
       status.textContent = 'Đang lưu ảnh đại diện và đồng bộ bình luận…';
       status.classList.remove('is-error', 'is-warning', 'is-success');
     }
-    let rpcSaved = false;
-    let rpcError = null;
-    if (typeof supabaseClient.rpc === 'function') {
-      try {
-        const { error } = await supabaseClient.rpc('update_disciple_avatar', {
-          p_avatar_url: avatarUrl
-        });
-        if (error) rpcError = error;
-        else rpcSaved = true;
-      } catch (error) {
-        rpcError = error;
-      }
-    }
-
-    let profile = null;
-    let profileError = null;
     try {
-      const { data, error } = await supabaseClient.from('disciples')
-        .update({ avatar_url: avatarUrl })
-        .eq('user_id', userId)
-        .select('*')
-        .maybeSingle();
-      if (error) profileError = error;
-      else profile = data;
+      const { data, error } = await supabaseClient.rpc('update_disciple_avatar', {
+        p_avatar_url: avatarUrl
+      });
+      if (error) throw error;
+      if (!data || data.ok !== true) {
+        throw new Error(data && data.message || 'Supabase không xác nhận đã lưu ảnh đại diện.');
+      }
     } catch (error) {
-      profileError = error;
-    }
-    if (profileError && !rpcSaved) {
-      const details = [rpcError && rpcError.message, profileError.message].filter(Boolean).join(' · ');
-      const message = `Không thể lưu ảnh đại diện: ${details || 'Lỗi Supabase.'}`;
+      const message = `Không thể lưu ảnh đại diện: ${error.message || 'Lỗi Supabase.'}`;
       if (status) {
         status.textContent = message;
         status.classList.add('is-error');
+        status.classList.remove('is-warning', 'is-success');
       }
-      console.error(message, { rpcError, profileError });
+      console.error(message, error);
       return false;
-    }
-    if (!profile && !rpcSaved) {
-      const message = 'Không tìm thấy hồ sơ môn đồ để cập nhật ảnh đại diện.';
-      if (status) {
-        status.textContent = message;
-        status.classList.add('is-error');
-      }
-      return false;
-    }
-    if (profileError && rpcSaved) {
-      console.warn('RPC đã lưu ảnh nhưng không thể đọc lại hồ sơ môn đồ:', profileError);
     }
 
-    if (String(authenticatedUser && authenticatedUser.id || '') !== userId) return true;
-    setCurrentUserProfile(profile || { ...(state.disciple || {}), user_id: userId, avatar_url: avatarUrl }, true);
     cacheDiscipleAvatar(userId, avatarUrl);
+    if (String(authenticatedUser && authenticatedUser.id || '') !== userId) return true;
+    setCurrentUserProfile({
+      ...(currentUserProfile || state.disciple || {}),
+      user_id: userId,
+      avatar_url: avatarUrl
+    }, true);
     sectChatState.conversations.forEach(conversation => {
       if (String(conversation.user_id) === userId) conversation.avatar_url = avatarUrl;
     });
@@ -3265,15 +3270,12 @@
     renderSectComments();
     renderDiscipleProfileTools();
 
-    const commentsSynced = rpcSaved;
-    const commentSyncError = rpcError;
-    if (commentsSynced && sectCommentState.rows.length) await loadSectComments(false);
+    const commentsSynced = true;
+    if (sectCommentState.rows.length) await loadSectComments(false);
     if (status) {
-      status.textContent = commentsSynced
-        ? '✨ Đã lưu ảnh đại diện và cập nhật ảnh trong Đàm Đạo Các!'
-        : `Ảnh đại diện đã lưu; chưa đồng bộ được ảnh bình luận: ${commentSyncError && commentSyncError.message || 'RPC chưa sẵn sàng.'}`;
-      status.classList.toggle('is-warning', !commentsSynced);
+      status.textContent = '✨ Đã lưu ảnh đại diện và cập nhật ảnh trong Đàm Đạo Các!';
       status.classList.toggle('is-success', commentsSynced);
+      status.classList.remove('is-error', 'is-warning');
     }
     return true;
   }
@@ -3290,22 +3292,25 @@
   }
 
   function encodeAvatarCanvas(canvas) {
-    const maxLength = 20 * 1024;
-    const qualities = [0.78, 0.68, 0.58, 0.48, 0.38, 0.28, 0.18];
-    for (const mimeType of ['image/webp', 'image/jpeg']) {
-      for (const quality of qualities) {
-        let dataUrl = '';
-        try {
-          dataUrl = canvas.toDataURL(mimeType, quality);
-        } catch (error) {
-          console.warn(`Không thể nén ảnh ${mimeType}:`, error);
-          break;
-        }
-        if (!dataUrl.startsWith(`data:${mimeType};base64,`)) break;
-        if (dataUrl.length <= maxLength) return dataUrl;
+    const maxLength = 18 * 1024;
+    const attempts = [
+      ['image/webp', 0.75],
+      ['image/jpeg', 0.75],
+      ...[0.68, 0.58, 0.48, 0.38, 0.28, 0.18]
+        .flatMap(quality => [['image/webp', quality], ['image/jpeg', quality]])
+    ];
+    for (const [mimeType, quality] of attempts) {
+      let dataUrl = '';
+      try {
+        dataUrl = canvas.toDataURL(mimeType, quality);
+      } catch (error) {
+        console.warn(`Không thể nén ảnh ${mimeType}:`, error);
+        continue;
       }
+      if (!dataUrl.startsWith(`data:${mimeType};base64,`)) continue;
+      if (dataUrl.length <= maxLength) return dataUrl;
     }
-    throw new Error('Ảnh sau khi nén vẫn vượt quá 20 KB. Hãy chọn ảnh khác.');
+    throw new Error('Ảnh sau khi nén vẫn vượt quá 18 KB. Hãy chọn ảnh khác.');
   }
 
   function initUserProfileModal() {
@@ -3529,8 +3534,8 @@
           const side = Math.min(image.naturalWidth, image.naturalHeight);
           if (!side) throw new Error('Ảnh không có kích thước hợp lệ.');
           const canvas = document.createElement('canvas');
-          canvas.width = 160;
-          canvas.height = 160;
+          canvas.width = 140;
+          canvas.height = 140;
           const context = canvas.getContext('2d');
           if (!context) throw new Error('Trình duyệt không hỗ trợ xử lý ảnh.');
           context.drawImage(image,
@@ -3540,8 +3545,8 @@
             side,
             0,
             0,
-            160,
-            160);
+            140,
+            140);
           URL.revokeObjectURL(source);
           source = '';
           const finalUrl = encodeAvatarCanvas(canvas);
@@ -5538,14 +5543,21 @@
         }
         const deleteButton = target && target.closest('[data-admin-delete-table]');
         if (deleteButton) void deleteAdminRecord(deleteButton);
-        const discipleAction = target && target.closest('[data-disciple-action]');
-        if (discipleAction) void handleAdminDiscipleAction(discipleAction);
         const specialDelete = target && target.closest('[data-special-question-delete]');
         if (specialDelete) void removeAdminSpecialQuestion(specialDelete.dataset.specialQuestionDelete);
       });
       dashboard.addEventListener('change', event => {
         const target = event.target instanceof HTMLInputElement ? event.target : null;
         if (target && target.matches('.admin-disciple-title-input')) void saveDiscipleTitle(target);
+      });
+    }
+    const discipleList = document.getElementById('admin-disciples-list');
+    if (discipleList && !discipleList.dataset.banActionsInitialized) {
+      discipleList.dataset.banActionsInitialized = 'true';
+      discipleList.addEventListener('click', event => {
+        const target = event.target instanceof Element ? event.target : null;
+        const action = target && target.closest('[data-disciple-action="ban"]');
+        if (action && discipleList.contains(action)) void handleAdminDiscipleAction(action);
       });
     }
     initAdminMemoryPreview();
@@ -5763,7 +5775,7 @@
     try {
       while (true) {
         const { data, error } = await supabaseClient.from('disciples')
-          .select('user_id,email,full_name,avatar_url,sect_title,is_banned,visit_count,last_seen,quiz_best_score,quiz_max_combo')
+          .select('user_id,email,full_name,avatar_url,sect_title,is_banned,tu_vi,cultivation_points,visit_count,last_seen,quiz_best_score,quiz_max_combo')
           .order('last_seen', { ascending: false })
           .range(offset, offset + 999);
         if (error) throw error;
@@ -5839,17 +5851,25 @@
       name.textContent = String(member.full_name || 'Đạo Hữu');
       const email = document.createElement('span');
       email.textContent = String(member.email || '');
-      identity.append(name, email);
+      const userId = document.createElement('span');
+      userId.textContent = `ID: ${String(member.user_id || '—')}`;
+      const statusBadge = document.createElement('span');
+      statusBadge.className = `admin-disciple-status-badge${member.is_banned ? ' is-banned' : ''}`;
+      statusBadge.textContent = member.is_banned ? '⛔ Đã Phong Ấn' : '✅ Hoạt động';
+      identity.append(name, email, userId, statusBadge);
 
       const details = document.createElement('div');
       details.className = 'admin-disciple-details';
+      const cultivation = Math.max(10, Number(member.cultivation_points ?? member.tu_vi) || 10);
+      const rank = document.createElement('span');
+      rank.textContent = `Cảnh giới: ${getCultivationRank(cultivation).name} · ${cultivation} Tu Vi`;
       const visits = document.createElement('span');
       visits.textContent = `Lượt ghé: ${Math.max(0, Number(member.visit_count) || 0)}`;
       const lastSeen = document.createElement('span');
       lastSeen.textContent = `Lần cuối: ${member.last_seen ? new Date(member.last_seen).toLocaleString('vi-VN') : '—'}`;
       const messages = document.createElement('span');
       messages.textContent = `Lời nhắn: ${counts.get(String(member.user_id)) || 0}`;
-      details.append(visits, lastSeen, messages);
+      details.append(rank, visits, lastSeen, messages);
 
       const controls = document.createElement('div');
       controls.className = 'admin-disciple-controls';
@@ -5866,8 +5886,9 @@
       ban.className = member.is_banned ? 'admin-delete-button' : 'admin-secondary-button';
       ban.dataset.discipleAction = 'ban';
       ban.dataset.userId = String(member.user_id);
+      ban.dataset.id = String(member.user_id);
       ban.dataset.banned = String(Boolean(member.is_banned));
-      ban.textContent = member.is_banned ? '🔓 Giải Ấn' : '🔒 Phong Ấn';
+      ban.textContent = member.is_banned ? '🔓 Giải Ấn' : '🔨 Phong Ấn';
       controls.append(title, ban);
       row.append(avatar, identity, details, controls);
       list.appendChild(row);
@@ -5907,30 +5928,53 @@
 
   async function handleAdminDiscipleAction(button) {
     if (!isAdminUser() || !supabaseClient) return;
-    const userId = button.dataset.userId;
-    const banned = button.dataset.banned !== 'true';
-    if (!userId || !window.confirm(banned
-      ? 'Phong ấn tài khoản môn đồ này?'
-      : 'Giải ấn tài khoản môn đồ này?')) return;
+    const row = button.closest('.admin-disciple-row');
+    const userId = String(button.dataset.userId || button.dataset.id ||
+      row && (row.dataset.userId || row.dataset.id) || '').trim();
+    const nextBanState = button.dataset.banned !== 'true';
+    if (!userId) {
+      notifyToast('Không tìm thấy mã tài khoản môn đồ cần cập nhật.', 'error');
+      return;
+    }
     button.disabled = true;
     try {
-      const { data, error } = await supabaseClient.from('disciples')
-        .update({ is_banned: banned })
-        .eq('user_id', userId)
-        .select('user_id')
-        .maybeSingle();
-      if (error) throw error;
-      if (!data) throw new Error('Không tìm thấy môn đồ hoặc tài khoản quản trị không có quyền cập nhật.');
+      let updated = false;
+      let rpcError = null;
+      try {
+        const { data, error } = await supabaseClient.rpc('admin_set_disciple_ban', {
+          p_target_id: userId,
+          p_ban: nextBanState
+        });
+        if (error) rpcError = error;
+        else if (data === false || data && data.ok === false) {
+          rpcError = new Error(data && data.message || 'RPC từ chối cập nhật.');
+        }
+        else updated = true;
+      } catch (error) {
+        rpcError = error;
+      }
+      if (!updated) {
+        const { data, error } = await supabaseClient.from('disciples')
+          .update({ is_banned: nextBanState })
+          .eq('user_id', userId)
+          .select('user_id')
+          .maybeSingle();
+        if (error) throw new Error(`${rpcError && rpcError.message ? `${rpcError.message} · ` : ''}${error.message || 'Lỗi cập nhật Supabase.'}`);
+        if (!data) throw new Error('Không tìm thấy môn đồ hoặc tài khoản quản trị không có quyền cập nhật.');
+      }
       const member = state.adminDisciples.find(item => String(item.user_id) === userId);
-      if (member) member.is_banned = banned;
+      if (member) member.is_banned = nextBanState;
       renderAdminDisciples();
       renderAdminOnlinePresence();
       const status = document.getElementById('admin-disciples-status');
-      if (status) status.textContent = banned ? 'Đã phong ấn tài khoản.' : 'Đã giải ấn tài khoản.';
+      const message = nextBanState ? 'Đã phong ấn tài khoản.' : 'Đã giải ấn tài khoản.';
+      if (status) status.textContent = message;
+      notifyToast(message, 'success');
     } catch (error) {
       const status = document.getElementById('admin-disciples-status');
       if (status) status.textContent = `Không thể cập nhật lệnh phong ấn: ${error.message || 'Lỗi Supabase.'}`;
-      button.disabled = false;
+      notifyToast(`Không thể cập nhật lệnh phong ấn: ${error.message || 'Lỗi Supabase.'}`, 'error');
+      if (button.isConnected) button.disabled = false;
     }
   }
 
@@ -10255,13 +10299,13 @@
       }).eq('user_id', authenticatedUser.id).select('*').maybeSingle();
       if (saveError) throw saveError;
       if (!saved) {
-        const { data: inserted, error: insertError } = await supabaseClient.from('disciples').upsert({
+        const { data: inserted, error: insertError } = await supabaseClient.from('disciples').insert({
           user_id: authenticatedUser.id,
           email: String(authenticatedUser.email || ''),
           username: String(state.disciple && state.disciple.username ||
             authenticatedUser.email && authenticatedUser.email.split('@')[0] || ''),
           full_name: getMemberFullName(authenticatedUser),
-          avatar_url: getCurrentDiscipleAvatar(authenticatedUser),
+          avatar_url: DEFAULT_DISCIPLE_AVATAR,
           sect_title: String(state.disciple.sect_title || 'Ngoại Môn Đệ Tử'),
           spirit_stones: 20,
           is_banned: false,
@@ -10269,7 +10313,7 @@
           last_seen: new Date().toISOString(),
           quiz_best_score: score,
           quiz_max_combo: bestCombo
-        }, { onConflict: 'user_id' }).select('*').maybeSingle();
+        }).select('*').maybeSingle();
         if (insertError) throw insertError;
         if (!inserted) throw new Error('Không thể tải hồ sơ môn đồ sau khi lưu thành tích.');
         setCurrentUserProfile(inserted, true);
@@ -11273,6 +11317,7 @@
   // 16. NHẠC NỀN PHÁT THEO YÊU CẦU & TRÁO NGẪU NHIÊN (NÂNG CẤP 2)
   // ========================================================
   function initBackgroundMusic() {
+    const playerWidget = ensureBackgroundMusicPlayer();
     // ── Danh sách nhạc nền thực tế trong audio/nhạc nền/ ──
     const BG_TRACKS = [
       {
@@ -11351,8 +11396,8 @@
     updateBgMusicUI();
 
     const toggleBtn = document.getElementById('bg-music-toggle-btn');
-    const playerWidget = document.getElementById('floating-bg-player');
     const collapseBtn = document.getElementById('bg-music-collapse-btn');
+    if (toggleBtn) initDraggableMusicControl(playerWidget, playerWidget);
     if (collapseBtn && playerWidget && toggleBtn) {
       collapseBtn.addEventListener('click', () => {
         playerWidget.classList.remove('is-expanded');
