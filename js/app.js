@@ -86,7 +86,6 @@
   let authenticatedUser = null;
   let pendingAuthAction = null;
   let activeAuthMode = 'login';
-  let pauseCanvasAnimation = null;
   let pauseXianxiaAnimation = null;
   let html2CanvasPromise = null;
   let adminToastTimer = null;
@@ -102,7 +101,16 @@
   let disciplesLoadPromise = null;
   let sectMessagesChannel = null;
   let sectCommentsChannel = null;
-  let sectChatState = { messages: [], conversations: [], selectedUserId: '', loading: false };
+  const homeDeferredScheduled = new Set();
+  const homeDeferredStarted = new Set();
+  let sectChatState = {
+    messages: [],
+    conversations: [],
+    selectedUserId: '',
+    loading: false,
+    reloadPending: false
+  };
+  let chatFallbackAvatarUrl = '';
   let sectCommentState = { offset: 0, hasMore: true, replyTo: null, rows: [] };
   const DISCIPLE_FRAMES = [
     { id: 'jade', name: 'Ngọc Bích Mặc Định', cost: 0 },
@@ -1276,7 +1284,7 @@
 
     try {
       await state.cultivation.syncPromise;
-      void loadLeaderboard();
+      requestLeaderboardLoad();
     } catch (error) {
       console.error('Không thể tải Tu Vi Đạo Hữu:', error);
       state.cultivation.profileError = 'Chưa thể đồng bộ Tu Vi. Vui lòng thử lại sau.';
@@ -1590,10 +1598,28 @@
     }
   }
 
-  let linhThachIconId = 0;
+  let linhThachGradientsReady = false;
 
   // Helper: Render five cultivation crystals, including half tiers.
   function renderStars(rating) {
+    if (!linhThachGradientsReady) {
+      const definitions = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      definitions.classList.add('linh-thach-svg-defs');
+      definitions.setAttribute('aria-hidden', 'true');
+      definitions.innerHTML = `
+        <defs>
+          <linearGradient id="linh-thach-full" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#34d399"></stop>
+            <stop offset="100%" stop-color="#fbbf24"></stop>
+          </linearGradient>
+          <linearGradient id="linh-thach-half" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="50%" stop-color="#34d399"></stop>
+            <stop offset="50%" stop-color="#16283a"></stop>
+          </linearGradient>
+        </defs>`;
+      document.body.prepend(definitions);
+      linhThachGradientsReady = true;
+    }
     const maxStars = 5;
     const rawValue = typeof rating === 'number' ? rating : parseFloat(rating) || 0;
     const num = Math.max(0, Math.min(maxStars, rawValue));
@@ -1601,25 +1627,14 @@
 
     for (let i = 1; i <= maxStars; i++) {
       const state = num >= i ? 'active' : num >= i - 0.5 ? 'half' : 'inactive';
-      const gradientId = `linh-thach-${++linhThachIconId}`;
       const fill = state === 'active'
-        ? `url(#${gradientId}-full)`
+        ? 'url(#linh-thach-full)'
         : state === 'half'
-          ? `url(#${gradientId}-half)`
+          ? 'url(#linh-thach-half)'
           : 'rgba(20, 32, 48, 0.9)';
       html += `
         <span class="rpg-crystal ${state}" aria-hidden="true">
           <svg viewBox="0 0 24 24" focusable="false">
-            <defs>
-              <linearGradient id="${gradientId}-full" x1="0%" y1="100%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="#34d399"></stop>
-                <stop offset="100%" stop-color="#fbbf24"></stop>
-              </linearGradient>
-              <linearGradient id="${gradientId}-half" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="50%" stop-color="#34d399"></stop>
-                <stop offset="50%" stop-color="#16283a"></stop>
-              </linearGradient>
-            </defs>
             <path d="M12 2.2 20.4 7v10L12 21.8 3.6 17V7z" fill="${fill}" stroke="${state === 'inactive' ? '#66808b' : '#fcd34d'}" stroke-width="1.25"></path>
             <path d="m12 2.2-3.8 5.3L12 21.8l3.8-14.3zM3.6 7h16.8M3.6 17h16.8" fill="none" stroke="rgba(226, 252, 245, 0.62)" stroke-width="0.75"></path>
           </svg>
@@ -1627,6 +1642,50 @@
     }
     html += `</div><span class="rpg-substat-tier">Tầng ${num}/${maxStars}</span>`;
     return html;
+  }
+
+  function deferHomeLoad(key, target, load) {
+    if (pageName !== 'home') {
+      load();
+      return;
+    }
+    if (homeDeferredScheduled.has(key) || homeDeferredStarted.has(key)) return;
+    homeDeferredScheduled.add(key);
+    let observer = null;
+    let idleTimer = 0;
+    const start = () => {
+      if (homeDeferredStarted.has(key)) return;
+      homeDeferredScheduled.delete(key);
+      homeDeferredStarted.add(key);
+      window.clearTimeout(idleTimer);
+      if (observer) observer.disconnect();
+      load();
+    };
+
+    if (target && 'IntersectionObserver' in window) {
+      observer = new IntersectionObserver(entries => {
+        if (entries.some(entry => entry.isIntersecting)) start();
+      }, { rootMargin: '600px 0px' });
+      observer.observe(target);
+    }
+
+    idleTimer = window.setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(start, { timeout: 1000 });
+      } else {
+        start();
+      }
+    }, 1500);
+  }
+
+  function requestLeaderboardLoad() {
+    if (pageName === 'home' && !homeDeferredStarted.has('leaderboard')) {
+      deferHomeLoad('leaderboard', document.getElementById('public-leaderboard'), () => {
+        void loadLeaderboard();
+      });
+      return;
+    }
+    void loadLeaderboard();
   }
 
   // ========================================================
@@ -1670,7 +1729,6 @@
       initHeaderOffset();
       initCultivationBackground();
       initXianxiaCanvas();
-      initSpiritParticlesCanvas();
       if (homePage) {
         initAchievements();
         initTimeCapsule();
@@ -1704,7 +1762,7 @@
       if (homePage || adminPage) void loadTongChuDecrees();
       initGlobalSiteRealtime();
       window.setTimeout(initPresence, 300);
-      if (homePage || tongmonPage) void loadLeaderboard();
+      if (homePage || tongmonPage) requestLeaderboardLoad();
     } catch (e) {
       console.error('Không thể khởi tạo trang:', e);
     }
@@ -1992,15 +2050,34 @@
   }
 
   async function syncDiscipleForUser(user) {
-    if (!user || !user.id || !supabaseClient || discipleSyncUserId === String(user.id)) return;
+    if (!user || !user.id || discipleSyncUserId === String(user.id)) return;
     discipleSyncUserId = String(user.id);
     state.discipleStatusReady = false;
     syncPageAccess();
     const visitKey = `thien-menh:disciple-visit:${user.id}`;
     let isNewVisit = false;
+    const defaultProfile = {
+      user_id: user.id,
+      email: String(user.email || ''),
+      username: String(user.user_metadata && user.user_metadata.username ||
+        user.email && user.email.split('@')[0] || ''),
+      full_name: getMemberFullName(user),
+      sect_title: 'Ngoại Môn Đệ Tử',
+      spirit_stones: 20,
+      is_banned: false,
+      avatar_url: getMemberAvatar(user),
+      visit_count: 0,
+      unlocked_frames: ['jade'],
+      active_frame: 'jade'
+    };
     try {
-      isNewVisit = !sessionStorage.getItem(visitKey);
-      if (isNewVisit) sessionStorage.setItem(visitKey, '1');
+      if (!supabaseClient) throw new Error('Dịch vụ Tông Môn chưa kết nối.');
+      try {
+        isNewVisit = !sessionStorage.getItem(visitKey);
+        if (isNewVisit) sessionStorage.setItem(visitKey, '1');
+      } catch (error) {
+        console.warn('Không thể lưu lượt ghé thăm Tông Môn:', error);
+      }
       const { data: existing, error: readError } = await supabaseClient.from('disciples')
         .select('*')
         .eq('user_id', user.id)
@@ -2008,17 +2085,20 @@
       if (readError) throw readError;
 
       const payload = {
+        ...defaultProfile,
+        ...(existing || {}),
         user_id: user.id,
         email: String(user.email || ''),
         full_name: getMemberFullName(user),
         username: String(user.user_metadata && user.user_metadata.username ||
-          existing && existing.username || ''),
+          existing && existing.username || defaultProfile.username),
         avatar_url: getMemberAvatar(user) || String(existing && existing.avatar_url || ''),
         sect_title: String(existing && existing.sect_title || 'Ngoại Môn Đệ Tử'),
         is_banned: Boolean(existing && existing.is_banned),
         visit_count: Math.max(0, Number(existing && existing.visit_count) || 0) + (isNewVisit ? 1 : 0),
-        spirit_stones: Math.max(0, Number(existing && existing.spirit_stones) ||
-          (!existing ? Number(user.user_metadata && user.user_metadata.starting_spirit_stones) || 0 : 0)),
+        spirit_stones: existing
+          ? Math.max(0, Number(existing.spirit_stones) || 0)
+          : 20,
         unlocked_frames: Array.isArray(existing && existing.unlocked_frames)
           ? existing.unlocked_frames : ['jade'],
         active_frame: String(existing && existing.active_frame || 'jade'),
@@ -2027,36 +2107,26 @@
       const { data, error } = await supabaseClient.from('disciples')
         .upsert(payload, { onConflict: 'user_id' })
         .select('*')
-        .single();
+        .maybeSingle();
       if (error) throw error;
+      if (String(authenticatedUser && authenticatedUser.id || '') !== String(user.id)) return;
       state.disciple = data || payload;
-      state.discipleStatusReady = true;
       initDiscipleRealtime(user);
-      refreshDiscipleshipUI();
-      renderDiscipleProfileTools();
-      updatePresence();
-      void loadGameLeaderboard();
+      requestLeaderboardLoad();
       if (isAdminUser()) void loadAdminDisciples();
     } catch (error) {
-      discipleSyncUserId = '';
-      state.disciple = {
-        user_id: user.id,
-        email: String(user.email || ''),
-        full_name: getMemberFullName(user),
-        username: String(user.user_metadata && user.user_metadata.username || ''),
-        avatar_url: getMemberAvatar(user),
-        sect_title: 'Ngoại Môn Đệ Tử',
-        is_banned: false,
-        visit_count: 0,
-        spirit_stones: Number(user.user_metadata && user.user_metadata.starting_spirit_stones) || 0,
-        unlocked_frames: ['jade'],
-        active_frame: 'jade'
-      };
-      state.discipleStatusReady = false;
-      console.warn('Không thể đồng bộ Sổ Môn Đồ:', error);
-      refreshDiscipleshipUI();
-      renderDiscipleProfileTools();
-      updatePresence();
+      if (String(authenticatedUser && authenticatedUser.id || '') === String(user.id)) {
+        discipleSyncUserId = '';
+        state.disciple = defaultProfile;
+        console.warn('Không thể đồng bộ Sổ Môn Đồ:', error);
+      }
+    } finally {
+      if (String(authenticatedUser && authenticatedUser.id || '') === String(user.id)) {
+        state.discipleStatusReady = true;
+        refreshDiscipleshipUI();
+        renderDiscipleProfileTools();
+        updatePresence();
+      }
     }
   }
 
@@ -2227,8 +2297,9 @@
     if (!authenticatedUser || !state.discipleStatusReady || !supabaseClient) return false;
     try {
       const { data, error } = await supabaseClient.from('disciples').update(patch)
-        .eq('user_id', authenticatedUser.id).select('*').single();
+        .eq('user_id', authenticatedUser.id).select('*').maybeSingle();
       if (error) throw error;
+      if (!data) throw new Error('Không tìm thấy hồ sơ môn đồ để cập nhật.');
       state.disciple = data;
       refreshDiscipleshipUI();
       renderDiscipleProfileTools();
@@ -2251,8 +2322,9 @@
       });
       if (error) throw error;
       const { data, error: readError } = await supabaseClient.from('disciples').select('*')
-        .eq('user_id', authenticatedUser.id).single();
+        .eq('user_id', authenticatedUser.id).maybeSingle();
       if (readError) throw readError;
+      if (!data) throw new Error('Không tìm thấy hồ sơ môn đồ sau khi cộng Linh Thạch.');
       state.disciple = data;
       renderDiscipleProfileTools();
     } catch (error) {
@@ -2338,8 +2410,9 @@
           return;
         }
         const { data, error: readError } = await supabaseClient.from('disciples').select('*')
-          .eq('user_id', authenticatedUser.id).single();
+          .eq('user_id', authenticatedUser.id).maybeSingle();
         if (readError) throw readError;
+        if (!data) throw new Error('Không tìm thấy hồ sơ môn đồ sau khi mở khung viền.');
         state.disciple = data;
         refreshDiscipleshipUI();
       } else {
@@ -2350,8 +2423,9 @@
           return;
         }
         const { data, error: readError } = await supabaseClient.from('disciples').select('*')
-          .eq('user_id', authenticatedUser.id).single();
+          .eq('user_id', authenticatedUser.id).maybeSingle();
         if (readError) throw readError;
+        if (!data) throw new Error('Không tìm thấy hồ sơ môn đồ sau khi trang bị khung viền.');
         state.disciple = data;
         refreshDiscipleshipUI();
       }
@@ -2363,26 +2437,31 @@
     const widget = document.createElement('aside');
     widget.id = 'sect-chat-widget';
     widget.className = 'sect-chat-widget';
-    widget.innerHTML = '<button type="button" id="sect-chat-toggle" class="sect-chat-toggle" aria-label="Mở Mật Thất Truyền Âm">💬<span id="sect-chat-unread" class="sect-chat-unread" hidden>0</span></button><section id="sect-chat-panel" class="sect-chat-panel" aria-label="Mật Thất Truyền Âm" hidden><header class="sect-chat-header"><div><strong>🕯️ Mật Thất Truyền Âm</strong><span id="sect-chat-subtitle">Trò chuyện riêng với Tông Chủ</span></div><button type="button" id="sect-chat-close" aria-label="Đóng">✕</button></header><div id="sect-chat-admin-layout" class="sect-chat-admin-layout" hidden><aside id="sect-chat-conversations" class="sect-chat-conversations"></aside><div class="sect-chat-room"><div id="sect-chat-messages" class="sect-chat-messages" aria-live="polite"></div><form id="sect-chat-form" class="sect-chat-form"><textarea id="sect-chat-input" rows="2" maxlength="1200" placeholder="Nhập lời truyền âm..." required></textarea><button type="submit" class="admin-primary-button">Gửi</button></form></div></div><div id="sect-chat-member-layout" class="sect-chat-member-layout"><div id="sect-chat-member-messages" class="sect-chat-messages" aria-live="polite"></div><form id="sect-chat-member-form" class="sect-chat-form"><textarea id="sect-chat-member-input" rows="2" maxlength="1200" placeholder="Gửi lời nhắn riêng tới Tông Chủ..." required></textarea><button type="submit" class="admin-primary-button">Gửi</button></form></div><p id="sect-chat-status" class="sect-chat-status" role="status" aria-live="polite"></p></section></aside>';
+    widget.innerHTML = '<section id="sect-chat-panel" class="sect-chat-panel" aria-label="Mật Thất Truyền Âm" hidden><header class="sect-chat-header"><div><strong>🕯️ Mật Thất Truyền Âm</strong><span id="sect-chat-subtitle">Trò chuyện riêng với Tông Chủ</span></div><button type="button" id="sect-chat-close" aria-label="Đóng">✕</button></header><div id="sect-chat-admin-layout" class="sect-chat-admin-layout" hidden><aside id="sect-chat-conversations" class="sect-chat-conversations"></aside><div class="sect-chat-room"><div class="sect-chat-room-header"><button type="button" id="sect-chat-back-list" class="sect-chat-back-list">← Danh sách</button><strong id="sect-chat-room-title">Hội thoại</strong></div><div id="sect-chat-messages" class="sect-chat-messages" aria-live="polite"></div><form id="sect-chat-form" class="sect-chat-form"><textarea id="sect-chat-input" rows="2" maxlength="1200" placeholder="Nhập lời truyền âm..." required></textarea><button type="submit" class="admin-primary-button">Gửi</button></form></div></div><div id="sect-chat-member-layout" class="sect-chat-member-layout"><div id="sect-chat-member-messages" class="sect-chat-messages" aria-live="polite"></div><form id="sect-chat-member-form" class="sect-chat-form"><textarea id="sect-chat-member-input" rows="2" maxlength="1200" placeholder="Gửi lời nhắn riêng tới Tông Chủ..." required></textarea><button type="submit" class="admin-primary-button">Gửi</button></form></div><p id="sect-chat-status" class="sect-chat-status" role="status" aria-live="polite"></p></section>';
     const cluster = document.createElement('div');
     cluster.id = 'floating-controls-cluster';
     cluster.className = 'floating-controls-cluster';
-    cluster.append(widget);
     const musicPlayer = document.getElementById('floating-bg-player');
     if (musicPlayer) cluster.append(musicPlayer);
+    document.body.appendChild(widget);
     document.body.appendChild(cluster);
     const panel = document.getElementById('sect-chat-panel');
-    document.getElementById('sect-chat-toggle').addEventListener('click', () => {
+    document.getElementById('nav-sect-chat-link')?.addEventListener('click', () => {
       if (!authenticatedUser) {
         openCommunityAuthGate('trò chuyện riêng trong Mật Thất Truyền Âm');
         return;
       }
-      panel.hidden = !panel.hidden;
-      if (!panel.hidden) void loadSectMessages();
+      panel.hidden = false;
+      document.getElementById('sect-chat-admin-layout').classList.remove('is-chatting');
+      void loadSectMessages();
     });
-    document.getElementById('sect-chat-close').addEventListener('click', () => { panel.hidden = true; });
+    document.getElementById('sect-chat-close').addEventListener('click', () => {
+      panel.hidden = true;
+      document.getElementById('sect-chat-admin-layout').classList.remove('is-chatting');
+    });
     document.getElementById('admin-open-sect-messages')?.addEventListener('click', () => {
       panel.hidden = false;
+      document.getElementById('sect-chat-admin-layout').classList.remove('is-chatting');
       void loadSectMessages();
     });
     const list = document.getElementById('sect-chat-conversations');
@@ -2390,7 +2469,13 @@
       const button = event.target.closest('[data-chat-user]');
       if (!button) return;
       sectChatState.selectedUserId = button.dataset.chatUser;
+      document.getElementById('sect-chat-admin-layout').classList.add('is-chatting');
+      document.getElementById('sect-chat-room-title').textContent =
+        button.querySelector('strong')?.textContent || 'Hội thoại';
       void loadSectMessages();
+    });
+    document.getElementById('sect-chat-back-list').addEventListener('click', () => {
+      document.getElementById('sect-chat-admin-layout').classList.remove('is-chatting');
     });
     document.getElementById('sect-chat-messages').addEventListener('click', event => {
       const button = event.target.closest('[data-chat-delete]');
@@ -2425,7 +2510,8 @@
       sectChatState.selectedUserId = '';
       renderSectChatMessages();
       renderSectChatConversations();
-      document.getElementById('sect-chat-unread').hidden = true;
+      const badge = document.getElementById('nav-admin-unread');
+      if (badge) badge.hidden = true;
       return;
     }
     const config = { event: '*', schema: 'public', table: 'sect_messages' };
@@ -2457,17 +2543,22 @@
         .select('id', { count: 'exact', head: true })
         .eq('sender_role', 'disciple').eq('is_read', false);
       if (error) throw error;
-      const badge = document.getElementById('sect-chat-unread');
-      if (!badge) return;
-      badge.textContent = String(count || 0);
-      badge.hidden = !(count > 0);
+      const navBadge = document.getElementById('nav-admin-unread');
+      if (navBadge) {
+        navBadge.textContent = String(count || 0);
+        navBadge.hidden = !(count > 0);
+      }
     } catch (error) {
       setSectChatStatus(`Không thể tải số tin chưa đọc: ${error.message || 'Lỗi Supabase.'}`, true);
     }
   }
 
   async function loadSectMessages() {
-    if (!authenticatedUser || !supabaseClient || sectChatState.loading) return;
+    if (!authenticatedUser || !supabaseClient) return;
+    if (sectChatState.loading) {
+      sectChatState.reloadPending = true;
+      return;
+    }
     sectChatState.loading = true;
     setSectChatStatus('Đang mở linh phù truyền âm…');
     try {
@@ -2476,13 +2567,18 @@
           .order('created_at', { ascending: false }).limit(500);
         if (error) throw error;
         const grouped = new Map();
+        const membersById = new Map((state.adminDisciples || [])
+          .map(member => [String(member.user_id), member]));
         (data || []).forEach(message => {
           const key = String(message.user_id || message.user_email || '');
           if (!key) return;
+          const member = membersById.get(String(message.user_id || ''));
           const conversation = grouped.get(key) || {
             user_id: String(message.user_id || ''),
             user_email: String(message.user_email || ''),
-            full_name: String(message.full_name || message.user_email || 'Đạo Hữu'),
+            full_name: String(member && (member.username || member.full_name) ||
+              message.full_name || message.user_email || 'Đạo Hữu'),
+            avatar_url: String(member && member.avatar_url || ''),
             unread: 0,
             latest: message.created_at
           };
@@ -2517,7 +2613,25 @@
       console.error('Không thể tải Mật Thất Truyền Âm:', error);
     } finally {
       sectChatState.loading = false;
+      if (sectChatState.reloadPending) {
+        sectChatState.reloadPending = false;
+        window.setTimeout(() => { void loadSectMessages(); }, 0);
+      }
     }
+  }
+
+  function getChatFallbackAvatarUrl() {
+    if (!chatFallbackAvatarUrl) chatFallbackAvatarUrl = makeXianxiaAvatar(0).src;
+    return chatFallbackAvatarUrl;
+  }
+
+  function setChatAvatarSource(image, source) {
+    const fallback = getChatFallbackAvatarUrl();
+    image.onerror = () => {
+      image.onerror = null;
+      image.src = fallback;
+    };
+    image.src = isDisplayableAvatar(source) ? String(source) : fallback;
   }
 
   function renderSectChatConversations() {
@@ -2533,11 +2647,21 @@
       button.type = 'button';
       button.className = `sect-chat-conversation${conversation.user_id === sectChatState.selectedUserId ? ' active' : ''}`;
       button.dataset.chatUser = conversation.user_id;
+      const avatar = document.createElement('img');
+      avatar.className = 'sect-chat-avatar';
+      avatar.alt = '';
+      avatar.setAttribute('aria-hidden', 'true');
+      avatar.loading = 'lazy';
+      avatar.decoding = 'async';
+      setChatAvatarSource(avatar, conversation.avatar_url);
       const name = document.createElement('strong');
       name.textContent = conversation.full_name;
       const email = document.createElement('span');
       email.textContent = conversation.user_email;
-      button.append(name, email);
+      const details = document.createElement('span');
+      details.className = 'sect-chat-conversation-details';
+      details.append(name, email);
+      button.append(avatar, details);
       if (conversation.unread) {
         const unread = document.createElement('b');
         unread.textContent = String(conversation.unread);
@@ -2548,6 +2672,8 @@
   }
 
   function renderSectChatMessages() {
+    const membersById = new Map((state.adminDisciples || [])
+      .map(profile => [String(profile.user_id), profile]));
     const containers = [
       document.getElementById('sect-chat-messages'),
       document.getElementById('sect-chat-member-messages')
@@ -2556,20 +2682,35 @@
       container.replaceChildren();
       sectChatState.messages.forEach(message => {
         const item = document.createElement('article');
-        item.className = `sect-chat-message${message.sender_role === 'owner' ? ' is-owner' : ''}`;
+        const isOwnerMessage = message.sender_role === 'owner';
+        item.className = `sect-chat-message${isOwnerMessage ? ' is-owner' : ''}`;
+        const avatar = document.createElement('img');
+        avatar.className = 'sect-chat-avatar';
+        avatar.alt = '';
+        avatar.setAttribute('aria-hidden', 'true');
+        avatar.loading = 'lazy';
+        avatar.decoding = 'async';
+        const member = isAdminUser() ? membersById.get(String(message.user_id)) : null;
+        const avatarUrl = isOwnerMessage
+          ? (isAdminUser() ? state.disciple && state.disciple.avatar_url : '')
+          : (isAdminUser() ? member && member.avatar_url : state.disciple && state.disciple.avatar_url);
+        setChatAvatarSource(avatar, avatarUrl);
+        const body = document.createElement('div');
+        body.className = 'sect-chat-message-body';
         const text = document.createElement('p');
         text.textContent = String(message.content || '');
         const meta = document.createElement('small');
         meta.textContent = `${message.sender_role === 'owner' ? 'Tông Chủ' : String(message.full_name || 'Đạo Hữu')} · ${message.created_at ? new Date(message.created_at).toLocaleString('vi-VN') : ''}`;
-        item.append(meta, text);
+        body.append(meta, text);
         if (isAdminUser()) {
           const remove = document.createElement('button');
           remove.type = 'button';
           remove.dataset.chatDelete = String(message.id);
           remove.textContent = 'Xóa';
           remove.setAttribute('aria-label', 'Xóa tin nhắn');
-          item.appendChild(remove);
+          body.appendChild(remove);
         }
+        item.append(avatar, body);
         container.appendChild(item);
       });
       container.scrollTop = container.scrollHeight;
@@ -2596,16 +2737,31 @@
     const button = form.querySelector('button[type="submit"]');
     if (button) button.disabled = true;
     try {
+      const isOwner = isAdminUser();
+      const senderName = isOwner
+        ? 'Tông Chủ'
+        : String(state.disciple && (state.disciple.username || state.disciple.full_name) ||
+          getMemberFullName(authenticatedUser));
+      const senderAvatar = String(state.disciple && state.disciple.avatar_url ||
+        getMemberAvatar(authenticatedUser) || '');
+      const createdAt = new Date().toISOString();
       const payload = {
-        user_id: isAdminUser() ? selected.user_id : authenticatedUser.id,
-        user_email: isAdminUser() ? selected.user_email : String(authenticatedUser.email || ''),
-        full_name: isAdminUser() ? 'Tông Chủ' : String(state.disciple && state.disciple.full_name || getMemberFullName(authenticatedUser)),
-        sender_role: isAdminUser() ? 'owner' : 'disciple',
+        user_id: isOwner ? selected.user_id : authenticatedUser.id,
+        user_email: isOwner ? selected.user_email : String(authenticatedUser.email || ''),
+        user_name: senderName,
+        full_name: isOwner
+          ? 'Tông Chủ'
+          : String(state.disciple && state.disciple.full_name || getMemberFullName(authenticatedUser)),
+        user_avatar: senderAvatar,
+        sender_role: isOwner ? 'owner' : 'disciple',
         content,
         is_read: false
       };
-      const { error } = await supabaseClient.from('sect_messages').insert(payload);
+      const { data, error } = await supabaseClient.from('sect_messages')
+        .insert(payload).select('*').maybeSingle();
       if (error) throw error;
+      sectChatState.messages.push(data || { ...payload, created_at: createdAt });
+      renderSectChatMessages();
       if (input) input.value = '';
       setSectChatStatus('Truyền âm đã gửi.');
       await loadSectMessages();
@@ -2662,18 +2818,20 @@
         void rewardSectComment(row, Number(button.dataset.amount));
       }
     });
-    void loadSectComments(false);
-    if (supabaseClient && supabaseClient.channel) {
-      sectCommentsChannel = supabaseClient.channel('sect-comments-live')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'sect_comments' }, () => {
-          void loadSectComments(false);
-        })
-        .subscribe(status => {
-          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            setSectCommentStatus('Bình luận chưa kết nối được Realtime.', true);
-          }
-        });
-    }
+    deferHomeLoad('sect-comments', document.getElementById('sect-discussion'), () => {
+      void loadSectComments(false);
+      if (supabaseClient && supabaseClient.channel) {
+        sectCommentsChannel = supabaseClient.channel('sect-comments-live')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'sect_comments' }, () => {
+            void loadSectComments(false);
+          })
+          .subscribe(status => {
+            if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+              setSectCommentStatus('Bình luận chưa kết nối được Realtime.', true);
+            }
+          });
+      }
+    });
   }
 
   function setSectCommentStatus(message, isError = false) {
@@ -2838,6 +2996,10 @@
       setSectCommentStatus('Đang xác minh tư cách môn đồ…');
       return;
     }
+    if (!state.disciple) {
+      setSectCommentStatus('Chưa tải được hồ sơ môn đồ. Vui lòng thử lại sau.', true);
+      return;
+    }
     if (isDiscipleBanned()) {
       setSectCommentStatus('⚠️ Tài khoản của đạo hữu đã bị Tông Môn Phong Ấn!', true);
       return;
@@ -2845,7 +3007,7 @@
     try {
       const { error } = await supabaseClient.from('sect_comments').insert({
         user_email: String(authenticatedUser.email || ''),
-        user_name: String(state.disciple.full_name || getMemberFullName(authenticatedUser)),
+        user_name: String(state.disciple.username || state.disciple.full_name || getMemberFullName(authenticatedUser)),
         user_avatar: String(state.disciple.avatar_url || ''),
         sect_title: String(state.disciple.sect_title || 'Ngoại Môn Đệ Tử'),
         active_frame: String(state.disciple.active_frame || 'jade'),
@@ -3166,11 +3328,10 @@
     refreshVisibleMemoryLikes();
     initMilestoneComments();
     refreshSectMessaging();
-    if (pageName === 'home') void loadSectComments(false);
     renderDiscipleProfileTools();
     if (authenticatedUser) {
       void syncCultivationForUser(authenticatedUser);
-      void loadLeaderboard();
+      requestLeaderboardLoad();
     } else {
       state.cultivation.userId = null;
       state.cultivation.profile = null;
@@ -3197,9 +3358,11 @@
   function syncPageAccess() {
     const isAdmin = isAdminUser();
     const homeLink = document.getElementById('nav-home-link');
+    const chatLink = document.getElementById('nav-sect-chat-link');
     const adminLink = document.getElementById('nav-admin-link');
     const homeAdminLink = document.getElementById('home-admin-route');
     if (homeLink) homeLink.hidden = pageName === 'home';
+    if (chatLink) chatLink.hidden = isAdmin;
     if (adminLink) adminLink.hidden = !isAdmin;
     if (homeAdminLink) homeAdminLink.hidden = !isAdmin;
 
@@ -4863,10 +5026,22 @@
       if (submitButton) submitButton.disabled = true;
       setAdminStatus('Đang lập danh tính Đạo Hữu…');
       try {
-        const { data: usernameAvailable, error: usernameError } = await supabaseClient.rpc(
+        const { data: available, error: usernameRpcError } = await supabaseClient.rpc(
           'is_disciple_username_available', { p_username: username }
         );
-        if (usernameError) throw new Error(`Chưa thể kiểm tra đạo hiệu: ${usernameError.message || 'hãy áp dụng cập nhật Supabase.'}`);
+        let usernameAvailable = available;
+        if (usernameRpcError) {
+          console.warn('RPC kiểm tra đạo hiệu chưa sẵn sàng; dùng truy vấn dự phòng:', usernameRpcError);
+          const { data: existingUsername, error: fallbackError } = await supabaseClient
+            .from('disciples')
+            .select('username')
+            .ilike('username', username)
+            .maybeSingle();
+          if (fallbackError) {
+            throw new Error(`Không thể xác minh đạo hiệu lúc này: ${fallbackError.message || 'hãy thử lại sau.'}`);
+          }
+          usernameAvailable = !existingUsername;
+        }
         if (usernameAvailable !== true) throw new Error('Tên đăng nhập này đã được sử dụng. Hãy chọn đạo hiệu khác.');
         const options = {
           data: {
@@ -4880,6 +5055,7 @@
         if (error) throw error;
         signupForm.reset();
         if (data.session && data.session.user) {
+          await syncDiscipleForUser(data.session.user);
           setAuthenticatedUser(data.session.user);
           setAdminStatus('Đăng ký thành công.');
         } else {
@@ -5683,11 +5859,11 @@
     if (!background) return;
 
     let updateScheduled = false;
+    let scrollableHeight = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     const updateJourneyProgress = () => {
       if (updateScheduled) return;
       updateScheduled = true;
       window.requestAnimationFrame(() => {
-        const scrollableHeight = document.documentElement.scrollHeight - window.innerHeight;
         const progress = scrollableHeight > 0
           ? Math.min(1, Math.max(0, window.scrollY / scrollableHeight))
           : 0;
@@ -5696,10 +5872,17 @@
         updateScheduled = false;
       });
     };
+    const refreshScrollableHeight = () => {
+      scrollableHeight = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+      updateJourneyProgress();
+    };
 
     updateJourneyProgress();
     window.addEventListener('scroll', updateJourneyProgress, { passive: true });
-    window.addEventListener('resize', updateJourneyProgress, { passive: true });
+    window.addEventListener('resize', refreshScrollableHeight, { passive: true });
+    if ('ResizeObserver' in window) {
+      new ResizeObserver(refreshScrollableHeight).observe(document.documentElement);
+    }
   }
 
   function initXianxiaCanvas() {
@@ -5726,6 +5909,15 @@
       phase: Math.random() * Math.PI * 2,
       radius: Math.random() * 1.8 + 0.7,
       jade: Math.random() > 0.5
+    }));
+    const spiritParticles = Array.from({ length: 25 }, () => ({
+      x: Math.random(),
+      y: Math.random(),
+      radius: 0.7 + Math.random() * 1.8,
+      speedX: (Math.random() - 0.5) * 0.012,
+      speedY: (Math.random() - 0.5) * 0.012,
+      phase: Math.random() * Math.PI * 2,
+      gold: Math.random() > 0.56
     }));
     const leaves = Array.from({ length: mobile() ? 5 : 9 }, () => ({
       x: Math.random(),
@@ -5755,7 +5947,7 @@
     const startedAt = performance.now();
 
     const resize = () => {
-      const ratio = Math.min(window.devicePixelRatio || 1, mobile() ? 1.5 : 2);
+      const ratio = Math.min(window.devicePixelRatio || 1, 1.25);
       width = window.innerWidth;
       height = window.innerHeight;
       canvas.width = Math.round(width * ratio);
@@ -5794,6 +5986,23 @@
         context.arc(x * width, y, mote.radius, 0, Math.PI * 2);
         context.fill();
       }
+      context.shadowBlur = 0;
+
+      for (let index = 0; index < spiritParticles.length; index += 1) {
+        const particle = spiritParticles[index];
+        if (!reducedMotionQuery.matches && delta > 0) {
+          particle.x = (particle.x + particle.speedX * delta + 1) % 1;
+          particle.y = (particle.y + particle.speedY * delta + 1) % 1;
+        }
+        context.globalAlpha = 0.4 + (Math.sin(seconds * 1.2 + particle.phase) + 1) * 0.24;
+        context.fillStyle = particle.gold ? '#ffde82' : '#70ffdc';
+        context.shadowBlur = 9;
+        context.shadowColor = particle.gold ? '#ffc34b' : '#2dd4bf';
+        context.beginPath();
+        context.arc(particle.x * width, particle.y * height, particle.radius, 0, Math.PI * 2);
+        context.fill();
+      }
+      context.globalAlpha = 1;
       context.shadowBlur = 0;
 
       for (let index = 0; index < swords.length; index += 1) {
@@ -5884,6 +6093,10 @@
     }
 
     const animate = now => {
+      if (mobile() && lastFrameTime && now - lastFrameTime < 1000 / 30) {
+        frameId = window.requestAnimationFrame(animate);
+        return;
+      }
       const delta = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.05) : 0;
       lastFrameTime = now;
       draw((now - startedAt) / 1000, delta);
@@ -5891,6 +6104,7 @@
     };
     const start = () => {
       if (reducedMotionQuery.matches || document.hidden || animationPaused || frameId) return;
+      lastFrameTime = 0;
       frameId = window.requestAnimationFrame(animate);
     };
     const stop = () => {
@@ -5905,7 +6119,7 @@
     };
     const scheduleResize = () => {
       window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(resize, 150);
+      resizeTimer = window.setTimeout(resize, 200);
     };
     const syncMotion = () => {
       if (reducedMotionQuery.matches || document.hidden) stop();
@@ -5936,7 +6150,6 @@
       const hasOpenModal = modalSelectors.some(selector => document.querySelector(selector)) ||
         Boolean(document.querySelector('.admin-modal.active'));
       document.body.classList.toggle('modal-open', hasOpenModal);
-      if (pauseCanvasAnimation) pauseCanvasAnimation(hasOpenModal);
       if (pauseXianxiaAnimation) pauseXianxiaAnimation(hasOpenModal);
 
       const nav = document.getElementById('sticky-header');
@@ -7049,111 +7262,6 @@
     syncFeatureModalScrollLock();
   }
 
-  function initSpiritParticlesCanvas() {
-    const canvas = document.getElementById('spiritParticlesCanvas');
-    const context = canvas && canvas.getContext ? canvas.getContext('2d') : null;
-    if (!canvas || !context) {
-      console.warn('Không thể khởi tạo canvas hạt linh khí.');
-      return;
-    }
-
-    const reducedMotionQuery = window.matchMedia
-      ? window.matchMedia('(prefers-reduced-motion: reduce)')
-      : { matches: false, addEventListener: null };
-    const particles = Array.from({ length: 25 }, () => ({
-      x: Math.random(),
-      y: Math.random(),
-      radius: 0.7 + Math.random() * 1.8,
-      speedX: (Math.random() - 0.5) * 0.012,
-      speedY: (Math.random() - 0.5) * 0.012,
-      phase: Math.random() * Math.PI * 2,
-      gold: Math.random() > 0.56
-    }));
-    let width = 0;
-    let height = 0;
-    let frameId = 0;
-    let lastFrameTime = 0;
-    let resizeTimer = 0;
-    let canvasPaused = false;
-
-    const resize = () => {
-      const ratio = Math.min(window.devicePixelRatio || 1, window.innerWidth < 768 ? 1.5 : 2);
-      width = window.innerWidth;
-      height = window.innerHeight;
-      canvas.width = Math.max(1, Math.round(width * ratio));
-      canvas.height = Math.max(1, Math.round(height * ratio));
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
-      context.setTransform(ratio, 0, 0, ratio, 0, 0);
-      drawParticles(0, 0);
-    };
-
-    const drawParticles = (time, delta) => {
-      context.clearRect(0, 0, width, height);
-      for (let index = 0; index < particles.length; index += 1) {
-        const particle = particles[index];
-        if (!reducedMotionQuery.matches && delta > 0) {
-          particle.x = (particle.x + particle.speedX * delta + 1) % 1;
-          particle.y = (particle.y + particle.speedY * delta + 1) % 1;
-        }
-        const x = particle.x * width;
-        const y = particle.y * height;
-        const pulse = 0.4 + (Math.sin(time * 0.0012 + particle.phase) + 1) * 0.24;
-        context.beginPath();
-        context.globalAlpha = pulse;
-        context.fillStyle = particle.gold ? '#ffde82' : '#70ffdc';
-        context.shadowBlur = 9;
-        context.shadowColor = particle.gold ? '#ffc34b' : '#2dd4bf';
-        context.arc(x, y, particle.radius, 0, Math.PI * 2);
-        context.fill();
-      }
-      context.globalAlpha = 1;
-      context.shadowBlur = 0;
-    };
-
-    const animate = now => {
-      const delta = lastFrameTime ? Math.min((now - lastFrameTime) / 1000, 0.05) : 0;
-      lastFrameTime = now;
-      drawParticles(now, delta);
-      frameId = window.requestAnimationFrame(animate);
-    };
-    const start = () => {
-      if (reducedMotionQuery.matches || document.hidden || canvasPaused || frameId) return;
-      lastFrameTime = 0;
-      frameId = window.requestAnimationFrame(animate);
-    };
-    const stop = () => {
-      if (!frameId) return;
-      window.cancelAnimationFrame(frameId);
-      frameId = 0;
-    };
-    const syncMotion = () => {
-      if (reducedMotionQuery.matches || document.hidden) {
-        stop();
-        drawParticles(0, 0);
-      } else {
-        start();
-      }
-    };
-    pauseCanvasAnimation = paused => {
-      canvasPaused = paused;
-      if (paused) stop();
-      else start();
-    };
-    const scheduleResize = () => {
-      window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(resize, 150);
-    };
-
-    resize();
-    start();
-    window.addEventListener('resize', scheduleResize, { passive: true });
-    document.addEventListener('visibilitychange', syncMotion);
-    if (reducedMotionQuery.addEventListener) {
-      reducedMotionQuery.addEventListener('change', syncMotion);
-    }
-  }
-
   function initGlassInteractions() {
     const targets = document.querySelectorAll(
       '.genesis-card-wrapper, .rpg-card, .public-leaderboard-card, .btn-open-archive, ' +
@@ -7184,8 +7292,7 @@
       }, { passive: true });
       target.addEventListener('pointermove', event => {
         if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-        if (!pointerBounds) pointerBounds = target.getBoundingClientRect();
-        if (!pointerBounds.width || !pointerBounds.height) return;
+        if (!pointerBounds || !pointerBounds.width || !pointerBounds.height) return;
         const x = Math.max(0, Math.min(1, (event.clientX - pointerBounds.left) / pointerBounds.width));
         const y = Math.max(0, Math.min(1, (event.clientY - pointerBounds.top) / pointerBounds.height));
         const rotateY = (x - 0.5) * 7;
@@ -8266,27 +8373,16 @@
     const statusId = 'game-leaderboard-status';
     setLeaderboardStatus(statusId, 'Đang triệu hồi Cao Thủ Đoán Niên Hiệu...');
     try {
-      const { data, error } = await supabaseClient.from('sect_public_disciples')
-        .select('user_id,full_name,sect_title,quiz_best_score,quiz_max_combo,active_frame,is_owner')
-        .order('quiz_best_score', { ascending: false })
-        .order('quiz_max_combo', { ascending: false })
+      const { data, error } = await supabaseClient.from('leaderboard')
+        .select('user_id,display_name,best_score,best_streak')
+        .order('best_score', { ascending: false })
+        .order('best_streak', { ascending: false })
         .limit(10);
-      if (error) {
-        console.warn('Chưa thể đọc Bảng Phong Thần công khai; thử bảng tương thích:', error);
-        const { data: legacyRows, error: legacyError } = await supabaseClient.from('leaderboard')
-          .select('user_id,display_name,best_score,best_streak')
-          .order('best_score', { ascending: false })
-          .order('best_streak', { ascending: false })
-          .limit(10);
-        if (legacyError) throw legacyError;
-        renderGameLeaderboard(legacyRows || []);
-        setLeaderboardStatus(statusId, 'Bảng đang hiển thị dữ liệu tương thích; hãy áp dụng migration để đồng bộ chức vụ và khung viền.');
-        return;
-      }
+      if (error) throw error;
       renderGameLeaderboard((data || []).filter(row =>
-        Number(row.quiz_best_score) > 0 || Number(row.quiz_max_combo) > 0
+        Number(row.best_score) > 0 || Number(row.best_streak) > 0
       ));
-      setLeaderboardStatus(statusId, '');
+      setLeaderboardStatus(statusId, 'Bảng xếp hạng đã được đồng bộ.');
     } catch (error) {
       console.error('Không thể tải Cao Thủ Đoán Niên Hiệu:', error);
       const list = document.getElementById('game-leaderboard-list');
@@ -8354,18 +8450,22 @@
       if (saveError) throw saveError;
       if (!saved) {
         const { data: inserted, error: insertError } = await supabaseClient.from('disciples').upsert({
-        user_id: authenticatedUser.id,
+          user_id: authenticatedUser.id,
           email: String(authenticatedUser.email || ''),
+          username: String(state.disciple && state.disciple.username ||
+            authenticatedUser.email && authenticatedUser.email.split('@')[0] || ''),
           full_name: getMemberFullName(authenticatedUser),
           avatar_url: getMemberAvatar(authenticatedUser),
           sect_title: String(state.disciple.sect_title || 'Ngoại Môn Đệ Tử'),
+          spirit_stones: 20,
           is_banned: false,
           visit_count: 1,
           last_seen: new Date().toISOString(),
           quiz_best_score: score,
           quiz_max_combo: bestCombo
-        }, { onConflict: 'user_id' }).select('*').single();
+        }, { onConflict: 'user_id' }).select('*').maybeSingle();
         if (insertError) throw insertError;
+        if (!inserted) throw new Error('Không thể tải hồ sơ môn đồ sau khi lưu thành tích.');
         state.disciple = inserted;
       } else {
         state.disciple = saved;
@@ -10069,7 +10169,7 @@
     }
 
     renderCapsules();
-    void loadGuestbook();
+    deferHomeLoad('guestbook', section, () => { void loadGuestbook(); });
 
     // 4. Form Character Counter
     const senderInput = document.getElementById('capsule-sender');

@@ -55,7 +55,7 @@ begin
     new.is_owner := false;
     new.is_pinned := false;
     new.rewarded_stones := 0;
-    select coalesce(d.full_name, 'Đạo Hữu'),
+    select coalesce(nullif(d.username, ''), d.full_name, 'Đạo Hữu'),
            coalesce(d.sect_title, 'Ngoại Môn Đệ Tử'),
            coalesce(d.avatar_url, ''),
            coalesce(d.active_frame, 'jade')

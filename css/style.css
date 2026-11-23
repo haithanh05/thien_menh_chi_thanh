@@ -586,7 +586,7 @@
   /* Typography & Core Metrics */
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-serif: 'Playfair Display', Georgia, serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
 
   --container-max: 1240px;
   --radius-sm: 8px;
@@ -8094,7 +8094,7 @@ body.museum-body {
   transform: translateZ(0);
 }
 
-body.museum-body > :not(#cultivation-bg):not(#spiritParticlesCanvas):not(#authSealModal):not(.ambient-glow):not(#sticky-header):not(.modal):not(.lightbox-modal):not(.cinema-modal):not(.feature-modal):not(#floating-bg-player):not(#auth-modal):not(.floating-controls-cluster) {
+body.museum-body > :not(#cultivation-bg):not(#authSealModal):not(.ambient-glow):not(#sticky-header):not(.modal):not(.lightbox-modal):not(.cinema-modal):not(.feature-modal):not(#floating-bg-player):not(#auth-modal):not(.floating-controls-cluster) {
   position: relative;
   z-index: 1;
 }
@@ -8327,7 +8327,7 @@ body.museum-body > :not(#cultivation-bg):not(#spiritParticlesCanvas):not(#authSe
   position: absolute;
   top: 36%;
   color: rgba(245, 158, 11, 0.85);
-  font: 600 clamp(14px, 2vw, 22px)/2.2 'Noto Serif', serif;
+  font: 600 clamp(14px, 2vw, 22px)/2.2 var(--font-serif), serif;
   letter-spacing: 0.2em;
   opacity: 0.06;
   text-align: center;
@@ -9088,7 +9088,7 @@ html[data-theme="xianxia"] .stage-main-title,
 html[data-theme="xianxia"] .stage-title,
 html[data-theme="xianxia"] .rpg-rank,
 html[data-theme="xianxia"] .rpg-level-name {
-  font-family: 'Noto Serif', var(--font-serif), serif;
+  font-family: var(--font-serif), serif;
   font-weight: 700;
 }
 
@@ -9122,7 +9122,7 @@ html[data-theme="xianxia"] .rpg-level-name {
   background: linear-gradient(145deg, rgba(127, 29, 29, 0.88), rgba(69, 10, 10, 0.92));
   box-shadow: inset 0 0 0 2px rgba(254, 202, 202, 0.12), 0 5px 16px rgba(127, 29, 29, 0.24);
   color: #fee2e2;
-  font-family: 'Noto Serif', serif;
+  font-family: var(--font-serif), serif;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -11097,7 +11097,7 @@ html[data-theme="xianxia"] .nav-btn-auth::before {
 
 .bagua-script {
   fill: rgba(255, 226, 138, 0.88);
-  font-family: 'Noto Serif', serif;
+  font-family: var(--font-serif), serif;
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 2px;
@@ -12521,15 +12521,7 @@ body {
   }
 }
 
-#spiritParticlesCanvas {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  width: 100vw;
-  height: 100vh;
-  pointer-events: none;
-  opacity: 0.78;
-}
+.linh-thach-svg-defs { position: absolute; width: 0; height: 0; overflow: hidden; pointer-events: none; }
 
 #authSealModal {
   position: fixed;
@@ -15153,15 +15145,27 @@ html[data-page="tongmon"] .tongmon-main {
   font: 700 11px/1.3 Arial, sans-serif;
 }
 
+html[data-theme="xianxia"] .nav-actions #nav-admin-link {
+  position: relative;
+  overflow: visible;
+}
+
+#nav-sect-chat-link[hidden],
+#nav-admin-link[hidden] {
+  display: none !important;
+}
+
 .sect-chat-panel {
   position: fixed;
-  right: 18px;
+  top: auto;
+  right: 14px;
   bottom: 86px;
-  z-index: 1000;
+  z-index: 1100;
   display: flex;
-  width: min(660px, calc(100vw - 28px));
-  height: min(540px, calc(100dvh - 190px));
-  min-height: 320px;
+  width: min(94vw, 440px);
+  height: min(72vh, 520px);
+  max-height: min(72vh, 520px);
+  min-height: 0;
   flex-direction: column;
   overflow: hidden;
   border: 1px solid rgba(106, 215, 187, .35);
@@ -15171,7 +15175,6 @@ html[data-page="tongmon"] .tongmon-main {
   box-shadow: 0 20px 60px rgba(0,0,0,.48);
   backdrop-filter: blur(16px);
 }
-
 .sect-chat-panel[hidden],
 .sect-chat-admin-layout[hidden],
 .sect-chat-member-layout[hidden] { display: none !important; }
@@ -15192,11 +15195,13 @@ html[data-page="tongmon"] .tongmon-main {
 .sect-chat-header button { border: 0; background: transparent; color: white; font-size: 1.2rem; cursor: pointer; }
 .sect-chat-admin-layout, .sect-chat-member-layout { min-height: 0; flex: 1; }
 .sect-chat-admin-layout { display: grid; grid-template-columns: minmax(130px, 36%) 1fr; }
-.sect-chat-conversations { overflow: auto; border-right: 1px solid rgba(255,255,255,.1); }
+.sect-chat-conversations { min-height: 0; overflow: auto; border-right: 1px solid rgba(255,255,255,.1); }
 .sect-chat-conversation {
   position: relative;
   display: grid;
   width: 100%;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
   gap: 4px;
   padding: 11px;
   border: 0;
@@ -15208,11 +15213,16 @@ html[data-page="tongmon"] .tongmon-main {
 }
 .sect-chat-conversation.active { background: rgba(66, 162, 134, .18); }
 .sect-chat-conversation span { overflow-wrap: anywhere; color: rgba(229, 241, 235, .62); font-size: .72rem; }
+.sect-chat-conversation-details { display: grid; min-width: 0; gap: 4px; }
 .sect-chat-conversation b { position: absolute; top: 8px; right: 8px; color: #ff9a94; }
 .sect-chat-room, .sect-chat-member-layout { display: flex; min-width: 0; flex-direction: column; }
+.sect-chat-room-header { display: none; }
 .sect-chat-messages { display: flex; min-height: 0; flex: 1; flex-direction: column; gap: 8px; overflow: auto; padding: 12px; }
 .sect-chat-message {
   position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   max-width: 92%;
   align-self: flex-start;
   padding: 9px 11px;
@@ -15222,9 +15232,11 @@ html[data-page="tongmon"] .tongmon-main {
   overflow-wrap: anywhere;
 }
 .sect-chat-message.is-owner { align-self: flex-end; border-radius: 13px 13px 4px 13px; background: rgba(98, 76, 35, .58); }
+.sect-chat-message-body { min-width: 0; }
 .sect-chat-message p { margin: 5px 0 0; white-space: pre-wrap; }
 .sect-chat-message small { color: rgba(235, 240, 233, .56); font-size: .68rem; }
 .sect-chat-message button { margin-left: 8px; border: 0; background: transparent; color: #ffaaaa; cursor: pointer; font-size: .72rem; }
+.sect-chat-avatar { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 50%; object-fit: cover; outline: 1px solid rgba(112, 220, 187, .5); outline-offset: 1px; }
 .sect-chat-form { grid-template-columns: 1fr auto; align-items: end; padding: 10px; border-top: 1px solid rgba(255,255,255,.1); }
 .sect-chat-form textarea { min-height: 48px; max-height: 105px; }
 .sect-chat-form .admin-primary-button { min-height: 42px; }
@@ -15269,14 +15281,23 @@ html[data-page="tongmon"] .tongmon-main {
 .frame-lotus { box-shadow: 0 0 0 2px #f4d781, 0 0 15px rgba(255, 219, 116, .48); }
 .ticket-disciple-avatar { width: 56px; height: 56px; margin-bottom: 8px; border-radius: 50%; object-fit: cover; vertical-align: middle; }
 .souvenir-ticket[class*="frame-"] { outline: 2px solid rgba(224, 193, 111, .35); outline-offset: 3px; }
-.admin-dashboard-panel .sect-chat-panel { position: relative; }
-
-@media (max-width: 600px) {
-  .sect-chat-panel { right: 18px; bottom: 86px; width: min(440px, calc(100vw - 36px)); height: min(520px, calc(100dvh - 170px)); }
-  .sect-chat-admin-layout { grid-template-columns: minmax(104px, 34%) 1fr; }
+@media (max-width: 640px) {
+  .sect-chat-panel { right: 14px; width: min(94vw, 440px); height: min(72vh, 520px); max-height: min(72vh, 520px); }
+  .sect-chat-admin-layout { display: block; }
+  .sect-chat-admin-layout.is-chatting .sect-chat-conversations,
+  .sect-chat-admin-layout:not(.is-chatting) .sect-chat-room { display: none; }
+  .sect-chat-conversations { height: 100%; border-right: 0; }
+  .sect-chat-room { height: 100%; animation: sect-chat-room-enter .18s ease-out; }
+  .sect-chat-room-header { display: flex; min-height: 38px; align-items: center; gap: 12px; padding: 8px 12px 0; color: #ffe6a3; }
+  .sect-chat-back-list { padding: 5px 9px; border: 1px solid rgba(106, 215, 187, .35); border-radius: 999px; background: rgba(18, 60, 53, .58); color: #e8fff5; }
   .sect-chat-form { grid-template-columns: 1fr; }
   .sect-chat-form .admin-primary-button { justify-self: end; }
   .sect-comment-card.is-reply { margin-left: 12px; }
+}
+
+@keyframes sect-chat-room-enter {
+  from { opacity: 0; transform: translateX(8px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 .qi-spiritual-path {
