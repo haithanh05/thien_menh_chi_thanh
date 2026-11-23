@@ -8,8 +8,8 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=79">
-  <link rel="stylesheet" href="css/style.css?v=79">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=80">
+  <link rel="stylesheet" href="css/style.css?v=85">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -238,7 +238,7 @@
                   <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="game"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🎯 Đố Vui Độ Kiếp</span></label>
                   <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="audio"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🎧 Nhạc Dưỡng Thần</span></label>
                   <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="autoPlayMusic"><span class="admin-toggle-switch" aria-hidden="true"></span><span>▶️ Tự phát &amp; nối tiếp nhạc khi chuyển trang</span></label>
-                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="attributes"><span class="admin-toggle-switch" aria-hidden="true"></span><span>💎 Bảng Thuộc Tính Tu Tiên</span></label>
+                  <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="attributes"><span class="admin-toggle-switch" aria-hidden="true"></span><span><span data-spirit-stone-icon aria-hidden="true"></span> Bảng Thuộc Tính Tu Tiên</span></label>
                   <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="leaderboard"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🏆 Bảng Vàng Tu Tiên</span></label>
                   <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="hideAdminFromLeaderboard"><span class="admin-toggle-switch" aria-hidden="true"></span><span>👑 Ẩn Admin khỏi Bảng Vàng &amp; Tu Vi công khai</span></label>
                   <label class="admin-toggle-row"><input type="checkbox" data-feature-toggle="comments"><span class="admin-toggle-switch" aria-hidden="true"></span><span>🗣️ Tường Truyền Âm</span></label>
@@ -448,6 +448,15 @@
               </section>
             </section>
             <section class="admin-dashboard-panel" id="admin-panel-disciples" role="tabpanel" aria-labelledby="admin-tab-disciples" hidden>
+              <section class="admin-tool-card admin-owner-name-card" aria-labelledby="admin-owner-name-heading">
+                <h4 id="admin-owner-name-heading">✏️ Đổi Đạo Hiệu Tông Chủ</h4>
+                <form id="admin-owner-name-form" class="admin-form admin-owner-name-form">
+                  <label for="admin-owner-name-input">Đạo hiệu mới (2–24 ký tự)</label>
+                  <input id="admin-owner-name-input" type="text" minlength="2" maxlength="24" required>
+                  <button type="submit" class="admin-primary-button">Lưu Đạo Hiệu</button>
+                </form>
+                <p id="admin-owner-name-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+              </section>
               <section class="admin-tool-card">
                 <h4>👥 Sổ Danh Sách Môn Đồ</h4>
                 <label class="admin-search-label" for="admin-disciples-search">Tìm theo tên hoặc email</label>
@@ -528,7 +537,6 @@
         <section id="auth-account-panel" hidden>
           <div class="admin-dashboard-heading">
             <p id="auth-user-label"></p>
-            <button type="button" id="auth-sign-out" class="admin-secondary-button">Đăng xuất</button>
           </div>
           <section id="auth-cultivation-card" class="auth-cultivation-card" hidden aria-labelledby="auth-cultivation-title">
             <div class="cultivation-card-heading">
@@ -588,9 +596,9 @@
       </div>
     </div>
   </footer>
-<script defer src="js/memories.js?v=79"></script>
+<script defer src="js/memories.js?v=85"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="js/premium-effects.js?v=79"></script>
-<script defer src="js/app.js?v=79"></script>
+<script defer src="js/premium-effects.js?v=85"></script>
+<script defer src="js/app.js?v=85"></script>
 </body>
 </html>

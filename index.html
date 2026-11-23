@@ -8,8 +8,8 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=79">
-  <link rel="stylesheet" href="css/style.css?v=79">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=80">
+  <link rel="stylesheet" href="css/style.css?v=85">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -584,7 +584,10 @@
       <p id="sect-comment-status" class="admin-tool-status" role="status" aria-live="polite"></p>
     </form>
     <ol id="sect-comment-list" class="sect-comment-list" aria-live="polite"><li class="admin-memory-empty">Đang mở Đàm Đạo Các…</li></ol>
-    <button id="sect-comment-load-more" type="button" class="admin-secondary-button">Xem thêm bình luận</button>
+    <div id="sect-comment-pagination" class="sect-comment-pagination">
+      <button id="sect-comment-load-more" type="button" class="admin-secondary-button" hidden></button>
+      <button id="sect-comment-collapse" type="button" class="admin-secondary-button" hidden>⬆️ Thu gọn bình luận</button>
+    </div>
   </section>
   <section class="utility-launcher" id="utility-launcher" aria-label="Tiện ích Đại Điện">
     <div class="container utility-launcher-container">
@@ -736,7 +739,6 @@
         <section id="auth-account-panel" hidden>
           <div class="admin-dashboard-heading">
             <p id="auth-user-label"></p>
-            <button type="button" id="auth-sign-out" class="admin-secondary-button">Đăng xuất</button>
           </div>
           <section id="auth-cultivation-card" class="auth-cultivation-card" hidden aria-labelledby="auth-cultivation-title">
             <div class="cultivation-card-heading">
@@ -796,9 +798,9 @@
       </div>
     </div>
   </footer>
-<script defer src="js/memories-home.js?v=79"></script>
+<script defer src="js/memories-home.js?v=85"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="js/premium-effects.js?v=79"></script>
-<script defer src="js/app.js?v=79"></script>
+<script defer src="js/premium-effects.js?v=85"></script>
+<script defer src="js/app.js?v=85"></script>
 </body>
 </html>

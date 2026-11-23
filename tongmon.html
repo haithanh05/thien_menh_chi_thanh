@@ -8,8 +8,8 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
-  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=79">
-  <link rel="stylesheet" href="css/style.css?v=79">
+  <link rel="icon" type="image/jpeg" href="images/2026/IMG_4295_Original.JPG?v=80">
+  <link rel="stylesheet" href="css/style.css?v=85">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
@@ -167,15 +167,6 @@
     <section class="tongmon-feature-actions"><button type="button" class="nav-btn nav-btn-game" id="btn-nav-game"><span class="btn-icon">🎯</span><span class="btn-text">Đố Vui Độ Kiếp</span></button><a class="nav-btn nav-btn-ticket" href="#ticket-station"><span class="btn-icon">🎟️</span><span class="btn-text">Cấp Thẻ Đệ Tử</span></a></section>
     <section id="ticket-station" class="ticket-station-section utility-section">
     <div class="container ticket-container">
-      <section id="disciple-profile-tools" class="disciple-profile-tools" hidden aria-labelledby="disciple-profile-title">
-        <div class="disciple-profile-heading"><h2 id="disciple-profile-title">🪷 Đạo Hiệu &amp; Pháp Bảo Cá Nhân</h2><strong id="spirit-stones-balance">💎 0 Linh Thạch</strong></div>
-        <div id="disciple-avatar-picker" class="disciple-avatar-picker" aria-label="Chọn avatar tu tiên"></div>
-        <label class="avatar-upload-label" for="disciple-avatar-upload">Tải avatar riêng (ảnh vuông sẽ tự cắt và nén)</label>
-        <input id="disciple-avatar-upload" type="file" accept="image/jpeg,image/png,image/webp" hidden>
-        <p id="disciple-avatar-status" class="admin-tool-status" role="status" aria-live="polite"></p>
-        <div id="disciple-frame-shop" class="disciple-frame-shop"></div>
-      </section>
-      
       <!-- Section Header -->
       <div class="ticket-section-header">
         <span class="ticket-badge">🎟️ TRẠM DỪNG CHÂN LƯU NIỆM</span>
@@ -378,15 +369,15 @@
       <div class="game-modal-header">
         <div class="game-title-group">
           <span class="game-tag-badge">🎮 MINI-GAME TRÍ NHỚ</span>
-          <h2 class="game-modal-title" id="game-modal-title">🎮 Thử Thách Đoán Năm</h2>
+          <h2 class="game-modal-title" id="game-modal-title">⚔️ Đố Vui Độ Kiếp</h2>
           <span class="game-score-badge" id="game-score-badge">Điểm: 0 | Chuỗi: 0🔥</span>
         </div>
         <button type="button" class="modal-close-btn" id="btn-close-game" aria-label="Đóng trò chơi">×</button>
       </div>
 
       <div class="game-mode-selector" role="group" aria-label="Chọn chế độ chơi">
-        <button type="button" class="game-mode-button active" data-game-mode="normal">🧘 Tu Luyện Thường · 10 ải</button>
-        <button type="button" class="game-mode-button" data-game-mode="death">⚔️ Độ Kiếp Sinh Tử · 3 mạng</button>
+        <button type="button" class="game-mode-button active" data-game-mode="normal">🧘 Tu Luyện · 10 ải</button>
+        <button type="button" class="game-mode-button" data-game-mode="death">⚔️ Độ Kiếp · 3 mạng</button>
       </div>
 
       <!-- Game Status & Progress Bar -->
@@ -404,9 +395,9 @@
       <!-- Game Playing Screen -->
       <div class="game-body" id="game-play-screen">
         <div class="game-powerups" id="game-powerups">
-          <button type="button" data-game-powerup="fifty" aria-label="Thiên Cơ Kính: loại hai đáp án sai">🔮 Thiên Cơ Kính</button>
-          <button type="button" data-game-powerup="hint" aria-label="Mảnh Tàn Hồn: xem gợi ý">📜 Mảnh Tàn Hồn</button>
-          <button type="button" data-game-powerup="freeze" aria-label="Định Thần Phù: đóng băng đồng hồ">⏳ Định Thần Phù</button>
+          <button type="button" data-game-powerup="fifty" aria-label="Thiên Cơ Kính: loại hai đáp án sai">🔮 Thiên Cơ</button>
+          <button type="button" data-game-powerup="hint" aria-label="Mảnh Tàn Hồn: xem gợi ý">📜 Tàn Hồn</button>
+          <button type="button" data-game-powerup="freeze" aria-label="Định Thần Phù: đóng băng đồng hồ">⏳ Định Thần</button>
         </div>
         <p id="game-hint-status" class="game-hint-status" role="status" aria-live="polite" hidden></p>
         
@@ -559,7 +550,6 @@
         <section id="auth-account-panel" hidden>
           <div class="admin-dashboard-heading">
             <p id="auth-user-label"></p>
-            <button type="button" id="auth-sign-out" class="admin-secondary-button">Đăng xuất</button>
           </div>
           <section id="auth-cultivation-card" class="auth-cultivation-card" hidden aria-labelledby="auth-cultivation-title">
             <div class="cultivation-card-heading">
@@ -619,9 +609,9 @@
       </div>
     </div>
   </footer>
-<script defer src="js/memories.js?v=79"></script>
+<script defer src="js/memories.js?v=85"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script defer src="js/premium-effects.js?v=79"></script>
-<script defer src="js/app.js?v=79"></script>
+<script defer src="js/premium-effects.js?v=85"></script>
+<script defer src="js/app.js?v=85"></script>
 </body>
 </html>

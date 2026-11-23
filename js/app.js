@@ -12,6 +12,11 @@
   const SITE_NAME = 'Thiên Mệnh Chi Thành';
   const pageName = document.documentElement.dataset.page || document.body.dataset.page || 'home';
   const MUSIC_SESSION_KEY = 'thien-menh-chi-thanh:background-music';
+  const MUSIC_POSITION_KEY = 'thien-menh-chi-thanh:background-music-position';
+  const DISCIPLE_AVATAR_CACHE_PREFIX = 'thien-menh-chi-thanh:disciple-avatar:';
+  const DISCIPLE_PROFILE_CACHE_PREFIX = 'thien-menh-chi-thanh:disciple-profile:';
+  const DEVICE_ID_KEY = 'tm_device_id';
+  const DEFAULT_DISCIPLE_AVATAR = 'images/avt/avt3.webp';
   const GENESIS_PREFACE = '"Nơi lưu giữ toàn bộ quá trình độ kiếp từ một phàm nhân hay ngủ nướng thành Kiến Trúc Sư Gõ Phím tuổi 21. Đạo hữu ghé thăm xin nhẹ tay tặng chút Linh Thạch, chớ dại trêu chọc Thành Chủ kẻo bị tế lên Thiên Kiêu Bảng!"';
   const HERO_INTRO = '"Chào mừng đạo hữu hạ phàm ghé thăm thánh địa của Thành Chủ Hải Thành! Nơi đây phong ấn toàn bộ huyết lệ từ thuở luyện khí còn sợ bug đến khi độ kiếp thành chiến thần gõ phím Lv.21. Đã lỡ chân bước vào thì đừng vội quay xe — hãy dâng chút Linh Thạch lấy hên rồi cùng khám phá thiên cơ!"';
   const INVITE_URL = 'https://kyniem.ht05.id.vn/';
@@ -86,14 +91,20 @@
   let authenticatedUser = null;
   let pendingAuthAction = null;
   let activeAuthMode = 'login';
+  let suppressMusicClickAfterDrag = false;
   let pauseXianxiaAnimation = null;
   let html2CanvasPromise = null;
   let adminToastTimer = null;
+  let discipleNameToastTimer = null;
   let cultivationCardControlsBound = false;
   let adminDashboardRequest = null;
   let adminWorkspaceInitialized = false;
   let adminPreviewObjectUrl = '';
   let discipleSyncUserId = '';
+  let currentUserProfile = null;
+  let sectOwnerProfile = null;
+  let bannedAccountEnforcement = null;
+  let bannedAccountUserId = '';
   let presenceChannel = null;
   let discipleRealtimeChannel = null;
   let presenceJoinTime = new Date().toISOString();
@@ -113,7 +124,9 @@
   let chatFallbackAvatarUrl = '';
   let sectCommentState = {
     offset: 0,
+    visibleRoots: 3,
     hasMore: true,
+    totalRoots: 0,
     replyTo: null,
     rows: [],
     expandedRoots: new Set(),
@@ -182,6 +195,7 @@
       playlist: [],
       currentIndex: 0,
       audio: new Audio(),
+      previousVolume: 0.5,
       startTimeApplied: false,
       isPlaying: false,
       isUserMuted: true,
@@ -859,7 +873,9 @@
     setVisibility('#nav-tongmon-link', toggles.ticket || toggles.game);
     setVisibility('#ticket-station', toggles.ticket);
     setVisibility('#btn-nav-game', toggles.game);
-    setVisibility('#global-audio-toggle, #floating-bg-player', toggles.audio);
+    setVisibility('#global-audio-toggle', toggles.audio);
+    const floatingMusicPlayer = document.getElementById('floating-bg-player');
+    if (floatingMusicPlayer) floatingMusicPlayer.hidden = false;
     setVisibility('.rpg-card', toggles.attributes);
     setVisibility('#home-cultivation-section', toggles.attributes);
     setVisibility('#public-leaderboard', toggles.leaderboard);
@@ -1160,6 +1176,11 @@
   function getUserDisplayName(user) {
     const email = String(user && user.email || '');
     const metadata = user && user.user_metadata || {};
+    if (user && state.disciple &&
+        String(state.disciple.user_id || '') === String(user.id || '')) {
+      const discipleName = String(state.disciple.full_name || state.disciple.username || '').trim();
+      if (discipleName) return discipleName;
+    }
     return String(metadata.display_name || metadata.full_name || email.split('@')[0] || 'Đạo Hữu').trim();
   }
 
@@ -1747,10 +1768,11 @@
       bindGlobalEvents();
       initModalNavbarSync();
       if (homePage || tongmonPage) initUtilityPanels();
+      initDiscipleProfileTools();
+      initSpiritStoneIconSlots();
       initAuthPortal();
       initSectMessages();
       if (homePage) initSectComments();
-      if (tongmonPage) initDiscipleProfileTools();
       initPageAccessControls();
       if (galleryPage) initArchiveLockModal();
       if (homePage) initCultivationOracle();
@@ -1993,6 +2015,90 @@
     return String(user && user.email || '').toLowerCase() === ADMIN_EMAIL;
   }
 
+  function getOrCreateDeviceId() {
+    let deviceId = window.localStorage.getItem(DEVICE_ID_KEY);
+    if (deviceId && /^[a-z0-9-]{16,80}$/i.test(deviceId)) return deviceId;
+    deviceId = window.crypto && typeof window.crypto.randomUUID === 'function'
+      ? window.crypto.randomUUID()
+      : `tm-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(DEVICE_ID_KEY, deviceId);
+    return deviceId;
+  }
+
+  async function checkAndRegisterIp(user, isNewSignup) {
+    let timeoutId = 0;
+    let deviceId = '';
+    try {
+      if (!supabaseClient) throw new Error('Dịch vụ tài khoản chưa sẵn sàng.');
+      deviceId = getOrCreateDeviceId();
+      const request = supabaseClient.rpc('check_and_register_ip', {
+          p_ip: '',
+          p_device_id: deviceId,
+          p_is_new_signup: Boolean(isNewSignup),
+          p_is_admin: isAdminUser(user)
+        });
+      const { data, error } = await Promise.race([
+        request,
+        new Promise((resolve, reject) => {
+          timeoutId = window.setTimeout(
+            () => reject(new Error('Hết thời gian xác minh IP/thiết bị (2,5 giây).')),
+            2500
+          );
+        })
+      ]);
+      if (error) throw error;
+      const result = Array.isArray(data) ? data[0] : data;
+      if (!result || typeof result.allowed !== 'boolean') {
+        throw new Error('Phản hồi giới hạn IP/thiết bị không hợp lệ.');
+      }
+      return {
+        allowed: result.allowed,
+        reason: String(result.reason || ''),
+        deviceId
+      };
+    } catch (error) {
+      console.error('Không thể xác minh giới hạn IP/thiết bị:', error);
+      return {
+        allowed: false,
+        reason: `Không thể xác minh IP/thiết bị: ${error.message || 'Lỗi Supabase.'}`,
+        deviceId
+      };
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId);
+    }
+  }
+
+  async function releaseIpReservation(deviceId) {
+    if (!deviceId || !supabaseClient) return;
+    try {
+      const { error } = await supabaseClient.rpc('release_ip_registration', {
+        p_device_id: deviceId
+      });
+      if (error) console.warn('Không thể giải phóng lượt ghi danh IP đang chờ:', error);
+    } catch (error) {
+      console.warn('Không thể giải phóng lượt ghi danh IP đang chờ:', error);
+    }
+  }
+
+  async function rejectIpRegistration(user, reason) {
+    let signOutError = null;
+    if (authenticatedUser && String(authenticatedUser.id || '') === String(user && user.id || '') &&
+        supabaseClient) {
+      try {
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) throw error;
+        if (authenticatedUser) setAuthenticatedUser(null);
+      } catch (error) {
+        signOutError = error;
+        console.error('Không thể đăng xuất phiên bị từ chối bởi giới hạn IP:', error);
+      }
+    }
+    const message = `Tài khoản bị từ chối: ${reason || 'IP hoặc thiết bị này đã được liên kết với tài khoản khác.'}` +
+      (signOutError ? ` Chưa thể đăng xuất tự động: ${signOutError.message || 'lỗi kết nối.'}` : '');
+    openAuthModal(message);
+    setAdminStatus(message, true);
+  }
+
   function requireAuth(actionCallback) {
     if (authenticatedUser) return true;
     pendingAuthAction = typeof actionCallback === 'function' ? actionCallback : null;
@@ -2002,7 +2108,85 @@
   }
 
   function isDiscipleBanned() {
-    return Boolean(state.disciple && state.disciple.is_banned === true);
+    return !isAdminUser() && Boolean(state.disciple && state.disciple.is_banned === true);
+  }
+
+  function showDiscipleBanModal(signOutError = '') {
+    let modal = document.getElementById('banned-account-modal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'banned-account-modal';
+      modal.className = 'disciple-ban-modal';
+      modal.innerHTML = `
+        <section class="disciple-ban-dialog" role="dialog" aria-modal="true" aria-labelledby="disciple-ban-title">
+          <div class="disciple-ban-seal" aria-hidden="true">⛔</div>
+          <h2 id="disciple-ban-title">Đạo Tịch Đã Bị Phong Ấn</h2>
+          <p>Tài khoản của bạn đã bị Tông Chủ phong ấn khỏi Tông Môn, mọi quyền truy cập đã bị khóa.</p>
+          <p class="disciple-ban-signout-error" role="status" aria-live="polite"></p>
+          <button type="button" class="disciple-ban-guest-button">Đã hiểu / Quay lại chế độ Khách</button>
+        </section>`;
+      modal.querySelector('.disciple-ban-guest-button').addEventListener('click', async () => {
+        const button = modal.querySelector('.disciple-ban-guest-button');
+        button.disabled = true;
+        try {
+          if (authenticatedUser && supabaseClient) {
+            const { error } = await supabaseClient.auth.signOut();
+            if (error) throw error;
+            if (authenticatedUser) setAuthenticatedUser(null);
+          }
+          modal.remove();
+          bannedAccountUserId = '';
+          setCurrentUserProfile(null);
+          state.discipleStatusReady = false;
+        } catch (error) {
+          console.error('Không thể kết thúc phiên bị phong ấn:', error);
+          const errorLabel = modal.querySelector('.disciple-ban-signout-error');
+          if (errorLabel) errorLabel.textContent = `Không thể chuyển về chế độ Khách: ${error.message || 'lỗi kết nối Supabase.'}`;
+          button.disabled = false;
+        }
+      });
+      document.body.appendChild(modal);
+    }
+    const errorLabel = modal.querySelector('.disciple-ban-signout-error');
+    if (errorLabel) {
+      errorLabel.textContent = signOutError
+        ? `Không thể thu hồi phiên đăng nhập: ${signOutError}`
+        : '';
+    }
+  }
+
+  async function enforceDiscipleBan(user) {
+    if (!user || isAdminUser(user)) return false;
+    const userId = String(user.id || '');
+    if (!userId) return false;
+    if (bannedAccountUserId === userId && document.getElementById('banned-account-modal') &&
+        !bannedAccountEnforcement) return false;
+    if (bannedAccountUserId !== userId) {
+      bannedAccountUserId = userId;
+      setCurrentUserProfile({ ...(state.disciple || {}), user_id: userId, is_banned: true });
+      state.discipleStatusReady = true;
+      closeUserProfileModal();
+      showDiscipleBanModal();
+    }
+    if (bannedAccountEnforcement) return bannedAccountEnforcement;
+    bannedAccountEnforcement = (async () => {
+      try {
+        if (!supabaseClient) throw new Error('Dịch vụ xác thực chưa sẵn sàng.');
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) throw error;
+        if (String(authenticatedUser && authenticatedUser.id || '') === userId) {
+          setAuthenticatedUser(null);
+        }
+        return true;
+      } catch (error) {
+        console.error('Không thể thu hồi phiên đăng nhập bị phong ấn:', error);
+        showDiscipleBanModal(error.message || 'lỗi kết nối Supabase.');
+        return false;
+      } finally {
+        bannedAccountEnforcement = null;
+      }
+    })();
+    return bannedAccountEnforcement;
   }
 
   function discipleBanMessage(status) {
@@ -2025,9 +2209,13 @@
       .maybeSingle();
     if (error) throw error;
     if (!data) throw new Error('Không tìm thấy linh tịch môn đồ để xác minh quyền gửi.');
-    state.disciple = { ...(state.disciple || {}), is_banned: Boolean(data.is_banned) };
+    setCurrentUserProfile({ ...(state.disciple || {}), is_banned: Boolean(data.is_banned) });
     state.discipleStatusReady = true;
-    return !isDiscipleBanned() || discipleBanMessage(status);
+    if (isDiscipleBanned()) {
+      await enforceDiscipleBan(authenticatedUser);
+      return discipleBanMessage(status);
+    }
+    return true;
   }
 
   function hasDiscipleFeatureAccess(status) {
@@ -2060,16 +2248,416 @@
       user && user.email && user.email.split('@')[0] || 'Đạo Hữu').trim();
   }
 
-  function getMemberAvatar(user) {
-    const metadata = user && user.user_metadata || {};
-    const value = String(metadata.avatar_url || metadata.picture || '').trim();
-    return /^https:\/\//i.test(value) ? value : '';
+  function resolveAvatarUrl(rawUrl) {
+    return String(rawUrl || '').trim() || DEFAULT_DISCIPLE_AVATAR;
+  }
+
+  function getCachedDiscipleAvatar(userId) {
+    if (!userId) return '';
+    try {
+      const avatar = window.localStorage.getItem(`${DISCIPLE_AVATAR_CACHE_PREFIX}${userId}`) || '';
+      return isDisplayableAvatar(avatar) ? avatar : '';
+    } catch (error) {
+      console.warn('Không thể đọc bộ nhớ đệm ảnh đại diện:', error);
+      return '';
+    }
+  }
+
+  function cacheDiscipleAvatar(userId, avatarUrl) {
+    if (!userId || !avatarUrl) return;
+    try {
+      window.localStorage.setItem(`${DISCIPLE_AVATAR_CACHE_PREFIX}${userId}`, avatarUrl);
+    } catch (error) {
+      console.warn('Không thể lưu bộ nhớ đệm ảnh đại diện:', error);
+    }
+  }
+
+  function getCachedDiscipleProfile(userId) {
+    if (!userId) return null;
+    try {
+      const cached = JSON.parse(window.localStorage.getItem(`${DISCIPLE_PROFILE_CACHE_PREFIX}${userId}`) || 'null');
+      return cached && typeof cached === 'object' ? cached : null;
+    } catch (error) {
+      console.warn('Không thể đọc bộ nhớ đệm hồ sơ môn đồ:', error);
+      return null;
+    }
+  }
+
+  function cacheDiscipleProfile(userId, profile) {
+    if (!userId || !profile) return;
+    try {
+      window.localStorage.setItem(`${DISCIPLE_PROFILE_CACHE_PREFIX}${userId}`, JSON.stringify({
+        avatar_url: resolveAvatarUrl(profile.avatar_url),
+        active_frame: String(profile.active_frame || profile.avatar_frame || 'jade'),
+        avatar_frame: String(profile.avatar_frame || profile.active_frame || 'jade'),
+        unlocked_frames: Array.isArray(profile.unlocked_frames) ? profile.unlocked_frames : ['jade'],
+        spirit_stones: Math.max(0, Number(profile.spirit_stones) || 0)
+      }));
+    } catch (error) {
+      console.warn('Không thể lưu bộ nhớ đệm hồ sơ môn đồ:', error);
+    }
+  }
+
+  function getDefaultDiscipleAvatar(user) {
+    return resolveAvatarUrl('');
+  }
+
+  function setAvatarImageSource(image, rawUrl) {
+    if (!image) return;
+    const requestedUrl = resolveAvatarUrl(rawUrl);
+    const sampleMatch = requestedUrl.match(/^(.*\/avt[1-5])\.(?:webp|jpe?g|png)$/i);
+    const defaultMatch = DEFAULT_DISCIPLE_AVATAR.match(/^(.*\/avt[1-5])\./i);
+    const sampleBase = sampleMatch && sampleMatch[1];
+    const defaultBase = defaultMatch && defaultMatch[1];
+    const sampleCandidates = base => base
+      ? ['webp', 'jpg', 'png'].map(extension => `${base}.${extension}`)
+      : [];
+    const candidates = Array.from(new Set([
+      requestedUrl,
+      ...sampleCandidates(sampleBase),
+      ...(requestedUrl === DEFAULT_DISCIPLE_AVATAR ? [] : sampleCandidates(defaultBase))
+    ]));
+    let nextIndex = 0;
+    image.onerror = () => {
+      if (nextIndex < candidates.length) {
+        image.src = candidates[nextIndex++];
+        return;
+      }
+      image.onerror = null;
+      image.src = makeXianxiaAvatar(2).src;
+    };
+    image.src = candidates[nextIndex++];
+  }
+
+  function setCurrentUserProfile(profile, persist = false) {
+    currentUserProfile = profile
+      ? { ...profile, avatar_frame: String(profile.avatar_frame || profile.active_frame || 'jade') }
+      : null;
+    state.disciple = currentUserProfile;
+    if (persist && authenticatedUser && currentUserProfile &&
+        String(currentUserProfile.user_id || '') === String(authenticatedUser.id)) {
+      cacheDiscipleProfile(authenticatedUser.id, currentUserProfile);
+    }
+  }
+
+  function getCurrentDiscipleAvatar(user = authenticatedUser) {
+    if (!user) return '';
+    const profile = currentUserProfile &&
+      String(currentUserProfile.user_id || '') === String(user.id || '')
+      ? currentUserProfile
+      : state.disciple &&
+        String(state.disciple.user_id || '') === String(user.id || '')
+        ? state.disciple
+      : null;
+    const equippedAvatar = profile && (
+      profile.equipped_avatar_url || profile.avatar_item_url || profile.active_avatar_url
+    );
+    return resolveAvatarUrl(profile && profile.avatar_url || getCachedDiscipleAvatar(user.id) ||
+      equippedAvatar || getDefaultDiscipleAvatar(user));
+  }
+
+  function getSpiritStoneIconSVG(size = 16) {
+    const iconSize = Math.max(12, Math.min(64, Math.round(Number(size) || 16)));
+    return `<svg class="spirit-stone-icon" width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 1.7 21.2 7l-2.35 10.9L12 22.3l-6.85-4.4L2.8 7 12 1.7Z" fill="#39d9b4" stroke="#c5fff0" stroke-width="1.1"/>
+      <path d="M12 1.7v20.6l6.85-4.4L21.2 7 12 1.7Z" fill="#078d82"/>
+      <path d="m12 1.7 4.2 6.1 5-0.8M12 7.8l6.85 10.1M12 7.8 5.15 17.9M2.8 7l5 .8L12 1.7M7.8 7.8 12 22.3" fill="none" stroke="#baffea" stroke-opacity=".82" stroke-width=".8" stroke-linejoin="round"/>
+      <path d="m8 7.8 4-6.1 4.2 6.1L12 12 8 7.8Z" fill="#d2fff1" fill-opacity=".72"/>
+    </svg>`;
+  }
+
+  function initSpiritStoneIconSlots() {
+    document.querySelectorAll('[data-spirit-stone-icon]').forEach(slot => {
+      slot.innerHTML = getSpiritStoneIconSVG(16);
+    });
+  }
+
+  function renderHeaderSpiritStones(user, headerButton) {
+    const actions = document.querySelector('.nav-account-actions');
+    if (!actions || !headerButton) return;
+    let button = document.getElementById('nav-spirit-stones');
+    if (!button) {
+      button = document.createElement('button');
+      button.id = 'nav-spirit-stones';
+      button.type = 'button';
+      button.className = 'nav-btn nav-spirit-stones';
+      button.setAttribute('aria-haspopup', 'dialog');
+      button.setAttribute('aria-controls', 'userProfileModal');
+      button.addEventListener('click', openUserProfileModal);
+    }
+    button.hidden = !user;
+    if (user) {
+      const count = isAdminUser(user)
+        ? '∞'
+        : Math.max(0, Number(state.disciple && state.disciple.spirit_stones) || 0);
+      button.innerHTML = `${getSpiritStoneIconSVG(16)}<span>${count}</span>`;
+      button.setAttribute('aria-label', `${count} Linh Thạch. Mở Hồ Sơ Cá Nhân`);
+      button.title = `${count} Linh Thạch · Mở Hồ Sơ Cá Nhân`;
+    } else {
+      button.replaceChildren();
+    }
+    headerButton.after(button);
+  }
+
+  function initDraggableMusicControl(player, cluster) {
+    const button = document.getElementById('bg-music-toggle-btn');
+    if (!button || cluster.dataset.dragInitialized) return;
+    cluster.dataset.dragInitialized = 'true';
+    const initialRect = player.getBoundingClientRect();
+    cluster.classList.add('is-draggable');
+    cluster.style.left = `${initialRect.left}px`;
+    cluster.style.top = `${initialRect.top}px`;
+    cluster.style.right = 'auto';
+    cluster.style.bottom = 'auto';
+    button.classList.add('is-draggable');
+    button.style.touchAction = 'none';
+    button.style.userSelect = 'none';
+    button.style.cursor = 'grab';
+    button.style.position = 'relative';
+    button.style.zIndex = '9990';
+    button.style.width = '46px';
+    button.style.height = '46px';
+
+    const clampPosition = (left, top) => {
+      const maxLeft = Math.max(12, window.innerWidth - 58);
+      const maxTop = Math.max(12, window.innerHeight - 64);
+      const minTop = Math.min(72, maxTop);
+      return {
+        left: Math.max(12, Math.min(Number(left) || 0, maxLeft)),
+        top: Math.max(minTop, Math.min(Number(top) || minTop, maxTop))
+      };
+    };
+    const savePosition = position => {
+      try {
+        window.localStorage.setItem(MUSIC_POSITION_KEY, JSON.stringify(position));
+      } catch (error) {
+        console.warn('Không thể lưu vị trí nút nhạc nền:', error);
+      }
+    };
+    const applyPosition = (left, top, shouldSave = false) => {
+      const position = clampPosition(left, top);
+      cluster.style.left = `${position.left}px`;
+      cluster.style.top = `${position.top}px`;
+      if (shouldSave) savePosition(position);
+      return position;
+    };
+    const snapToNearestEdge = (left, top, shouldSave = true) => {
+      const bounded = clampPosition(left, top);
+      const rightEdge = Math.max(12, window.innerWidth - 58);
+      const snappedLeft = bounded.left + 23 <= window.innerWidth / 2 ? 12 : rightEdge;
+      const position = applyPosition(snappedLeft, bounded.top, shouldSave);
+      positionMiniMusicControl();
+      return position;
+    };
+
+    let savedPosition = null;
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(MUSIC_POSITION_KEY) || 'null');
+      if (saved && Number.isFinite(Number(saved.left)) && Number.isFinite(Number(saved.top))) {
+        savedPosition = { left: Number(saved.left), top: Number(saved.top) };
+      }
+    } catch (error) {
+      console.warn('Không thể khôi phục vị trí nút nhạc nền:', error);
+    }
+    snapToNearestEdge(
+      savedPosition ? savedPosition.left : initialRect.left,
+      savedPosition ? savedPosition.top : initialRect.top,
+      true
+    );
+    initMiniMusicControl(button);
+
+    let pointer = null;
+    const finishDrag = event => {
+      if (!pointer || event.pointerId !== pointer.id) return;
+      if (pointer.dragged) {
+        const bounds = cluster.getBoundingClientRect();
+        cluster.classList.remove('is-dragging');
+        snapToNearestEdge(bounds.left, bounds.top, true);
+        suppressMusicClickAfterDrag = true;
+        window.setTimeout(() => { suppressMusicClickAfterDrag = false; }, 350);
+      }
+      const pointerId = pointer.id;
+      pointer = null;
+      if (button.hasPointerCapture && button.hasPointerCapture(pointerId)) {
+        button.releasePointerCapture(pointerId);
+      }
+    };
+    button.addEventListener('pointerdown', event => {
+      if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+      const bounds = cluster.getBoundingClientRect();
+      pointer = {
+        id: event.pointerId,
+        startX: event.clientX,
+        startY: event.clientY,
+        left: bounds.left,
+        top: bounds.top,
+        dragged: false
+      };
+      button.setPointerCapture(event.pointerId);
+    });
+    button.addEventListener('pointermove', event => {
+      if (!pointer || event.pointerId !== pointer.id) return;
+      const deltaX = event.clientX - pointer.startX;
+      const deltaY = event.clientY - pointer.startY;
+      if (!pointer.dragged && Math.hypot(deltaX, deltaY) >= 6) {
+        pointer.dragged = true;
+        cluster.classList.add('is-dragging');
+      }
+      if (!pointer.dragged) return;
+      const position = applyPosition(pointer.left + deltaX, pointer.top + deltaY);
+      pointer.left = position.left - deltaX;
+      pointer.top = position.top - deltaY;
+      positionMiniMusicControl();
+      if (event.cancelable) event.preventDefault();
+    });
+    button.addEventListener('pointerup', finishDrag);
+    button.addEventListener('pointercancel', finishDrag);
+    window.addEventListener('resize', () => {
+      const bounds = cluster.getBoundingClientRect();
+      snapToNearestEdge(bounds.left, bounds.top, true);
+    });
+  }
+
+  function initMiniMusicControl(button) {
+    if (!button || document.getElementById('mini-bg-music-control')) return;
+    const panel = document.createElement('section');
+    panel.id = 'mini-bg-music-control';
+    panel.className = 'mini-bg-music-control';
+    panel.hidden = true;
+    panel.setAttribute('aria-label', 'Bảng điều khiển Âm Luật');
+    panel.style.position = 'fixed';
+    panel.style.zIndex = '9991';
+    panel.style.width = 'min(280px, calc(100vw - 24px))';
+    panel.style.padding = '14px';
+    panel.style.maxHeight = 'calc(100dvh - 24px)';
+    panel.style.overflow = 'auto';
+    panel.style.border = '1px solid rgba(154, 224, 204, .34)';
+    panel.style.borderRadius = '18px';
+    panel.style.background = 'rgba(8, 28, 29, .92)';
+    panel.style.color = '#effff8';
+    panel.style.boxShadow = '0 16px 48px rgba(0, 0, 0, .48), inset 0 1px rgba(255, 255, 255, .18)';
+    panel.style.backdropFilter = 'blur(24px) saturate(155%)';
+    panel.innerHTML = `
+      <header class="mini-bg-music-header">
+        <div class="mini-bg-music-track">
+          <span class="mini-bg-music-wave" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          <div><strong>Âm Luật</strong><span id="mini-bg-music-status">Đang tạm dừng</span></div>
+        </div>
+        <button type="button" class="mini-bg-music-close" data-mini-music-action="close" aria-label="Đóng">✕</button>
+      </header>
+      <p class="mini-bg-music-title" id="mini-bg-music-title">Đang chọn khúc nhạc...</p>
+      <div class="mini-bg-music-actions">
+        <button type="button" class="admin-primary-button" data-mini-music-action="toggle">▶️ Tiếp tục</button>
+        <button type="button" class="admin-secondary-button" data-mini-music-action="next">⏭️ Đổi khúc</button>
+      </div>
+      <div class="mini-bg-music-volume">
+        <button type="button" class="mini-bg-music-volume-toggle" data-mini-music-action="mute" aria-label="Tắt tiếng">🔊</button>
+        <label for="mini-bg-music-volume">Âm lượng</label>
+        <input id="mini-bg-music-volume" type="range" min="0" max="1" step="0.01" value="0.5">
+      </div>`;
+    document.body.appendChild(panel);
+
+    button.addEventListener('click', event => {
+      if (suppressMusicClickAfterDrag) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        suppressMusicClickAfterDrag = false;
+        return;
+      }
+      panel.hidden = !panel.hidden;
+      button.setAttribute('aria-expanded', String(!panel.hidden));
+      if (!panel.hidden) {
+        updateMiniMusicControlUI();
+        positionMiniMusicControl();
+      }
+    });
+    panel.addEventListener('click', event => {
+      const action = event.target.closest('[data-mini-music-action]');
+      if (!action) return;
+      if (action.dataset.miniMusicAction === 'close') {
+        panel.hidden = true;
+        button.setAttribute('aria-expanded', 'false');
+      } else if (action.dataset.miniMusicAction === 'toggle') {
+        toggleBgMusic();
+      } else if (action.dataset.miniMusicAction === 'next') {
+        nextBgMusicTrack();
+      } else if (action.dataset.miniMusicAction === 'mute') {
+        if (state.bgMusic.audio.volume > 0) {
+          state.bgMusic.previousVolume = state.bgMusic.audio.volume;
+          state.bgMusic.audio.volume = 0;
+        } else {
+          state.bgMusic.audio.volume = state.bgMusic.previousVolume || 0.5;
+        }
+        updateMiniMusicControlUI();
+      }
+    });
+    panel.querySelector('#mini-bg-music-volume').addEventListener('input', event => {
+      const volume = Number(event.currentTarget.value);
+      state.bgMusic.audio.volume = volume;
+      if (volume > 0) state.bgMusic.previousVolume = volume;
+      updateMiniMusicControlUI();
+    });
+    window.addEventListener('resize', positionMiniMusicControl);
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !panel.hidden) {
+        panel.hidden = true;
+        button.setAttribute('aria-expanded', 'false');
+      }
+    });
+    updateMiniMusicControlUI();
+  }
+
+  function positionMiniMusicControl() {
+    const panel = document.getElementById('mini-bg-music-control');
+    const button = document.getElementById('bg-music-toggle-btn');
+    if (!panel || panel.hidden || !button) return;
+    const anchor = button.getBoundingClientRect();
+    const bounds = panel.getBoundingClientRect();
+    const gap = 12;
+    const width = Math.min(280, Math.max(0, window.innerWidth - gap * 2));
+    const height = bounds.height;
+    const placeRight = anchor.left < window.innerWidth / 2;
+    const belowSpace = window.innerHeight - anchor.bottom - gap;
+    const aboveSpace = anchor.top - gap;
+    const placeBelow = belowSpace >= height || belowSpace >= aboveSpace;
+    const proposedLeft = placeRight ? anchor.right + gap : anchor.left - width - gap;
+    const proposedTop = placeBelow
+      ? anchor.bottom + gap
+      : anchor.top - height - gap;
+    const left = Math.max(gap, Math.min(proposedLeft, window.innerWidth - width - gap));
+    const top = Math.max(gap, Math.min(proposedTop, window.innerHeight - height - gap));
+    panel.style.left = `${left}px`;
+    panel.style.top = `${top}px`;
+  }
+
+  function updateMiniMusicControlUI() {
+    const panel = document.getElementById('mini-bg-music-control');
+    if (!panel) return;
+    const playing = state.bgMusic.isPlaying && !state.bgMusic.audio.paused &&
+      !state.bgMusic.isUserMuted;
+    const status = panel.querySelector('#mini-bg-music-status');
+    const title = panel.querySelector('#mini-bg-music-title');
+    const toggle = panel.querySelector('[data-mini-music-action="toggle"]');
+    const volume = panel.querySelector('#mini-bg-music-volume');
+    const mute = panel.querySelector('[data-mini-music-action="mute"]');
+    const track = state.bgMusic.playlist[state.bgMusic.currentIndex];
+    if (status) status.textContent = playing ? 'Đang phát' : 'Đang tạm dừng';
+    if (title) title.textContent = track && track.title || 'Chưa có khúc nhạc';
+    if (toggle) toggle.textContent = playing ? '⏸️ Tạm dừng' : '▶️ Tiếp tục';
+    if (volume) volume.value = String(state.bgMusic.audio.volume);
+    if (mute) {
+      mute.textContent = state.bgMusic.audio.volume > 0 ? '🔊' : '🔇';
+      mute.setAttribute('aria-label', state.bgMusic.audio.volume > 0 ? 'Tắt tiếng' : 'Bật tiếng');
+    }
+    panel.classList.toggle('is-playing', playing);
+    positionMiniMusicControl();
   }
 
   function isDisplayableAvatar(value) {
     const url = String(value || '').trim();
     return /^https:\/\//i.test(url) ||
-      /^data:image\/(?:webp|jpeg|png|svg\+xml)(?:;[^,]*)?,/i.test(url);
+      /^data:image\/(?:webp|jpeg|png|svg\+xml)(?:;[^,]*)?,/i.test(url) ||
+      /^images\/avt\/avt[1-5]\.(?:webp|jpe?g|png)$/i.test(url);
   }
 
   async function syncDiscipleForUser(user) {
@@ -2088,7 +2676,7 @@
       sect_title: 'Ngoại Môn Đệ Tử',
       spirit_stones: 20,
       is_banned: false,
-      avatar_url: getMemberAvatar(user),
+      avatar_url: resolveAvatarUrl(''),
       visit_count: 0,
       unlocked_frames: ['jade'],
       active_frame: 'jade'
@@ -2106,16 +2694,30 @@
         .eq('user_id', user.id)
         .maybeSingle();
       if (readError) throw readError;
+      if (existing && existing.is_banned === true && !isAdminUser(user)) {
+        setCurrentUserProfile(existing);
+        state.discipleStatusReady = true;
+        await enforceDiscipleBan(user);
+        return;
+      }
 
+      const ipCheck = await checkAndRegisterIp(user, !existing);
+      if (!ipCheck.allowed) {
+        await rejectIpRegistration(user, ipCheck.reason);
+        return;
+      }
+
+      const cachedProfile = getCachedDiscipleProfile(user.id);
       const payload = {
         ...defaultProfile,
         ...(existing || {}),
         user_id: user.id,
         email: String(user.email || ''),
-        full_name: getMemberFullName(user),
-        username: String(user.user_metadata && user.user_metadata.username ||
-          existing && existing.username || defaultProfile.username),
-        avatar_url: getMemberAvatar(user) || String(existing && existing.avatar_url || ''),
+        full_name: String(existing && existing.full_name || getMemberFullName(user)),
+        username: String(existing && existing.username ||
+          user.user_metadata && user.user_metadata.username || defaultProfile.username),
+        avatar_url: resolveAvatarUrl(existing && existing.avatar_url ||
+          getCachedDiscipleAvatar(user.id) || cachedProfile && cachedProfile.avatar_url || ''),
         sect_title: String(existing && existing.sect_title || 'Ngoại Môn Đệ Tử'),
         is_banned: Boolean(existing && existing.is_banned),
         visit_count: Math.max(0, Number(existing && existing.visit_count) || 0) + (isNewVisit ? 1 : 0),
@@ -2123,8 +2725,11 @@
           ? Math.max(0, Number(existing.spirit_stones) || 0)
           : 20,
         unlocked_frames: Array.isArray(existing && existing.unlocked_frames)
-          ? existing.unlocked_frames : ['jade'],
-        active_frame: String(existing && existing.active_frame || 'jade'),
+          ? existing.unlocked_frames
+          : Array.isArray(cachedProfile && cachedProfile.unlocked_frames)
+            ? cachedProfile.unlocked_frames : ['jade'],
+        active_frame: String(existing && existing.active_frame ||
+          cachedProfile && (cachedProfile.active_frame || cachedProfile.avatar_frame) || 'jade'),
         last_seen: new Date().toISOString()
       };
       const { data, error } = await supabaseClient.from('disciples')
@@ -2133,15 +2738,16 @@
         .maybeSingle();
       if (error) throw error;
       if (String(authenticatedUser && authenticatedUser.id || '') !== String(user.id)) return;
-      state.disciple = data || payload;
+      setCurrentUserProfile(data || payload, true);
       initDiscipleRealtime(user);
+      renderHeaderAccountButton(authenticatedUser);
       requestLeaderboardLoad();
       if (isAdminUser()) void loadAdminDisciples();
       if (state.disciple.is_banned) discipleBanMessage();
     } catch (error) {
       if (String(authenticatedUser && authenticatedUser.id || '') === String(user.id)) {
         discipleSyncUserId = '';
-        state.disciple = defaultProfile;
+        setCurrentUserProfile(defaultProfile, true);
         console.warn('Không thể đồng bộ Sổ Môn Đồ:', error);
       }
     } finally {
@@ -2149,6 +2755,9 @@
         state.discipleStatusReady = true;
         refreshDiscipleshipUI();
         renderDiscipleProfileTools();
+        renderHeaderAccountButton(authenticatedUser);
+        const ownerNameInput = document.getElementById('admin-owner-name-input');
+        if (ownerNameInput && isAdminUser()) ownerNameInput.value = getCurrentDiscipleName();
         updatePresence();
       }
     }
@@ -2165,8 +2774,11 @@
         filter: `user_id=eq.${user.id}`
       }, payload => {
         if (!payload.new || String(payload.new.user_id) !== String(authenticatedUser && authenticatedUser.id)) return;
-        state.disciple = { ...(state.disciple || {}), ...payload.new };
+        setCurrentUserProfile({ ...(state.disciple || {}), ...payload.new }, true);
         state.discipleStatusReady = true;
+        if (state.disciple.is_banned === true && !isAdminUser(authenticatedUser)) {
+          void enforceDiscipleBan(authenticatedUser);
+        }
         refreshDiscipleshipUI();
         updatePresence();
       })
@@ -2198,6 +2810,7 @@
       }
       const profileTools = document.getElementById('disciple-profile-tools');
       if (profileTools) profileTools.hidden = true;
+      if (authenticatedUser && !isAdminUser()) void enforceDiscipleBan(authenticatedUser);
     } else {
       document.querySelectorAll('.milestone-comment-form textarea, .milestone-comment-form button[type="submit"]')
         .forEach(element => { element.disabled = false; });
@@ -2205,6 +2818,7 @@
         .forEach(element => { element.disabled = false; });
     }
     renderDiscipleProfileTools();
+    renderHeaderAccountButton(authenticatedUser);
   }
 
   function openCommunityAuthGate(feature) {
@@ -2252,30 +2866,73 @@
   function renderDiscipleProfileTools() {
     const section = document.getElementById('disciple-profile-tools');
     if (!section) return;
-    section.hidden = !authenticatedUser || !state.discipleStatusReady || isDiscipleBanned();
+    section.hidden = !authenticatedUser || isDiscipleBanned();
     if (section.hidden) return;
     const balance = document.getElementById('spirit-stones-balance');
-    if (balance) balance.textContent = `💎 ${Math.max(0, Number(state.disciple && state.disciple.spirit_stones) || 0)} Linh Thạch`;
+    const stoneCount = isAdminUser()
+      ? '∞'
+      : Math.max(0, Number(state.disciple && state.disciple.spirit_stones) || 0);
+    if (balance) balance.innerHTML = `${getSpiritStoneIconSVG(18)}<span>${stoneCount} Linh Thạch</span>`;
+    renderHeaderSpiritStones(authenticatedUser, document.getElementById('btn-header-auth'));
+    if (!state.discipleStatusReady || !state.disciple) {
+      const status = document.getElementById('disciple-avatar-status');
+      if (status) status.textContent = 'Đang tải Hồ Sơ Đạo Hữu…';
+      return;
+    }
+    const avatarPreview = document.getElementById('disciple-avatar-preview');
+    if (avatarPreview) {
+      setAvatarImageSource(avatarPreview, getCurrentDiscipleAvatar());
+      avatarPreview.className = `disciple-avatar-preview ${frameClass(state.disciple.avatar_frame || state.disciple.active_frame)}`;
+    }
+    const uploadPreview = document.getElementById('disciple-avatar-upload-preview');
+    if (uploadPreview) {
+      setAvatarImageSource(uploadPreview, getCurrentDiscipleAvatar());
+    }
     const picker = document.getElementById('disciple-avatar-picker');
     if (picker && !picker.dataset.initialized) {
       picker.dataset.initialized = 'true';
       picker.replaceChildren();
-      Array.from({ length: 12 }, (_, index) => makeXianxiaAvatar(index)).forEach((avatar, index) => {
+      for (let index = 1; index <= 5; index += 1) {
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'disciple-avatar-option';
-        button.dataset.avatarIndex = String(index);
-        button.setAttribute('aria-label', `Chọn avatar ${avatar.name}`);
+        button.dataset.avatarSample = String(index);
+        button.dataset.avatarPath = `images/avt/avt${index}`;
+        button.disabled = true;
+        button.setAttribute('aria-label', `Chọn ảnh đại diện mẫu ${index}`);
         const image = document.createElement('img');
-        image.src = avatar.src;
+        image.className = 'disciple-avatar-sample-image';
         image.alt = '';
         image.loading = 'lazy';
         image.decoding = 'async';
+        const placeholder = document.createElement('span');
+        placeholder.className = 'disciple-avatar-sample-placeholder';
+        placeholder.textContent = 'Đang chờ ảnh';
+        placeholder.hidden = true;
         const label = document.createElement('span');
-        label.textContent = avatar.name;
-        button.append(image, label);
+        label.textContent = `Mẫu ${index}`;
+        button.append(image, placeholder, label);
+        const extensions = ['webp', 'jpg', 'png'];
+        let extensionIndex = 0;
+        image.onerror = () => {
+          if (extensionIndex < extensions.length) {
+            image.src = `${button.dataset.avatarPath}.${extensions[extensionIndex++]}`;
+            return;
+          }
+          image.hidden = true;
+          placeholder.hidden = false;
+          button.disabled = true;
+          button.classList.add('is-avatar-sample-missing');
+        };
+        image.onload = () => {
+          image.hidden = false;
+          placeholder.hidden = true;
+          button.disabled = false;
+          button.dataset.avatarPath = image.getAttribute('src');
+        };
+        image.src = `${button.dataset.avatarPath}.${extensions[extensionIndex++]}`;
         picker.appendChild(button);
-      });
+      }
     }
     const shop = document.getElementById('disciple-frame-shop');
     if (shop) {
@@ -2288,12 +2945,14 @@
         const title = document.createElement('strong');
         title.textContent = frame.name;
         const cost = document.createElement('span');
-        cost.textContent = frame.cost ? `💎 ${frame.cost}` : 'Miễn phí';
+        cost.innerHTML = frame.cost && !isAdminUser()
+          ? `${getSpiritStoneIconSVG(14)} ${frame.cost}`
+          : 'Miễn phí';
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'admin-secondary-button';
         button.dataset.frameId = frame.id;
-        if (state.disciple.active_frame === frame.id) {
+        if ((state.disciple.avatar_frame || state.disciple.active_frame) === frame.id) {
           button.textContent = 'Đang trang bị';
           button.disabled = true;
         } else {
@@ -2305,14 +2964,14 @@
     }
     const ticketAvatar = document.getElementById('ticket-disp-avatar');
     if (ticketAvatar) {
-      ticketAvatar.src = String(state.disciple.avatar_url || getMemberAvatar(authenticatedUser) || makeXianxiaAvatar(0).src);
-      ticketAvatar.className = `ticket-disciple-avatar ${frameClass(state.disciple.active_frame)}`;
+      setAvatarImageSource(ticketAvatar, getCurrentDiscipleAvatar());
+      ticketAvatar.className = `ticket-disciple-avatar ${frameClass(state.disciple.avatar_frame || state.disciple.active_frame)}`;
       ticketAvatar.hidden = false;
     }
     const ticket = document.getElementById('souvenir-ticket');
     if (ticket) {
       DISCIPLE_FRAMES.forEach(frame => ticket.classList.remove(`frame-${frame.id}`));
-      ticket.classList.add(frameClass(state.disciple.active_frame));
+      ticket.classList.add(frameClass(state.disciple.avatar_frame || state.disciple.active_frame));
     }
   }
 
@@ -2324,7 +2983,11 @@
         .eq('user_id', authenticatedUser.id).select('*').maybeSingle();
       if (error) throw error;
       if (!data) throw new Error('Không tìm thấy hồ sơ môn đồ để cập nhật.');
-      state.disciple = data;
+      setCurrentUserProfile(data, true);
+      if (patch.avatar_url) {
+        cacheDiscipleAvatar(authenticatedUser.id, patch.avatar_url);
+        renderHeaderAccountButton(authenticatedUser);
+      }
       refreshDiscipleshipUI();
       renderDiscipleProfileTools();
       if (status) status.textContent = 'Đã lưu hồ sơ đạo hữu.';
@@ -2349,7 +3012,7 @@
         .eq('user_id', authenticatedUser.id).maybeSingle();
       if (readError) throw readError;
       if (!data) throw new Error('Không tìm thấy hồ sơ môn đồ sau khi cộng Linh Thạch.');
-      state.disciple = data;
+      setCurrentUserProfile(data, true);
       renderDiscipleProfileTools();
     } catch (error) {
       console.warn('Không thể cộng Linh Thạch sau Đố Vui Độ Kiếp:', error);
@@ -2358,110 +3021,478 @@
     }
   }
 
+  async function saveDiscipleAvatar(avatarUrl) {
+    const status = document.getElementById('disciple-avatar-status');
+    if (!authenticatedUser || !state.discipleStatusReady || !supabaseClient) {
+      if (status) {
+        status.textContent = 'Vui lòng đăng nhập và chờ hồ sơ môn đồ đồng bộ trước khi lưu ảnh.';
+        status.classList.add('is-error');
+      }
+      return false;
+    }
+    if (!hasDiscipleFeatureAccess(status)) return false;
+
+    const userId = String(authenticatedUser.id);
+    if (status) {
+      status.textContent = 'Đang lưu ảnh đại diện và đồng bộ bình luận…';
+      status.classList.remove('is-error', 'is-warning', 'is-success');
+    }
+    let rpcSaved = false;
+    let rpcError = null;
+    if (typeof supabaseClient.rpc === 'function') {
+      try {
+        const { error } = await supabaseClient.rpc('update_disciple_avatar', {
+          p_avatar_url: avatarUrl
+        });
+        if (error) rpcError = error;
+        else rpcSaved = true;
+      } catch (error) {
+        rpcError = error;
+      }
+    }
+
+    let profile = null;
+    let profileError = null;
+    try {
+      const { data, error } = await supabaseClient.from('disciples')
+        .update({ avatar_url: avatarUrl })
+        .eq('user_id', userId)
+        .select('*')
+        .maybeSingle();
+      if (error) profileError = error;
+      else profile = data;
+    } catch (error) {
+      profileError = error;
+    }
+    if (profileError && !rpcSaved) {
+      const details = [rpcError && rpcError.message, profileError.message].filter(Boolean).join(' · ');
+      const message = `Không thể lưu ảnh đại diện: ${details || 'Lỗi Supabase.'}`;
+      if (status) {
+        status.textContent = message;
+        status.classList.add('is-error');
+      }
+      console.error(message, { rpcError, profileError });
+      return false;
+    }
+    if (!profile && !rpcSaved) {
+      const message = 'Không tìm thấy hồ sơ môn đồ để cập nhật ảnh đại diện.';
+      if (status) {
+        status.textContent = message;
+        status.classList.add('is-error');
+      }
+      return false;
+    }
+    if (profileError && rpcSaved) {
+      console.warn('RPC đã lưu ảnh nhưng không thể đọc lại hồ sơ môn đồ:', profileError);
+    }
+
+    if (String(authenticatedUser && authenticatedUser.id || '') !== userId) return true;
+    setCurrentUserProfile(profile || { ...(state.disciple || {}), user_id: userId, avatar_url: avatarUrl }, true);
+    cacheDiscipleAvatar(userId, avatarUrl);
+    sectChatState.conversations.forEach(conversation => {
+      if (String(conversation.user_id) === userId) conversation.avatar_url = avatarUrl;
+    });
+    sectChatState.messages.forEach(message => {
+      if (String(message.user_id) === userId) message.user_avatar = avatarUrl;
+    });
+    sectCommentState.rows.forEach(comment => {
+      if (String(comment.user_id || '') === userId) comment.user_avatar = avatarUrl;
+      (comment.replies || []).forEach(reply => {
+        if (String(reply.user_id || '') === userId) reply.user_avatar = avatarUrl;
+      });
+    });
+    renderHeaderAccountButton(authenticatedUser);
+    renderSectChatConversations();
+    renderSectChatMessages();
+    renderSectComments();
+    renderDiscipleProfileTools();
+
+    const commentsSynced = rpcSaved;
+    const commentSyncError = rpcError;
+    if (commentsSynced && sectCommentState.rows.length) await loadSectComments(false);
+    if (status) {
+      status.textContent = commentsSynced
+        ? '✨ Đã lưu ảnh đại diện và cập nhật ảnh trong Đàm Đạo Các!'
+        : `Ảnh đại diện đã lưu; chưa đồng bộ được ảnh bình luận: ${commentSyncError && commentSyncError.message || 'RPC chưa sẵn sàng.'}`;
+      status.classList.toggle('is-warning', !commentsSynced);
+      status.classList.toggle('is-success', commentsSynced);
+    }
+    return true;
+  }
+
+  function setAvatarUploadLoading(isLoading) {
+    const button = document.getElementById('disciple-avatar-upload-button');
+    if (!button) return;
+    const label = button.querySelector('.avatar-upload-button-label');
+    const spinner = button.querySelector('.avatar-upload-spinner');
+    button.disabled = isLoading;
+    button.setAttribute('aria-busy', String(isLoading));
+    if (label) label.textContent = isLoading ? 'Đang xử lý ảnh…' : '✨ Tải Ảnh Đại Diện';
+    if (spinner) spinner.hidden = !isLoading;
+  }
+
+  function initUserProfileModal() {
+    if (document.getElementById('userProfileModal')) return;
+    const modal = document.createElement('div');
+    modal.id = 'userProfileModal';
+    modal.className = 'user-profile-modal';
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    modal.innerHTML = `
+      <section class="user-profile-dialog" role="dialog" aria-modal="true" aria-labelledby="user-profile-title">
+        <header class="user-profile-modal-header">
+          <div>
+            <span class="mini-bg-music-kicker">HỒ SƠ ĐẠO HỮU</span>
+            <h2 id="user-profile-title">🪪 Hồ Sơ Cá Nhân</h2>
+          </div>
+          <button type="button" class="user-profile-close" data-user-profile-close aria-label="Đóng hồ sơ">✕</button>
+        </header>
+        <div class="user-profile-modal-content">
+          <section id="disciple-profile-tools" class="disciple-profile-tools" aria-label="Đạo Hiệu và Pháp Bảo Cá Nhân">
+            <div class="disciple-profile-tools-heading">
+              <img id="disciple-avatar-preview" class="disciple-avatar-preview" alt="Ảnh đại diện của bạn">
+              <div>
+                <h3>🪷 Đạo Hiệu &amp; Pháp Bảo Cá Nhân</h3>
+                <p id="spirit-stones-balance" class="spirit-stones-balance"></p>
+              </div>
+            </div>
+            <form id="disciple-profile-name-form" class="disciple-profile-name-form">
+              <label for="disciple-profile-name-input">Đổi Đạo Hiệu (2–24 ký tự)</label>
+              <div class="disciple-profile-name-controls">
+                <input id="disciple-profile-name-input" name="new_name" type="text" minlength="2" maxlength="24" autocomplete="nickname" required>
+                <button type="submit" class="admin-primary-button">Lưu Đạo Hiệu</button>
+              </div>
+              <p id="disciple-profile-name-status" class="admin-tool-status" role="status" aria-live="polite"></p>
+            </form>
+            <section class="disciple-avatar-samples-section" aria-labelledby="disciple-avatar-samples-title">
+              <h4 id="disciple-avatar-samples-title">🖼️ Chọn Ảnh Đại Diện Tông Môn</h4>
+              <div id="disciple-avatar-picker" class="disciple-avatar-picker" aria-label="Ảnh đại diện mẫu"></div>
+            </section>
+            <section class="disciple-avatar-upload-card" aria-labelledby="disciple-avatar-upload-title">
+              <div class="disciple-avatar-upload-preview">
+                <img id="disciple-avatar-upload-preview" alt="" aria-hidden="true">
+                <span aria-hidden="true">📷</span>
+              </div>
+              <div class="disciple-avatar-upload-copy">
+                <h4 id="disciple-avatar-upload-title">Tải Ảnh Đại Diện Cá Nhân</h4>
+                <p>Tự động căn vuông &amp; tối ưu sắc nét</p>
+              </div>
+              <input id="disciple-avatar-upload" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+              <button id="disciple-avatar-upload-button" class="disciple-avatar-upload-button" type="button">
+                <span class="avatar-upload-button-label">✨ Tải Ảnh Đại Diện</span>
+                <span class="avatar-upload-spinner" hidden aria-hidden="true"></span>
+              </button>
+            </section>
+            <p id="disciple-avatar-status" class="disciple-avatar-status" role="status" aria-live="polite"></p>
+            <section class="disciple-frame-section">
+              <h4>🛡️ Trang bị Pháp Bảo &amp; Khung Viền</h4>
+              <div id="disciple-frame-shop" class="disciple-frame-shop"></div>
+            </section>
+          </section>
+        </div>
+        <footer class="user-profile-modal-footer">
+          <p id="user-profile-sign-out-status" role="status" aria-live="polite"></p>
+          <button type="button" id="user-profile-sign-out" class="user-profile-sign-out">🚪 Đăng Xuất</button>
+        </footer>
+      </section>`;
+    document.body.appendChild(modal);
+    modal.querySelectorAll('[data-user-profile-close]').forEach(button =>
+      button.addEventListener('click', closeUserProfileModal));
+    modal.addEventListener('click', event => {
+      if (event.target === modal) closeUserProfileModal();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !modal.hidden) closeUserProfileModal();
+    });
+  }
+
+  function openUserProfileModal() {
+    if (!authenticatedUser) {
+      openAuthModal();
+      return;
+    }
+    if (isDiscipleBanned()) {
+      void enforceDiscipleBan(authenticatedUser);
+      return;
+    }
+    const modal = document.getElementById('userProfileModal');
+    if (!modal) return;
+    renderDiscipleProfileTools();
+    const nameInput = document.getElementById('disciple-profile-name-input');
+    if (nameInput) nameInput.value = getCurrentDiscipleName();
+    const nameStatus = document.getElementById('disciple-profile-name-status');
+    if (nameStatus) {
+      nameStatus.textContent = '';
+      nameStatus.classList.remove('is-error', 'is-success');
+    }
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('user-profile-modal-open');
+    window.requestAnimationFrame(() => modal.querySelector('[data-user-profile-close]')?.focus());
+  }
+
+  function closeUserProfileModal() {
+    const modal = document.getElementById('userProfileModal');
+    if (!modal) return;
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.classList.remove('user-profile-modal-open');
+  }
+
+  async function signOutFromUserProfile(button) {
+    const status = document.getElementById('user-profile-sign-out-status');
+    if (!supabaseClient) {
+      if (status) status.textContent = 'Dịch vụ tài khoản chưa sẵn sàng.';
+      return;
+    }
+    if (button) button.disabled = true;
+    if (status) status.textContent = 'Đang đăng xuất…';
+    const userId = String(authenticatedUser && authenticatedUser.id || '');
+    try {
+      const { error } = await supabaseClient.auth.signOut();
+      if (error) throw error;
+      try {
+        const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0];
+        window.localStorage.removeItem(`sb-${projectRef}-auth-token`);
+        if (userId) window.sessionStorage.removeItem(`thien-menh:disciple-visit:${userId}`);
+      } catch (error) {
+        console.warn('Không thể dọn bộ nhớ phiên đăng nhập sau khi đăng xuất:', error);
+      }
+      if (authenticatedUser) setAuthenticatedUser(null);
+      activeAuthMode = 'login';
+      renderAuthState(null);
+      setAuthMode('login');
+      closeUserProfileModal();
+      showToast('Đã đăng xuất. Bạn đang ở chế độ Khách.', '🚪');
+    } catch (error) {
+      console.error('Không thể đăng xuất khỏi Hồ Sơ Cá Nhân:', error);
+      if (status) status.textContent = `Không thể đăng xuất: ${error.message || 'Lỗi kết nối Supabase.'}`;
+      if (button) button.disabled = false;
+    }
+  }
+
   function initDiscipleProfileTools() {
+    initUserProfileModal();
     const picker = document.getElementById('disciple-avatar-picker');
     const upload = document.getElementById('disciple-avatar-upload');
+    const uploadButton = document.getElementById('disciple-avatar-upload-button');
     const shop = document.getElementById('disciple-frame-shop');
+    document.getElementById('user-profile-sign-out')
+      ?.addEventListener('click', event => { void signOutFromUserProfile(event.currentTarget); });
+    const nameForm = document.getElementById('disciple-profile-name-form');
+    if (nameForm && !nameForm.dataset.initialized) {
+      nameForm.dataset.initialized = 'true';
+      nameForm.addEventListener('submit', event => {
+        event.preventDefault();
+        void saveDiscipleName(
+          document.getElementById('disciple-profile-name-input').value,
+          document.getElementById('disciple-profile-name-status'),
+          nameForm.querySelector('button[type="submit"]')
+        );
+      });
+    }
+    if (uploadButton && upload && !uploadButton.dataset.initialized) {
+      uploadButton.dataset.initialized = 'true';
+      uploadButton.addEventListener('click', () => upload.click());
+    }
     if (picker) picker.addEventListener('click', event => {
-      const button = event.target.closest('[data-avatar-index]');
+      const button = event.target.closest('[data-avatar-sample]');
       if (!button || !authenticatedUser) return;
       if (!hasDiscipleFeatureAccess()) return;
-      const avatar = makeXianxiaAvatar(Number(button.dataset.avatarIndex));
-      void saveDiscipleChanges({ avatar_url: avatar.src });
+      if (button.disabled || !button.dataset.avatarPath) return;
+      const finalUrl = new URL(button.dataset.avatarPath, window.location.href).href;
+      void saveDiscipleAvatar(finalUrl);
     });
-    if (upload) upload.addEventListener('change', async () => {
-      const file = upload.files && upload.files[0];
-      upload.value = '';
-      if (!file) return;
-      if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 12 * 1024 * 1024) {
+    if (upload && !upload.dataset.initialized) {
+      upload.dataset.initialized = 'true';
+      upload.addEventListener('change', async () => {
+        const file = upload.files && upload.files[0];
+        upload.value = '';
+        if (!file) return;
         const status = document.getElementById('disciple-avatar-status');
-        if (status) status.textContent = 'Chỉ nhận ảnh JPEG, PNG hoặc WebP, dung lượng tối đa 12 MB.';
-        return;
-      }
-      if (!hasDiscipleFeatureAccess()) return;
-      const status = document.getElementById('disciple-avatar-status');
-      let source = '';
-      try {
-        const image = new Image();
-        source = URL.createObjectURL(file);
-        image.src = source;
-        await new Promise((resolve, reject) => {
-          image.onload = resolve;
-          image.onerror = () => reject(new Error('Không thể đọc ảnh đã chọn.'));
-        });
-        const side = Math.min(image.naturalWidth, image.naturalHeight);
-        const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
-        const context = canvas.getContext('2d');
-        if (!context) throw new Error('Trình duyệt không hỗ trợ xử lý ảnh.');
-        context.drawImage(image, (image.naturalWidth - side) / 2, (image.naturalHeight - side) / 2, side, side, 0, 0, 256, 256);
-        URL.revokeObjectURL(source);
-        source = '';
-        let mime = 'image/webp';
-        let quality = 0.78;
-        let dataUrl = canvas.toDataURL(mime, quality);
-        if (!dataUrl.startsWith('data:image/webp')) mime = 'image/jpeg';
-        for (let attempt = 0; attempt < 8 && Math.ceil(dataUrl.length * 0.75) > 35000; attempt += 1) {
-          quality = Math.max(0.35, quality - 0.06);
-          dataUrl = canvas.toDataURL(mime, quality);
+        if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size > 12 * 1024 * 1024) {
+          if (status) {
+            status.textContent = 'Chỉ nhận ảnh JPEG, PNG hoặc WebP, dung lượng tối đa 12 MB.';
+            status.classList.add('is-error');
+            status.classList.remove('is-warning', 'is-success');
+          }
+          return;
         }
-        if (Math.ceil(dataUrl.length * 0.75) > 35000) throw new Error('Ảnh chưa thể nén xuống dưới 35 KB. Vui lòng chọn ảnh khác.');
-        await saveDiscipleChanges({ avatar_url: dataUrl });
-      } catch (error) {
-        if (source) URL.revokeObjectURL(source);
-        if (status) status.textContent = error.message || 'Không thể xử lý ảnh.';
-      }
-    });
+        if (!hasDiscipleFeatureAccess(status)) return;
+        const uploadUserId = String(authenticatedUser && authenticatedUser.id || '');
+        let source = '';
+        setAvatarUploadLoading(true);
+        try {
+          const image = new Image();
+          source = URL.createObjectURL(file);
+          image.src = source;
+          await new Promise((resolve, reject) => {
+            image.onload = resolve;
+            image.onerror = () => reject(new Error('Không thể đọc ảnh đã chọn.'));
+          });
+          const side = Math.min(image.naturalWidth, image.naturalHeight);
+          if (!side) throw new Error('Ảnh không có kích thước hợp lệ.');
+          const canvas = document.createElement('canvas');
+          canvas.width = 256;
+          canvas.height = 256;
+          const context = canvas.getContext('2d');
+          if (!context) throw new Error('Trình duyệt không hỗ trợ xử lý ảnh.');
+          context.drawImage(image,
+            (image.naturalWidth - side) / 2,
+            (image.naturalHeight - side) / 2,
+            side,
+            side,
+            0,
+            0,
+            256,
+            256);
+          URL.revokeObjectURL(source);
+          source = '';
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          if (!dataUrl.startsWith('data:image/jpeg;base64,')) {
+            throw new Error('Không thể nén ảnh sang định dạng JPEG.');
+          }
+
+          let finalUrl = dataUrl;
+          try {
+            if (!supabaseClient.storage) throw new Error('Supabase Storage chưa sẵn sàng.');
+            if (String(authenticatedUser && authenticatedUser.id || '') !== uploadUserId) {
+              throw new Error('Phiên đăng nhập đã thay đổi; hãy chọn lại ảnh.');
+            }
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+            if (!blob) throw new Error('Không thể tạo tệp JPEG để tải lên Storage.');
+            const storagePath = `${uploadUserId}/avatar.jpg`;
+            const bucket = supabaseClient.storage.from('avatars');
+            const { error: storageError } = await bucket.upload(storagePath, blob, {
+              cacheControl: '3600',
+              contentType: 'image/jpeg',
+              upsert: true
+            });
+            if (storageError) throw storageError;
+            const { data: publicUrlData } = bucket.getPublicUrl(storagePath);
+            if (!publicUrlData || !publicUrlData.publicUrl) {
+              throw new Error('Không lấy được đường dẫn ảnh công khai từ Storage.');
+            }
+            const separator = publicUrlData.publicUrl.includes('?') ? '&' : '?';
+            finalUrl = `${publicUrlData.publicUrl}${separator}v=${Date.now()}`;
+          } catch (storageError) {
+            console.warn('Tải avatar lên Storage thất bại, chuyển sang lưu ảnh JPEG đã nén:', storageError);
+          }
+          if (String(authenticatedUser && authenticatedUser.id || '') !== uploadUserId) {
+            throw new Error('Phiên đăng nhập đã thay đổi; hãy chọn lại ảnh.');
+          }
+          await saveDiscipleAvatar(finalUrl);
+        } catch (error) {
+          if (status) {
+            status.textContent = error.message || 'Không thể xử lý ảnh.';
+            status.classList.add('is-error');
+            status.classList.remove('is-warning', 'is-success');
+          }
+        } finally {
+          if (source) URL.revokeObjectURL(source);
+          setAvatarUploadLoading(false);
+        }
+      });
+    }
     if (shop) shop.addEventListener('click', async event => {
       const button = event.target.closest('[data-frame-id]');
       if (!button || !authenticatedUser || !hasDiscipleFeatureAccess()) return;
       const frame = DISCIPLE_FRAMES.find(item => item.id === button.dataset.frameId);
-      if (!frame) return;
-      const unlocked = new Set(Array.isArray(state.disciple.unlocked_frames)
-        ? state.disciple.unlocked_frames : ['jade']);
-      if (!unlocked.has(frame.id)) {
-        const balance = Number(state.disciple.spirit_stones) || 0;
-        if (balance < frame.cost) {
-          const status = document.getElementById('disciple-avatar-status');
-          if (status) status.textContent = `Cần ${frame.cost} Linh Thạch để mở khóa ${frame.name}.`;
-          return;
+      if (!frame || button.disabled) return;
+      const status = document.getElementById('disciple-avatar-status');
+      const userId = String(authenticatedUser.id);
+      button.disabled = true;
+      button.textContent = 'Đang trang bị';
+      if (status) {
+        status.textContent = 'Đang cập nhật khung viền…';
+        status.classList.remove('is-error', 'is-warning');
+      }
+      try {
+        const { data, error } = await supabaseClient.rpc('equip_or_buy_frame', {
+          p_frame_id: frame.id,
+          p_cost: frame.cost,
+          p_is_admin: isAdminUser()
+        });
+        if (error) throw error;
+        let profile = data && typeof data === 'object' ? data : null;
+        if (!profile || !profile.user_id) {
+          const { data: refreshed, error: readError } = await supabaseClient.from('disciples')
+            .select('*').eq('user_id', userId).maybeSingle();
+          if (readError) throw readError;
+          if (!refreshed) throw new Error('Không tìm thấy hồ sơ môn đồ sau khi trang bị khung viền.');
+          profile = refreshed;
         }
-        const { error } = await supabaseClient.rpc('purchase_disciple_frame', { p_frame: frame.id });
-        if (error) {
-          const status = document.getElementById('disciple-avatar-status');
-          if (status) status.textContent = `Không thể mở khung viền: ${error.message || 'hãy kiểm tra cấu hình Supabase.'}`;
-          return;
-        }
-        const { data, error: readError } = await supabaseClient.from('disciples').select('*')
-          .eq('user_id', authenticatedUser.id).maybeSingle();
-        if (readError) throw readError;
-        if (!data) throw new Error('Không tìm thấy hồ sơ môn đồ sau khi mở khung viền.');
-        state.disciple = data;
+        const activeFrame = String(profile.avatar_frame || profile.active_frame || frame.id);
+        const updatedProfile = {
+          ...state.disciple,
+          ...profile,
+          active_frame: activeFrame,
+          avatar_frame: activeFrame
+        };
+        setCurrentUserProfile(updatedProfile, true);
+        sectCommentState.rows.forEach(comment => {
+          if (String(comment.user_id || '') === userId) comment.active_frame = activeFrame;
+        });
         refreshDiscipleshipUI();
-      } else {
-        const { error } = await supabaseClient.rpc('equip_disciple_frame', { p_frame: frame.id });
-        if (error) {
-          const status = document.getElementById('disciple-avatar-status');
-          if (status) status.textContent = `Không thể trang bị khung viền: ${error.message || 'hãy kiểm tra cấu hình Supabase.'}`;
-          return;
+        renderDiscipleProfileTools();
+        renderSectComments();
+        if (sectCommentState.rows.length) void loadSectComments(false);
+        if (status) {
+          status.textContent = `✨ Đã trang bị ${frame.name}.`;
+          status.classList.add('is-success');
         }
-        const { data, error: readError } = await supabaseClient.from('disciples').select('*')
-          .eq('user_id', authenticatedUser.id).maybeSingle();
-        if (readError) throw readError;
-        if (!data) throw new Error('Không tìm thấy hồ sơ môn đồ sau khi trang bị khung viền.');
-        state.disciple = data;
-        refreshDiscipleshipUI();
+      } catch (error) {
+        console.error('Không thể trang bị khung viền:', error);
+        if (status) {
+          status.textContent = `Không thể trang bị ${frame.name}: ${error.message || 'Lỗi Supabase.'}`;
+          status.classList.add('is-error');
+        }
+        button.disabled = false;
+        button.textContent = 'Thử lại';
       }
     });
   }
 
   function initSectMessages() {
     if (document.getElementById('sect-chat-widget')) return;
-    const widget = document.createElement('aside');
+    const widget = document.createElement('div');
     widget.id = 'sect-chat-widget';
-    widget.className = 'sect-chat-widget';
-    widget.innerHTML = '<section id="sect-chat-panel" class="sect-chat-panel" aria-label="Mật Thất Truyền Âm" hidden><header class="sect-chat-header"><div><strong>🕯️ Mật Thất Truyền Âm</strong><span id="sect-chat-subtitle">Trò chuyện riêng với Tông Chủ</span></div><button type="button" id="sect-chat-close" aria-label="Đóng">✕</button></header><div id="sect-chat-admin-layout" class="sect-chat-admin-layout" hidden><aside id="sect-chat-conversations" class="sect-chat-conversations"></aside><div class="sect-chat-room"><div class="sect-chat-room-header"><button type="button" id="sect-chat-back-list" class="sect-chat-back-list">← Danh sách</button><strong id="sect-chat-room-title">Hội thoại</strong></div><div id="sect-chat-messages" class="sect-chat-messages" aria-live="polite"></div><form id="sect-chat-form" class="sect-chat-form"><textarea id="sect-chat-input" rows="2" maxlength="1200" placeholder="Nhập lời truyền âm..." required></textarea><button type="submit" class="admin-primary-button">Gửi</button></form></div></div><div id="sect-chat-member-layout" class="sect-chat-member-layout"><div id="sect-chat-member-messages" class="sect-chat-messages" aria-live="polite"></div><form id="sect-chat-member-form" class="sect-chat-form"><textarea id="sect-chat-member-input" rows="2" maxlength="1200" placeholder="Gửi lời nhắn riêng tới Tông Chủ..." required></textarea><button type="submit" class="admin-primary-button">Gửi</button></form></div><p id="sect-chat-status" class="sect-chat-status" role="status" aria-live="polite"></p></section>';
+    widget.className = 'sect-chat-overlay';
+    widget.hidden = true;
+    widget.innerHTML = `
+      <section id="sect-chat-panel" class="sect-chat-panel" role="dialog" aria-modal="true"
+        aria-labelledby="sect-chat-dialog-title" aria-label="Mật Thất Truyền Âm">
+        <header class="sect-chat-header">
+          <img id="sect-chat-owner-avatar" class="sect-chat-owner-avatar" alt="Ảnh Tông Chủ">
+          <div>
+            <strong id="sect-chat-dialog-title">Tông Chủ</strong>
+            <span id="sect-chat-subtitle">Mật Thất Truyền Âm · Trò chuyện riêng</span>
+          </div>
+          <button type="button" id="sect-chat-close" aria-label="Đóng Truyền Âm">✕ Đóng</button>
+        </header>
+        <div id="sect-chat-admin-layout" class="sect-chat-admin-layout" hidden>
+          <aside id="sect-chat-conversations" class="sect-chat-conversations"></aside>
+          <div class="sect-chat-room">
+            <div class="sect-chat-room-header">
+              <button type="button" id="sect-chat-back-list" class="sect-chat-back-list">← Danh sách</button>
+              <strong id="sect-chat-room-title">Hội thoại</strong>
+            </div>
+            <div id="sect-chat-messages" class="sect-chat-messages" aria-live="polite"></div>
+            <form id="sect-chat-form" class="sect-chat-form">
+              <textarea id="sect-chat-input" rows="2" maxlength="1200" placeholder="Nhập lời truyền âm..." required></textarea>
+              <button type="submit" class="admin-primary-button">Gửi</button>
+            </form>
+          </div>
+        </div>
+        <div id="sect-chat-member-layout" class="sect-chat-member-layout">
+          <div id="sect-chat-member-messages" class="sect-chat-messages" aria-live="polite"></div>
+          <form id="sect-chat-member-form" class="sect-chat-form">
+            <textarea id="sect-chat-member-input" rows="2" maxlength="1200" placeholder="Gửi lời nhắn riêng tới Tông Chủ..." required></textarea>
+            <button type="submit" class="admin-primary-button">Gửi</button>
+          </form>
+        </div>
+        <p id="sect-chat-status" class="sect-chat-status" role="status" aria-live="polite"></p>
+      </section>`;
     const cluster = document.createElement('div');
     cluster.id = 'floating-controls-cluster';
     cluster.className = 'floating-controls-cluster';
@@ -2469,22 +3500,34 @@
     if (musicPlayer) cluster.append(musicPlayer);
     document.body.appendChild(widget);
     document.body.appendChild(cluster);
-    const panel = document.getElementById('sect-chat-panel');
+    if (musicPlayer) initDraggableMusicControl(musicPlayer, cluster);
+    const overlay = widget;
+    const openSectChat = async () => {
+      overlay.hidden = false;
+      document.getElementById('sect-chat-admin-layout').classList.remove('is-chatting');
+      await loadSectOwnerProfile();
+      await loadSectMessages();
+    };
     document.getElementById('nav-sect-chat-link')?.addEventListener('click', () => {
       if (!authenticatedUser) {
         openCommunityAuthGate('trò chuyện riêng trong Mật Thất Truyền Âm');
         return;
       }
-      panel.hidden = false;
-      document.getElementById('sect-chat-admin-layout').classList.remove('is-chatting');
-      void loadSectMessages();
+      void openSectChat();
     });
-    document.getElementById('sect-chat-close').addEventListener('click', () => {
-      panel.hidden = true;
+    const closeSectChat = () => {
+      overlay.hidden = true;
       document.getElementById('sect-chat-admin-layout').classList.remove('is-chatting');
+    };
+    document.getElementById('sect-chat-close').addEventListener('click', closeSectChat);
+    overlay.addEventListener('click', event => {
+      if (event.target === overlay) closeSectChat();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !overlay.hidden) closeSectChat();
     });
     document.getElementById('admin-open-sect-messages')?.addEventListener('click', () => {
-      panel.hidden = false;
+      overlay.hidden = false;
       document.getElementById('sect-chat-admin-layout').classList.remove('is-chatting');
       void loadSectMessages();
     });
@@ -2537,6 +3580,8 @@
     if (adminLayout) adminLayout.hidden = !isAdminUser();
     if (memberLayout) memberLayout.hidden = isAdminUser();
     if (!authenticatedUser || !supabaseClient || !supabaseClient.channel) {
+      const overlay = document.getElementById('sect-chat-widget');
+      if (overlay) overlay.hidden = true;
       sectChatState.messages = [];
       sectChatState.conversations = [];
       sectChatState.selectedUserId = '';
@@ -2550,7 +3595,7 @@
     if (!isAdminUser()) config.filter = `user_id=eq.${authenticatedUser.id}`;
     sectMessagesChannel = supabaseClient.channel(`sect-messages:${authenticatedUser.id}`)
       .on('postgres_changes', config, () => {
-        if (!document.getElementById('sect-chat-panel').hidden || isAdminUser()) void loadSectMessages();
+        if (!document.getElementById('sect-chat-widget').hidden || isAdminUser()) void loadSectMessages();
         else void refreshSectUnread();
       })
       .subscribe(status => {
@@ -2618,7 +3663,7 @@
               key,
               user_id: userId,
               user_email: userEmail,
-              full_name: String(member && (member.username || member.full_name) ||
+              full_name: String(member && (member.full_name || member.username) ||
                 message.full_name || message.user_name || userEmail || 'Đạo Hữu'),
               avatar_url: String(member && member.avatar_url || message.user_avatar || ''),
               unread: 0,
@@ -2700,17 +3745,44 @@
   }
 
   function getChatFallbackAvatarUrl() {
-    if (!chatFallbackAvatarUrl) chatFallbackAvatarUrl = makeXianxiaAvatar(0).src;
+    if (!chatFallbackAvatarUrl) chatFallbackAvatarUrl = resolveAvatarUrl('');
     return chatFallbackAvatarUrl;
   }
 
+  async function loadSectOwnerProfile() {
+    if (!supabaseClient) return null;
+    try {
+      const { data, error } = await supabaseClient.from('sect_public_disciples')
+        .select('user_id,full_name,avatar_url,active_frame,is_owner')
+        .eq('is_owner', true)
+        .maybeSingle();
+      if (error) throw error;
+      sectOwnerProfile = data
+        ? { ...data, avatar_url: resolveAvatarUrl(data.avatar_url) }
+        : { avatar_url: resolveAvatarUrl(''), active_frame: 'jade' };
+      if (isAdminUser() && authenticatedUser &&
+          String(sectOwnerProfile.user_id || '') === String(authenticatedUser.id)) {
+        setCurrentUserProfile({
+          ...state.disciple,
+          ...sectOwnerProfile,
+          avatar_frame: String(sectOwnerProfile.avatar_frame || sectOwnerProfile.active_frame || 'jade')
+        }, true);
+        renderHeaderAccountButton(authenticatedUser);
+      }
+    } catch (error) {
+      console.warn('Không thể tải ảnh đại diện Tông Chủ mới nhất:', error);
+      sectOwnerProfile = {
+        ...(sectOwnerProfile || {}),
+        avatar_url: resolveAvatarUrl(sectOwnerProfile && sectOwnerProfile.avatar_url),
+        active_frame: String(sectOwnerProfile && sectOwnerProfile.active_frame || 'jade')
+      };
+    }
+    renderSectChatMessages();
+    return sectOwnerProfile;
+  }
+
   function setChatAvatarSource(image, source) {
-    const fallback = getChatFallbackAvatarUrl();
-    image.onerror = () => {
-      image.onerror = null;
-      image.src = fallback;
-    };
-    image.src = isDisplayableAvatar(source) ? String(source) : fallback;
+    setAvatarImageSource(image, isDisplayableAvatar(source) ? String(source) : getChatFallbackAvatarUrl());
   }
 
   function renderSectChatConversations() {
@@ -2755,6 +3827,20 @@
   function renderSectChatMessages() {
     const membersById = new Map((state.adminDisciples || [])
       .map(profile => [String(profile.user_id), profile]));
+    const ownerMessage = sectChatState.messages.find(message =>
+      ['owner', 'admin', 'tong_chu'].includes(message.sender_role));
+    const ownerAvatar = document.getElementById('sect-chat-owner-avatar');
+    if (ownerAvatar) {
+      setChatAvatarSource(ownerAvatar, isAdminUser()
+        ? getCurrentDiscipleAvatar()
+        : sectOwnerProfile && sectOwnerProfile.avatar_url || ownerMessage && ownerMessage.user_avatar);
+    }
+    const ownerTitle = document.getElementById('sect-chat-dialog-title');
+    if (ownerTitle) {
+      ownerTitle.textContent = isAdminUser()
+        ? getCurrentDiscipleName()
+        : String(ownerMessage && (ownerMessage.user_name || ownerMessage.full_name) || 'Tông Chủ');
+    }
     const containers = [
       document.getElementById('sect-chat-messages'),
       document.getElementById('sect-chat-member-messages'),
@@ -2765,7 +3851,8 @@
       sectChatState.messages.forEach(message => {
         const item = document.createElement('article');
         const isOwnerMessage = ['owner', 'admin', 'tong_chu'].includes(message.sender_role);
-        item.className = `sect-chat-message${isOwnerMessage ? ' is-owner' : ''}`;
+        const isMine = isAdminUser() ? isOwnerMessage : message.sender_role === 'disciple';
+        item.className = `sect-chat-message${isMine ? ' is-mine' : ''}${isOwnerMessage ? ' is-owner' : ''}`;
         const avatar = document.createElement('img');
         avatar.className = 'sect-chat-avatar';
         avatar.alt = '';
@@ -2774,7 +3861,7 @@
         avatar.decoding = 'async';
         const member = isAdminUser() ? membersById.get(String(message.user_id)) : null;
         const avatarUrl = isOwnerMessage
-          ? (isAdminUser() ? state.disciple && state.disciple.avatar_url : '')
+          ? (isAdminUser() ? getCurrentDiscipleAvatar() : sectOwnerProfile && sectOwnerProfile.avatar_url)
           : (isAdminUser() ? member && member.avatar_url : state.disciple && state.disciple.avatar_url);
         setChatAvatarSource(avatar, avatarUrl);
         const body = document.createElement('div');
@@ -2782,7 +3869,11 @@
         const text = document.createElement('p');
         text.textContent = String(message.content || '');
         const meta = document.createElement('small');
-        meta.textContent = `${isOwnerMessage ? 'Tông Chủ' : String(message.full_name || 'Đạo Hữu')} · ${message.created_at ? new Date(message.created_at).toLocaleString('vi-VN') : ''}`;
+        const senderName = isOwnerMessage
+          ? (isAdminUser() ? getCurrentDiscipleName() : String(ownerMessage &&
+            (ownerMessage.user_name || ownerMessage.full_name) || 'Tông Chủ'))
+          : (isMine ? getCurrentDiscipleName() : String(message.full_name || 'Đạo Hữu'));
+        meta.textContent = `${senderName} · ${message.created_at ? new Date(message.created_at).toLocaleString('vi-VN') : ''}`;
         body.append(meta, text);
         if (isAdminUser()) {
           const remove = document.createElement('button');
@@ -2828,18 +3919,17 @@
     try {
       const isOwner = isAdminUser();
       const senderName = isOwner
-        ? 'Tông Chủ'
-        : String(state.disciple && (state.disciple.username || state.disciple.full_name) ||
+        ? getCurrentDiscipleName()
+        : String(state.disciple && (state.disciple.full_name || state.disciple.username) ||
           getMemberFullName(authenticatedUser));
-      const senderAvatar = String(state.disciple && state.disciple.avatar_url ||
-        getMemberAvatar(authenticatedUser) || '');
+      const senderAvatar = getCurrentDiscipleAvatar(authenticatedUser);
       const createdAt = new Date().toISOString();
       const payload = {
         user_id: isOwner ? selected.user_id : authenticatedUser.id,
         user_email: isOwner ? selected.user_email : String(authenticatedUser.email || ''),
         user_name: senderName,
         full_name: isOwner
-          ? 'Tông Chủ'
+          ? senderName
           : String(state.disciple && state.disciple.full_name || getMemberFullName(authenticatedUser)),
         user_avatar: senderAvatar,
         sender_role: isOwner ? 'tong_chu' : 'disciple',
@@ -2884,6 +3974,9 @@
     });
     document.getElementById('sect-comment-load-more').addEventListener('click', () => {
       void loadSectComments(true);
+    });
+    document.getElementById('sect-comment-collapse').addEventListener('click', () => {
+      collapseSectComments();
     });
     document.getElementById('sect-comment-cancel-reply').addEventListener('click', () => {
       sectCommentState.replyTo = null;
@@ -2947,11 +4040,12 @@
     });
   }
 
-  function setSectCommentStatus(message, isError = false) {
+  function setSectCommentStatus(message, isError = false, isSuccess = false) {
     const status = document.getElementById('sect-comment-status');
     if (!status) return;
     status.textContent = message;
     status.classList.toggle('is-error', isError);
+    status.classList.toggle('is-success', isSuccess && !isError);
   }
 
   function updateSectCommentReplyLabel() {
@@ -2972,30 +4066,40 @@
       sectCommentState.reloadPending = true;
       return;
     }
+    const pageSize = append ? 5 : Math.max(3, sectCommentState.visibleRoots);
     if (!append) {
       sectCommentState.offset = 0;
       sectCommentState.rows = [];
     }
     sectCommentState.loading = true;
+    const loadMoreButton = document.getElementById('sect-comment-load-more');
+    const collapseButton = document.getElementById('sect-comment-collapse');
+    if (loadMoreButton) loadMoreButton.disabled = true;
+    if (collapseButton) collapseButton.disabled = true;
     setSectCommentStatus('Đang tải lời đàm đạo…');
     try {
+      const identityColumn = ',user_id';
       let query = supabaseClient.from('sect_comments')
-        .select('id,parent_id,user_name,user_avatar,sect_title,active_frame,content,is_pinned,rewarded_stones,created_at')
+        .select(`id,parent_id,user_name,user_avatar,sect_title,active_frame,content,is_pinned,rewarded_stones,created_at${identityColumn}`, { count: 'exact' })
         .is('parent_id', null)
         .order('is_pinned', { ascending: false })
         .order('created_at', { ascending: false })
-        .range(sectCommentState.offset, sectCommentState.offset + 9);
-      const { data: roots, error } = await query;
+        .range(sectCommentState.offset, sectCommentState.offset + pageSize - 1);
+      const { data: roots, count, error } = await query;
       if (error) throw error;
       const rootRows = roots || [];
-      sectCommentState.hasMore = rootRows.length === 10;
       sectCommentState.offset += rootRows.length;
+      sectCommentState.visibleRoots = sectCommentState.offset;
+      sectCommentState.totalRoots = Number.isFinite(count)
+        ? count
+        : sectCommentState.offset;
+      sectCommentState.hasMore = sectCommentState.offset < sectCommentState.totalRoots;
       const rootIds = rootRows.map(item => item.id);
       let replies = [];
       if (rootIds.length) {
         for (let offset = 0; ; offset += 1000) {
           const { data, error: replyError } = await supabaseClient.from('sect_comments')
-            .select('id,parent_id,user_name,user_avatar,sect_title,active_frame,content,is_pinned,rewarded_stones,created_at')
+            .select(`id,parent_id,user_name,user_avatar,sect_title,active_frame,content,is_pinned,rewarded_stones,created_at${identityColumn}`)
             .in('parent_id', rootIds).order('is_pinned', { ascending: false })
             .order('created_at', { ascending: true }).range(offset, offset + 999);
           if (replyError) throw replyError;
@@ -3005,22 +4109,105 @@
         }
       }
       const incoming = [...rootRows, ...replies];
+      const userIds = Array.from(new Set(incoming
+        .map(comment => String(comment.user_id || ''))
+        .filter(Boolean)));
+      const profilesByUserId = new Map();
+      if (userIds.length) {
+        const { data: profiles, error: profileError } = await supabaseClient
+          .from('sect_public_disciples')
+          .select('user_id,full_name,avatar_url,sect_title,active_frame,avatar_frame,role,tu_vi,cultivation_points,is_owner')
+          .in('user_id', userIds);
+        if (profileError) throw profileError;
+        (profiles || []).forEach(profile => profilesByUserId.set(String(profile.user_id), profile));
+      }
+      if (authenticatedUser && state.disciple &&
+          String(state.disciple.user_id || '') === String(authenticatedUser.id)) {
+        const currentUserId = String(authenticatedUser.id);
+        const savedProfile = profilesByUserId.get(currentUserId) || {};
+        const hasCurrentCultivation = state.cultivation.userId === currentUserId &&
+          Boolean(state.cultivation.profile);
+        const currentTuVi = hasCurrentCultivation
+          ? Number(state.cultivation.tuVi) || 0
+          : Number(savedProfile.tu_vi ?? savedProfile.cultivation_points) || 0;
+        profilesByUserId.set(String(authenticatedUser.id), {
+          ...savedProfile,
+          user_id: authenticatedUser.id,
+          full_name: getCurrentDiscipleName(),
+          avatar_url: String(state.disciple.avatar_url || getCachedDiscipleAvatar(authenticatedUser.id) || ''),
+          sect_title: String(state.disciple.sect_title || 'Đạo Hữu'),
+          active_frame: String(state.disciple.avatar_frame || state.disciple.active_frame || 'jade'),
+          avatar_frame: String(state.disciple.avatar_frame || state.disciple.active_frame || 'jade'),
+          role: isAdminUser() ? 'admin' : 'disciple',
+          is_owner: isAdminUser(),
+          tu_vi: currentTuVi,
+          cultivation_points: currentTuVi
+        });
+      }
+      incoming.forEach(comment => {
+        const profile = profilesByUserId.get(String(comment.user_id || ''));
+        if (!profile) return;
+        if (profile.avatar_url) comment.user_avatar = String(profile.avatar_url);
+        if (profile.full_name) comment.user_name = String(profile.full_name);
+        if (profile.sect_title) comment.sect_title = String(profile.sect_title);
+        if (profile.active_frame || profile.avatar_frame) {
+          comment.active_frame = String(profile.avatar_frame || profile.active_frame);
+          comment.avatar_frame = comment.active_frame;
+        }
+        comment.role = String(profile.role || (profile.is_owner ? 'admin' : 'disciple'));
+        comment.is_owner = Boolean(profile.is_owner || comment.role === 'admin');
+        comment.tu_vi = Number(profile.tu_vi ?? profile.cultivation_points) || 0;
+        comment.cultivation_points = comment.tu_vi;
+      });
       const byId = new Map(sectCommentState.rows.map(item => [String(item.id), item]));
       incoming.forEach(item => byId.set(String(item.id), item));
       sectCommentState.rows = Array.from(byId.values());
       renderSectComments(append);
-      document.getElementById('sect-comment-load-more').hidden = !sectCommentState.hasMore;
+      renderSectCommentPagination();
       setSectCommentStatus('');
     } catch (error) {
       setSectCommentStatus(`Không thể tải Đàm Đạo Các: ${error.message || 'Hãy kiểm tra bảng sect_comments và quyền đọc.'}`, true);
       console.error('Không thể tải Đàm Đạo Các:', error);
     } finally {
       sectCommentState.loading = false;
+      if (loadMoreButton) loadMoreButton.disabled = false;
+      if (collapseButton) collapseButton.disabled = false;
       if (sectCommentState.reloadPending) {
         sectCommentState.reloadPending = false;
         window.setTimeout(() => { void loadSectComments(false); }, 0);
       }
     }
+  }
+
+  function renderSectCommentPagination() {
+    const loadMoreButton = document.getElementById('sect-comment-load-more');
+    const collapseButton = document.getElementById('sect-comment-collapse');
+    const visibleRoots = sectCommentState.rows.filter(item => !item.parent_id).length;
+    const remaining = Math.max(0, sectCommentState.totalRoots - visibleRoots);
+    if (loadMoreButton) {
+      loadMoreButton.hidden = sectCommentState.totalRoots <= 3 || remaining === 0;
+      loadMoreButton.textContent = `⬇️ Xem thêm bình luận (còn ${remaining} bình luận)`;
+    }
+    if (collapseButton) {
+      collapseButton.hidden = sectCommentState.totalRoots <= 3 || visibleRoots <= 3;
+    }
+  }
+
+  function collapseSectComments() {
+    const roots = sectCommentState.rows.filter(item => !item.parent_id).slice(0, 3);
+    const rootIds = new Set(roots.map(item => String(item.id)));
+    sectCommentState.rows = sectCommentState.rows.filter(item =>
+      rootIds.has(String(item.id)) || rootIds.has(String(item.parent_id)));
+    sectCommentState.offset = roots.length;
+    sectCommentState.visibleRoots = roots.length;
+    sectCommentState.hasMore = sectCommentState.offset < sectCommentState.totalRoots;
+    sectCommentState.expandedRoots.forEach(rootId => {
+      if (!rootIds.has(rootId)) sectCommentState.expandedRoots.delete(rootId);
+    });
+    renderSectComments(false);
+    renderSectCommentPagination();
+    document.getElementById('sect-discussion')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   function renderSectComments(append) {
@@ -3073,12 +4260,11 @@
     const card = document.createElement('article');
     card.className = `sect-comment-card${isReply ? ' is-reply' : ''}${comment.is_pinned ? ' is-pinned' : ''}`;
     const avatar = document.createElement('img');
-    avatar.className = `sect-comment-avatar ${frameClass(comment.active_frame)}`;
+    avatar.className = `sect-comment-avatar ${frameClass(comment.avatar_frame || comment.active_frame)}`;
     avatar.alt = '';
     avatar.loading = 'lazy';
     avatar.decoding = 'async';
-    avatar.src = String(comment.user_avatar || makeXianxiaAvatar(0).src);
-    avatar.addEventListener('error', () => { avatar.src = makeXianxiaAvatar(0).src; }, { once: true });
+    setAvatarImageSource(avatar, comment.user_avatar);
     const body = document.createElement('div');
     body.className = 'sect-comment-body';
     const header = document.createElement('header');
@@ -3087,9 +4273,11 @@
     header.appendChild(name);
     const role = document.createElement('span');
     role.className = 'sect-comment-title';
-    role.textContent = String(comment.sect_title || 'Đạo Hữu');
+    const isOwner = Boolean(comment.is_owner || comment.role === 'admin' || comment.sect_title === 'Tông Chủ');
+    role.textContent = isOwner ? '' : formatSectCommentCultivation(comment);
+    role.hidden = isOwner;
     header.appendChild(role);
-    if (comment.sect_title === 'Tông Chủ') {
+    if (isOwner) {
       const badge = document.createElement('b');
       badge.className = 'sect-owner-badge';
       badge.textContent = '👑 Tông Chủ';
@@ -3098,7 +4286,7 @@
     if (Number(comment.rewarded_stones) > 0) {
       const reward = document.createElement('b');
       reward.className = 'sect-reward-badge';
-      reward.textContent = `💎 Được Tông Chủ ban thưởng +${Number(comment.rewarded_stones)} Linh Thạch`;
+      reward.innerHTML = `${getSpiritStoneIconSVG(14)} Được Tông Chủ ban thưởng +${Number(comment.rewarded_stones)} Linh Thạch`;
       header.appendChild(reward);
     }
     const text = document.createElement('p');
@@ -3109,13 +4297,24 @@
     actions.className = 'sect-comment-actions';
     addSectCommentAction(actions, 'reply', comment, '↩ Phản hồi');
     if (isAdminUser()) {
-      addSectCommentAction(actions, 'reward', comment, '💎 Tặng Linh Thạch');
+      if (comment.sect_title !== 'Tông Chủ') {
+        addSectCommentAction(actions, 'reward', comment, 'Tặng Linh Thạch');
+      }
       addSectCommentAction(actions, 'pin', comment, comment.is_pinned ? '📌 Bỏ ghim' : '📌 Ghim');
       addSectCommentAction(actions, 'delete', comment, '🗑️ Xóa');
     }
     body.append(header, text, meta, actions);
     card.append(avatar, body);
     return card;
+  }
+
+  function formatSectCommentCultivation(comment) {
+    const points = Math.max(0, Number(comment && (comment.cultivation_points ?? comment.tu_vi)) || 0);
+    const rank = getCultivationRank(points).name
+      .replace(' Nhập Môn', '')
+      .replace(' Kỳ', '')
+      .replace(' Đại Năng', '');
+    return `${rank} · ${points}`;
   }
 
   function addSectCommentAction(container, action, comment, label, amount) {
@@ -3125,7 +4324,8 @@
     button.dataset.sectAction = action;
     button.dataset.commentId = String(comment.id);
     if (amount) button.dataset.amount = String(amount);
-    button.textContent = label;
+    if (action === 'reward') button.innerHTML = `${getSpiritStoneIconSVG(14)} ${label}`;
+    else button.textContent = label;
     container.appendChild(button);
   }
 
@@ -3152,7 +4352,7 @@
         : '';
       const { error } = await supabaseClient.from('sect_comments').insert({
         user_email: String(authenticatedUser.email || ''),
-        user_name: String(state.disciple.username || state.disciple.full_name || getMemberFullName(authenticatedUser)),
+        user_name: String(state.disciple.full_name || state.disciple.username || getMemberFullName(authenticatedUser)),
         user_avatar: String(state.disciple.avatar_url || ''),
         sect_title: String(state.disciple.sect_title || 'Ngoại Môn Đệ Tử'),
         active_frame: String(state.disciple.active_frame || 'jade'),
@@ -3198,23 +4398,27 @@
   }
 
   async function rewardSectComment(comment) {
-    const enteredAmount = window.prompt('Nhập số lượng Linh Thạch muốn ban tặng:', '10');
-    if (enteredAmount === null) return;
-    const amount = Number(enteredAmount.trim());
-    if (!Number.isSafeInteger(amount) || amount < 1 || amount > 1000000) {
-      setSectCommentStatus('Số Linh Thạch phải là số nguyên từ 1 đến 1.000.000.', true);
+    const commentId = String(comment && comment.id || '');
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(commentId)) {
+      setSectCommentStatus('Không thể tặng Linh Thạch: mã bình luận không phải UUID hợp lệ.', true);
       return;
     }
     try {
       const { error } = await supabaseClient.rpc('admin_reward_sect_comment', {
-        p_comment_id: comment.id,
-        p_amount: amount
+        p_amount: 10,
+        p_comment_id: commentId
       });
       if (error) throw error;
-      setSectCommentStatus(`💎 Đã ban thưởng +${amount} Linh Thạch.`);
+      const currentComment = sectCommentState.rows.find(row => String(row.id) === commentId);
+      if (currentComment) {
+        currentComment.rewarded_stones = Math.max(0, Number(currentComment.rewarded_stones) || 0) + 10;
+        renderSectComments(false);
+      }
+      const successMessage = '✨ Đã ban thưởng +10 Linh Thạch cho đạo hữu!';
+      setSectCommentStatus(successMessage, false, true);
+      showAdminToast(successMessage);
       document.getElementById('sect-comment-list')?.classList.add('is-rewarded');
       window.setTimeout(() => document.getElementById('sect-comment-list')?.classList.remove('is-rewarded'), 1100);
-      await loadSectComments(false);
     } catch (error) {
       setSectCommentStatus(`Không thể tặng Linh Thạch: ${error.message || 'Cần cấu hình RPC admin_reward_sect_comment trong Supabase.'}`, true);
     }
@@ -3243,7 +4447,7 @@
         : anonymousName,
       email: '',
       avatar_url: user
-        ? String(state.disciple && state.disciple.avatar_url || getMemberAvatar(user))
+        ? getCurrentDiscipleAvatar(user)
         : '',
       sect_title: user
         ? String(state.disciple && state.disciple.sect_title || 'Ngoại Môn Đệ Tử')
@@ -3344,6 +4548,7 @@
     const modal = document.getElementById('auth-modal');
     if (!modal) return;
     modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
@@ -3387,6 +4592,249 @@
     window.requestAnimationFrame(() => visibleForm.classList.add('auth-form-enter'));
   }
 
+  function getCurrentDiscipleName() {
+    return String(state.disciple &&
+      (state.disciple.full_name || state.disciple.username) ||
+      getUserDisplayName(authenticatedUser)).trim();
+  }
+
+  function initDiscipleNameEditor() {
+    const headerButton = document.getElementById('btn-header-auth');
+    if (headerButton && !headerButton.dataset.profileOpenBound) {
+      headerButton.dataset.profileOpenBound = 'true';
+      headerButton.addEventListener('click', () => {
+        if (!authenticatedUser) {
+          openAuthModal();
+          const title = document.getElementById('auth-modal-title');
+          if (title) title.textContent = 'Cổng Đạo Hữu';
+          return;
+        }
+        openUserProfileModal();
+      });
+    }
+    const brand = document.querySelector('.nav-brand');
+    if (brand && !brand.dataset.profileOpenBound) {
+      brand.dataset.profileOpenBound = 'true';
+      brand.addEventListener('click', event => {
+        if (!authenticatedUser) return;
+        event.preventDefault();
+        openUserProfileModal();
+      });
+    }
+
+    const adminForm = document.getElementById('admin-owner-name-form');
+    if (adminForm && !adminForm.dataset.initialized) {
+      adminForm.dataset.initialized = 'true';
+      adminForm.addEventListener('submit', event => {
+        event.preventDefault();
+        const input = document.getElementById('admin-owner-name-input');
+        void saveDiscipleName(input.value, document.getElementById('admin-owner-name-status'),
+          adminForm.querySelector('button[type="submit"]'));
+      });
+    }
+  }
+
+  function isMissingDiscipleNameRpc(error) {
+    return Boolean(error && (
+      error.code === 'PGRST202' || error.code === '42883' ||
+      /could not find the function|function .* does not exist|schema cache/i.test(String(error.message || ''))
+    ));
+  }
+
+  function getDiscipleNameError(error) {
+    const message = String(error && error.message || '');
+    if (/duplicate|unique|already exists|đã được sử dụng|trùng/i.test(message) ||
+        error && error.code === '23505') {
+      return 'Đạo hiệu này đã được sử dụng. Vui lòng chọn tên khác.';
+    }
+    return message || 'Lỗi kết nối Supabase.';
+  }
+
+  function showDiscipleNameToast(message, isWarning = false) {
+    let toast = document.getElementById('disciple-name-toast');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.id = 'disciple-name-toast';
+      toast.className = 'disciple-name-toast';
+      toast.setAttribute('role', 'status');
+      toast.setAttribute('aria-live', 'polite');
+      document.body.appendChild(toast);
+    }
+    toast.textContent = message;
+    toast.classList.toggle('is-warning', isWarning);
+    toast.classList.add('is-visible');
+    if (discipleNameToastTimer) window.clearTimeout(discipleNameToastTimer);
+    discipleNameToastTimer = window.setTimeout(() => {
+      toast.classList.remove('is-visible');
+    }, 4200);
+  }
+
+  async function saveDiscipleName(value, status, submitButton) {
+    const newName = String(value || '').trim();
+    const length = Array.from(newName).length;
+    if (length < 2 || length > 24) {
+      if (status) {
+        status.textContent = 'Đạo hiệu phải có từ 2 đến 24 ký tự.';
+        status.classList.add('is-error');
+        status.classList.remove('is-success');
+      }
+      return;
+    }
+    if (!authenticatedUser || !state.discipleStatusReady || !supabaseClient) {
+      if (status) {
+        status.textContent = 'Vui lòng đăng nhập và chờ hồ sơ môn đồ đồng bộ trước khi đổi Đạo Hiệu.';
+        status.classList.add('is-error');
+        status.classList.remove('is-success');
+      }
+      return;
+    }
+    if (submitButton) submitButton.disabled = true;
+    if (status) {
+      status.textContent = 'Đang lưu Đạo Hiệu…';
+      status.classList.remove('is-error');
+      status.classList.remove('is-success');
+    }
+    try {
+      let rpcError = null;
+      if (typeof supabaseClient.rpc === 'function') {
+        const result = await supabaseClient.rpc('update_disciple_name', { p_new_name: newName });
+        rpcError = result.error;
+      }
+      if (rpcError && !isMissingDiscipleNameRpc(rpcError)) throw rpcError;
+      if (rpcError || typeof supabaseClient.rpc !== 'function') {
+        const { data, error: discipleError } = await supabaseClient.from('disciples')
+          .update({ username: newName, full_name: newName })
+          .eq('user_id', authenticatedUser.id).select('*').maybeSingle();
+        if (discipleError) throw discipleError;
+        if (!data) throw new Error('Không tìm thấy hồ sơ môn đồ để cập nhật.');
+      }
+
+      let authSyncError = null;
+      try {
+        const { data: authData, error: authError } = await supabaseClient.auth.updateUser({
+          data: { username: newName, full_name: newName }
+        });
+        if (authError) throw authError;
+        if (authData && authData.user) {
+          authenticatedUser = { ...authenticatedUser, ...authData.user };
+        } else {
+          authenticatedUser = {
+            ...authenticatedUser,
+            user_metadata: {
+              ...(authenticatedUser.user_metadata || {}),
+              username: newName,
+              full_name: newName
+            }
+          };
+        }
+      } catch (error) {
+        authSyncError = error;
+        console.error('Không thể đồng bộ Đạo Hiệu vào phiên đăng nhập:', error);
+      }
+
+      setCurrentUserProfile({ ...(state.disciple || {}), username: newName, full_name: newName }, true);
+      const ownerNameInput = document.getElementById('admin-owner-name-input');
+      if (ownerNameInput && isAdminUser()) ownerNameInput.value = newName;
+      state.adminDisciples = (state.adminDisciples || []).map(member =>
+        String(member.user_id) === String(authenticatedUser.id)
+          ? { ...member, username: newName, full_name: newName }
+          : member);
+      sectChatState.conversations.forEach(conversation => {
+        if (String(conversation.user_id) === String(authenticatedUser.id)) {
+          conversation.full_name = newName;
+        }
+      });
+      sectChatState.messages.forEach(message => {
+        if (String(message.user_id) === String(authenticatedUser.id)) message.full_name = newName;
+      });
+      sectCommentState.rows.forEach(comment => {
+        if (String(comment.user_id || '') === String(authenticatedUser.id)) comment.user_name = newName;
+        (comment.replies || []).forEach(reply => {
+          if (String(reply.user_id || '') === String(authenticatedUser.id)) reply.user_name = newName;
+        });
+      });
+      renderHeaderAccountButton(authenticatedUser);
+      renderSectChatConversations();
+      renderSectChatMessages();
+      renderSectComments();
+      if (isAdminUser()) renderAdminDisciples();
+      if (sectCommentState.rows.length) void loadSectComments(false);
+      if (status) {
+        status.textContent = authSyncError
+          ? `Đạo Hiệu đã đổi; chưa đồng bộ được phiên đăng nhập: ${authSyncError.message || 'lỗi kết nối.'}`
+          : `✨ Đã đổi Đạo Hiệu thành ${newName}!`;
+        status.classList.toggle('is-error', Boolean(authSyncError));
+        status.classList.toggle('is-success', !authSyncError);
+      }
+      showDiscipleNameToast(
+        authSyncError
+          ? `Đạo Hiệu đã đổi; phiên đăng nhập chưa đồng bộ: ${authSyncError.message || 'lỗi kết nối.'}`
+          : `✨ Đã đổi Đạo Hiệu thành ${newName}!`,
+        Boolean(authSyncError)
+      );
+      closeUserProfileModal();
+    } catch (error) {
+      const message = `Không thể đổi Đạo Hiệu: ${getDiscipleNameError(error)}`;
+      if (status) {
+        status.textContent = message;
+        status.classList.add('is-error');
+        status.classList.remove('is-success');
+      }
+      console.error(message, error);
+    } finally {
+      if (submitButton) submitButton.disabled = false;
+    }
+  }
+
+  function renderHeaderAccountButton(user) {
+    const headerButton = document.getElementById('btn-header-auth');
+    if (!headerButton) return;
+    const brand = document.querySelector('.nav-brand');
+    const brandLogo = brand && brand.querySelector('.brand-logo-img');
+    if (brand && brandLogo) {
+      if (!brandLogo.dataset.defaultSrc) {
+        brandLogo.dataset.defaultSrc = brandLogo.getAttribute('src') || 'images/2026/IMG_4295_Original.JPG';
+      }
+      brand.href = user ? 'tongmon.html' : 'index.html';
+      brand.title = user ? 'Mở Hồ Sơ Cá Nhân để đổi ảnh đại diện hoặc pháp bảo' : 'Đại Điện Thiên Mệnh Chi Thành';
+      brandLogo.classList.toggle('is-account-avatar', Boolean(user));
+      DISCIPLE_FRAMES.forEach(frame => brandLogo.classList.remove(`frame-${frame.id}`));
+      if (user) {
+        setAvatarImageSource(brandLogo, getCurrentDiscipleAvatar(user));
+        brandLogo.classList.add(frameClass(state.disciple && (state.disciple.avatar_frame || state.disciple.active_frame)));
+        brandLogo.alt = `Ảnh đại diện ${getMemberFullName(user)}`;
+      } else {
+        brandLogo.onerror = null;
+        brandLogo.src = brandLogo.dataset.defaultSrc;
+        brandLogo.alt = 'Hải Thành';
+      }
+    }
+    const email = String(user && user.email || '');
+    const admin = isAdminUser(user);
+    const displayName = user ? getUserDisplayName(user) : '';
+    const label = !user
+      ? '◈ Đăng nhập'
+      : admin
+        ? `◈ Tông Chủ · ${displayName || 'Admin'}`
+        : `◈ ${displayName || email.split('@')[0] || 'Đạo Hữu'}`;
+    headerButton.replaceChildren();
+    const text = document.createElement('span');
+    text.textContent = label;
+    headerButton.appendChild(text);
+    if (user) {
+      const editIcon = document.createElement('span');
+      editIcon.className = 'nav-account-edit-icon';
+      editIcon.setAttribute('aria-hidden', 'true');
+      editIcon.textContent = '✏️';
+      headerButton.appendChild(editIcon);
+    }
+    headerButton.title = user ? `${email} · Bấm để mở Hồ Sơ Cá Nhân` : 'Đăng nhập hoặc đăng ký';
+    headerButton.setAttribute('aria-controls', user ? 'userProfileModal' : 'auth-modal');
+    headerButton.classList.toggle('is-admin', admin);
+    headerButton.classList.toggle('is-member', Boolean(user) && !admin);
+    renderHeaderSpiritStones(user, headerButton);
+  }
+
   function renderAuthState(user) {
     const headerButton = document.getElementById('btn-header-auth');
     const cultivationBadge = document.getElementById('nav-cultivation-badge');
@@ -3401,18 +4849,8 @@
     const email = String(user && user.email || '');
     const admin = isAdminUser(user);
     const displayName = user ? getUserDisplayName(user) : '';
-    const headerLabel = !user
-      ? '◈ Đăng nhập'
-      : admin
-        ? '◈ Admin'
-        : `◈ ${displayName || email.split('@')[0] || 'Đạo Hữu'}`;
 
-    if (headerButton) {
-      headerButton.textContent = headerLabel;
-      headerButton.title = user ? email : 'Đăng nhập hoặc đăng ký';
-      headerButton.classList.toggle('is-admin', admin);
-      headerButton.classList.toggle('is-member', Boolean(user) && !admin);
-    }
+    renderHeaderAccountButton(user);
     if (cultivationBadge) cultivationBadge.classList.toggle('is-visible', Boolean(user));
 
     if (!tabs || !loginForm || !signupForm || !accountPanel) return;
@@ -3474,6 +4912,7 @@
       discipleRealtimeChannel = null;
     }
     if (!authenticatedUser || previousUserId !== String(authenticatedUser.id)) {
+      currentUserProfile = null;
       state.disciple = null;
       state.discipleStatusReady = false;
       discipleSyncUserId = '';
@@ -5036,25 +6475,18 @@
 
   function initAuthPortal() {
     const modal = document.getElementById('auth-modal');
-    const headerButton = document.getElementById('btn-header-auth');
     const loginForm = document.getElementById('auth-login-form');
     const signupForm = document.getElementById('auth-signup-form');
     if (!modal || !loginForm || !signupForm) return;
 
     renderAuthState(authenticatedUser);
+    initDiscipleNameEditor();
     const oauthError = new URLSearchParams(window.location.search).get('error_description');
     if (oauthError) {
       const providerDisabled = /provider.*(not enabled|disabled)|unsupported provider|google.*provider/i.test(oauthError);
       setAdminStatus(providerDisabled
         ? 'Đăng nhập Google chưa được bật trong cấu hình Supabase. Tông Chủ cần bật Google Provider và khai báo URL chuyển hướng của trang.'
         : `Đăng nhập Google thất bại: ${oauthError}`, true);
-    }
-    if (headerButton) {
-      headerButton.addEventListener('click', () => {
-        openAuthModal();
-        const title = document.getElementById('auth-modal-title');
-        if (title) title.textContent = 'Cổng Đạo Hữu';
-      });
     }
     const cultivationBadge = document.getElementById('nav-cultivation-badge');
     if (cultivationBadge) {
@@ -5185,6 +6617,8 @@
       const submitButton = signupForm.querySelector('button[type="submit"]');
       if (submitButton) submitButton.disabled = true;
       setAdminStatus('Đang lập danh tính Đạo Hữu…');
+      let reservationDeviceId = '';
+      let signupCompleted = false;
       try {
         const { data: available, error: usernameRpcError } = await supabaseClient.rpc(
           'is_disciple_username_available', { p_username: username }
@@ -5211,45 +6645,34 @@
             starting_spirit_stones: 20
           }
         };
+        const ipCheck = await checkAndRegisterIp({ email }, true);
+        reservationDeviceId = ipCheck.deviceId || '';
+        if (!ipCheck.allowed) {
+          throw new Error(ipCheck.reason || 'IP hoặc thiết bị này đã được liên kết với tài khoản khác.');
+        }
         const { data, error } = await supabaseClient.auth.signUp({ email, password, options });
         if (error) throw error;
+        signupCompleted = true;
         signupForm.reset();
         if (data.session && data.session.user) {
-          await syncDiscipleForUser(data.session.user);
           setAuthenticatedUser(data.session.user);
+          reservationDeviceId = '';
           setAdminStatus('Đăng ký thành công.');
         } else {
+          reservationDeviceId = '';
           document.getElementById('auth-login-email').value = email;
           setAuthMode('login');
           setAdminStatus('Đăng ký thành công. Vui lòng xác nhận email để hoàn tất rồi đăng nhập.');
         }
       } catch (error) {
+        if (reservationDeviceId && !signupCompleted) {
+          await releaseIpReservation(reservationDeviceId);
+        }
         setAdminStatus(authErrorMessage(error, 'signup'), true);
       } finally {
         if (submitButton) submitButton.disabled = false;
       }
     });
-
-    const signOutButton = document.getElementById('auth-sign-out');
-    if (signOutButton) {
-      signOutButton.addEventListener('click', async () => {
-        if (!supabaseClient) return;
-        signOutButton.disabled = true;
-        try {
-          const { error } = await supabaseClient.auth.signOut();
-          if (error) throw error;
-          setAuthenticatedUser(null);
-          activeAuthMode = 'login';
-          renderAuthState(null);
-          setAuthMode('login');
-          setAdminStatus('Đã đăng xuất.');
-        } catch (error) {
-          setAdminStatus(`Không thể đăng xuất: ${error.message || 'Lỗi kết nối.'}`, true);
-        } finally {
-          signOutButton.disabled = false;
-        }
-      });
-    }
 
     if (supabaseClient) {
       supabaseClient.auth.onAuthStateChange((_event, session) => {
@@ -8060,6 +9483,15 @@
     }
   }
 
+  function renderGameScoreBadge() {
+    const badge = document.getElementById('game-score-badge');
+    if (!badge) return;
+    const lives = state.game.mode === 'death' ? state.game.lives : '∞';
+    badge.textContent =
+      `Điểm ${state.game.score} • Combo ${state.game.combo} 🔥 • Mạng ${lives} ❤️`;
+    badge.classList.toggle('is-hot-combo', state.game.combo >= 2);
+  }
+
   function startNewGame() {
     if (!authenticatedUser) { openFeatureAuthSeal('game'); return; }
     if (!hasDiscipleFeatureAccess()) return;
@@ -8150,8 +9582,7 @@
     state.game.timeLeft = 15;
 
     document.getElementById('game-q-counter').textContent = `Câu ${index + 1} / ${questions.length}`;
-    document.getElementById('game-score-badge').textContent =
-      `Điểm: ${state.game.score} | Combo: ${state.game.combo}🔥`;
+    renderGameScoreBadge();
     const progressPct = ((index + 1) / questions.length) * 100;
     document.getElementById('game-progress-fill').style.width = `${progressPct}%`;
     renderGameTimer();
@@ -8169,6 +9600,13 @@
     const imgEl = document.getElementById('game-current-img');
     imgEl.src = currentQ.imageUrl;
     imgEl.alt = 'Bức ảnh bí ẩn cần đoán năm';
+    const photoWrap = imgEl.closest('.game-photo-wrap');
+    if (photoWrap) {
+      photoWrap.classList.remove('is-question-transition');
+      void photoWrap.offsetWidth;
+      photoWrap.classList.add('is-question-transition');
+      window.setTimeout(() => photoWrap.classList.remove('is-question-transition'), 520);
+    }
 
     const yearInput = document.getElementById('game-year-input');
     const submitBtn = document.getElementById('game-year-submit');
@@ -8254,6 +9692,7 @@
     const statusText = document.getElementById('reveal-status-text');
     const revealHeader = revealCard.querySelector('.reveal-header');
     const revealHint = document.getElementById('reveal-hint');
+    const gameDialog = document.querySelector('.year-guess-dialog');
 
     const correctLines = [
       'Đỉnh nóc kịch trần! Trí nhớ siêu việt như ổ cứng SSD NVMe!',
@@ -8322,7 +9761,11 @@
         revealHint.hidden = true;
         revealHint.textContent = '';
       }
-      const gameDialog = document.querySelector('.year-guess-dialog');
+      if (gameDialog) {
+        gameDialog.classList.remove('is-correct-burst');
+        window.requestAnimationFrame(() => gameDialog.classList.add('is-correct-burst'));
+        window.setTimeout(() => gameDialog.classList.remove('is-correct-burst'), 850);
+      }
       if (gameDialog && state.game.combo >= 2) {
         gameDialog.classList.remove('is-combo-lightning');
         window.requestAnimationFrame(() => gameDialog.classList.add('is-combo-lightning'));
@@ -8332,6 +9775,11 @@
       state.game.streak = 0;
       state.game.combo = 0;
       if (state.game.mode === 'death') state.game.lives = Math.max(0, state.game.lives - 1);
+      if (gameDialog) {
+        gameDialog.classList.remove('is-answer-wrong');
+        window.requestAnimationFrame(() => gameDialog.classList.add('is-answer-wrong'));
+        window.setTimeout(() => gameDialog.classList.remove('is-answer-wrong'), 520);
+      }
       revealCard.classList.add('is-wrong');
       let line;
       do { line = wrongLines[Math.floor(Math.random() * wrongLines.length)]; } while (line === state.game.lastWrongLine);
@@ -8348,8 +9796,7 @@
       }
     }
     renderGameTimer();
-    document.getElementById('game-score-badge').textContent =
-      `Điểm: ${state.game.score} | Combo: ${state.game.combo}🔥`;
+    renderGameScoreBadge();
 
     // Populate Reveal Memory Details
     document.getElementById('reveal-memory-title').textContent = question.title;
@@ -8615,7 +10062,7 @@
           username: String(state.disciple && state.disciple.username ||
             authenticatedUser.email && authenticatedUser.email.split('@')[0] || ''),
           full_name: getMemberFullName(authenticatedUser),
-          avatar_url: getMemberAvatar(authenticatedUser),
+          avatar_url: getCurrentDiscipleAvatar(authenticatedUser),
           sect_title: String(state.disciple.sect_title || 'Ngoại Môn Đệ Tử'),
           spirit_stones: 20,
           is_banned: false,
@@ -8626,9 +10073,9 @@
         }, { onConflict: 'user_id' }).select('*').maybeSingle();
         if (insertError) throw insertError;
         if (!inserted) throw new Error('Không thể tải hồ sơ môn đồ sau khi lưu thành tích.');
-        state.disciple = inserted;
+        setCurrentUserProfile(inserted, true);
       } else {
-        state.disciple = saved;
+        setCurrentUserProfile(saved, true);
       }
 
       let legacySynced = true;
@@ -9704,25 +11151,9 @@
 
     updateBgMusicUI();
 
-    // Nút Bật/Tắt nhạc nền nổi
     const toggleBtn = document.getElementById('bg-music-toggle-btn');
-    if (toggleBtn) {
-      toggleBtn.addEventListener('click', toggleBgMusic);
-    }
-
     const playerWidget = document.getElementById('floating-bg-player');
     const collapseBtn = document.getElementById('bg-music-collapse-btn');
-    if (toggleBtn && playerWidget) {
-      toggleBtn.addEventListener('click', event => {
-        if (window.matchMedia && window.matchMedia('(max-width: 767px)').matches &&
-            !playerWidget.classList.contains('is-expanded')) {
-          event.stopImmediatePropagation();
-          playerWidget.classList.add('is-expanded');
-          toggleBtn.setAttribute('aria-expanded', 'true');
-          updateBgMusicUI();
-        }
-      }, true);
-    }
     if (collapseBtn && playerWidget && toggleBtn) {
       collapseBtn.addEventListener('click', () => {
         playerWidget.classList.remove('is-expanded');
@@ -9952,8 +11383,6 @@
     const globalAudioToggle = document.getElementById('global-audio-toggle');
 
     const isActive = !state.bgMusic.isUserMuted;
-    const isMobile = Boolean(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
-    const isExpanded = Boolean(playerWidget && playerWidget.classList.contains('is-expanded'));
 
     if (isActive && !state.currentAudio) {
       if (playerWidget) playerWidget.classList.add('playing');
@@ -9964,16 +11393,16 @@
     }
     if (diskIcon) diskIcon.textContent = '🎵';
     if (toggleBtn) {
-      toggleBtn.title = isMobile && !isExpanded
-        ? 'Mở trình phát nhạc'
-        : isActive ? 'Tạm dừng nhạc nền' : 'Bật nhạc nền tổng';
+      toggleBtn.title = 'Mở bảng điều khiển Âm Luật';
       toggleBtn.setAttribute('aria-label', toggleBtn.title);
-      toggleBtn.setAttribute('aria-expanded', String(isMobile && isExpanded));
+      const miniPanel = document.getElementById('mini-bg-music-control');
+      toggleBtn.setAttribute('aria-expanded', String(Boolean(miniPanel && !miniPanel.hidden)));
     }
     if (globalAudioToggle) {
       globalAudioToggle.title = isActive ? 'Tạm dừng Nhạc Dưỡng Thần' : 'Bật Nhạc Dưỡng Thần';
       globalAudioToggle.setAttribute('aria-label', 'Nhạc Dưỡng Thần');
     }
+    updateMiniMusicControlUI();
   }
 
   // ========================================================
